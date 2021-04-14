@@ -279,7 +279,7 @@ fn main() -> anyhow::Result<()> {
 
                     let wgpu_corrected = Vec2::new(
                         (screen_space_pos.x + 1.0) / 2.0,
-                        (1.0 - screen_space_pos.y) / 2.0
+                        (1.0 - screen_space_pos.y) / 2.0,
                     );
 
                     wgpu_corrected
@@ -296,7 +296,7 @@ fn main() -> anyhow::Result<()> {
                         decay: 1.0,
                         exposure: 1.0,
                         num_samples: 100,
-                        uv_space_light_pos
+                        uv_space_light_pos,
                     }),
                 );
                 render_pass.draw(0..3, 0..1);
@@ -376,30 +376,50 @@ impl Resizables {
                 DEPTH_FORMAT,
                 wgpu::TextureUsage::RENDER_ATTACHMENT,
             ),
-            first_bloom_blur_pass: make_effect_bind_group(&device, &resources, &bloom_buffer, "first bloom blur pass bind group"),
+            first_bloom_blur_pass: make_effect_bind_group(
+                &device,
+                &resources,
+                &bloom_buffer,
+                "first bloom blur pass bind group",
+            ),
             bloom_buffer,
-            second_bloom_blur_pass: make_effect_bind_group(&device, &resources, &intermediate_bloom_buffer, "second bloom blur pass bind group"),
+            second_bloom_blur_pass: make_effect_bind_group(
+                &device,
+                &resources,
+                &intermediate_bloom_buffer,
+                "second bloom blur pass bind group",
+            ),
             intermediate_bloom_buffer,
-            godray_bind_group: make_effect_bind_group(&device, &resources, &godray_buffer, "godray blur bind group"),
+            godray_bind_group: make_effect_bind_group(
+                &device,
+                &resources,
+                &godray_buffer,
+                "godray blur bind group",
+            ),
             godray_buffer,
         }
     }
 }
 
-fn make_effect_bind_group(device: &wgpu::Device, resources: &Resources, source: &wgpu::TextureView, label: &str) -> wgpu::BindGroup {
+fn make_effect_bind_group(
+    device: &wgpu::Device,
+    resources: &Resources,
+    source: &wgpu::TextureView,
+    label: &str,
+) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some(label),
         layout: &resources.effect_bgl,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&resources.linear_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(source),
-                },
-            ],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Sampler(&resources.linear_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(source),
+            },
+        ],
     })
 }
 
@@ -628,7 +648,7 @@ impl Pipelines {
         let ignore_colour_state = wgpu::ColorTargetState {
             format: display_format,
             write_mask: wgpu::ColorWrite::empty(),
-            blend: None
+            blend: None,
         };
 
         Self {
@@ -655,7 +675,11 @@ impl Pipelines {
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_ship,
                         entry_point: "main",
-                        targets: &[display_format.into(), display_format.into(), ignore_colour_state],
+                        targets: &[
+                            display_format.into(),
+                            display_format.into(),
+                            ignore_colour_state,
+                        ],
                     }),
                     primitive: backface_culling.clone(),
                     depth_stencil: Some(depth_write.clone()),
@@ -698,7 +722,11 @@ impl Pipelines {
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_background,
                         entry_point: "main",
-                        targets: &[display_format.into(), display_format.into(), display_format.into()],
+                        targets: &[
+                            display_format.into(),
+                            display_format.into(),
+                            display_format.into(),
+                        ],
                     }),
                     primitive: clamp_depth.clone(),
                     depth_stencil: Some(depth_read.clone()),
@@ -751,8 +779,10 @@ impl Pipelines {
 
                 let fs_godray_blur = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                     label: Some("fs godray blur"),
-                    source: wgpu::util::make_spirv(include_bytes!("../shaders/compiled/godray_blur.frag.spv")),
-                    flags: wgpu::ShaderFlags::empty()
+                    source: wgpu::util::make_spirv(include_bytes!(
+                        "../shaders/compiled/godray_blur.frag.spv"
+                    )),
+                    flags: wgpu::ShaderFlags::empty(),
                 });
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -772,7 +802,7 @@ impl Pipelines {
                     depth_stencil: None,
                     multisample: wgpu::MultisampleState::default(),
                 })
-            }
+            },
         }
     }
 }

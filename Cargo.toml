@@ -26,8 +26,5 @@ env_logger = "0.8.3"
 opt-level = 3
 
 [patch."https://github.com/gfx-rs/wgpu"]
-wgpu-core = { path = "../wgpu/wgpu-core" }
-wgpu-types = { path = "../wgpu/wgpu-types" }
-
-[patch."https://github.com/gfx-rs/naga"]
-naga = { path = "../naga" }
+wgpu-core = { git = "https://github.com/expenses/wgpu", branch = "texture-size-query-flags" }
+wgpu-types = { git = "https://github.com/expenses/wgpu", branch = "texture-size-query-flags" }

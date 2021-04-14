@@ -134,7 +134,11 @@ pub fn create_stars(rng: &mut ThreadRng) -> impl Iterator<Item = BackgroundVerte
     })
 }
 
-pub fn star_points(unit_pos: Vec3, scale: f32, colour: Vec3) -> impl Iterator<Item = BackgroundVertex> {
+pub fn star_points(
+    unit_pos: Vec3,
+    scale: f32,
+    colour: Vec3,
+) -> impl Iterator<Item = BackgroundVertex> {
     let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), unit_pos);
 
     let mut points = [

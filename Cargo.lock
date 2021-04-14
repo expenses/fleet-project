@@ -1220,6 +1220,7 @@ dependencies = [
 [[package]]
 name = "naga"
 version = "0.3.1"
+source = "git+https://github.com/gfx-rs/naga?tag=gfx-21#98252cf5d29790f85cc4397e0cf7a5b6cfaac614"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -1867,9 +1868,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94341e4e44e24f6b591b59e47a8a027df12e008d73fd5672dbea9cc22f4507d9"
+checksum = "8270314b5ccceb518e7e578952f0b72b88222d02e8f77f5ecf7abbb673539041"
 dependencies = [
  "bitflags",
 ]
@@ -2374,6 +2375,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.7.0"
+source = "git+https://github.com/expenses/wgpu?branch=texture-size-query-flags#b653e862ca9a490dd903c0d1a4636a24df932244"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -2402,6 +2404,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.7.0"
+source = "git+https://github.com/expenses/wgpu?branch=texture-size-query-flags#b653e862ca9a490dd903c0d1a4636a24df932244"
 dependencies = [
  "bitflags",
 ]
