@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
     sun_dir.y = sun_dir.y.abs();
 
     let stars = background::create_stars(&mut rng)
-        .chain(background::star_points(sun_dir, 50.0, Vec3::broadcast(2.0)))
+        .chain(background::star_points(sun_dir, 250.0, Vec3::broadcast(2.0)))
         .collect::<Vec<_>>();
     let num_stars = stars.len() as u32;
     let star_vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -292,9 +292,8 @@ fn main() -> anyhow::Result<()> {
                     0,
                     bytemuck::bytes_of(&GodraySettings {
                         density: 1.0,
+                        decay: 0.98,
                         weight: 0.01,
-                        decay: 1.0,
-                        exposure: 1.0,
                         num_samples: 100,
                         uv_space_light_pos,
                     }),
@@ -500,11 +499,10 @@ pub struct BlurSettings {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GodraySettings {
     density: f32,
-    weight: f32,
     decay: f32,
-    exposure: f32,
-    uv_space_light_pos: Vec2,
+    weight: f32,
     num_samples: u32,
+    uv_space_light_pos: Vec2,
 }
 
 struct Resources {

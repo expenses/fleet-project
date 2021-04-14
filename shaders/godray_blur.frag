@@ -9,11 +9,10 @@ layout (location = 0) out vec4 colour;
 
 layout(push_constant) uniform GodraySettings {
     float density;
-    float weight;
     float decay;
-    float exposure;
-    vec2 uv_space_light_pos;
+    float weight;
     uint num_samples;
+    vec2 uv_space_light_pos;
 };
 
 // Adapted from https://github.com/Erkaman/glsl-godrays/blob/master/index.glsl
@@ -30,12 +29,12 @@ void main() {
 	for(uint i = 0; i < num_samples; i += 1){
 		sample_uv -= delta_uv;
 		vec3 contribution = textureLod(sampler2D(u_texture, u_sampler), sample_uv, 0).rgb
-            * illumination_decay * weight;
+            * illumination_decay;
 		output_colour += contribution;
 		illumination_decay *= decay;
 	}
 
-	output_colour *= exposure;
+	output_colour *= weight;
 
     colour = vec4(output_colour, 1.0);
 }
