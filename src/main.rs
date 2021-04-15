@@ -4,6 +4,11 @@ use winit::event::*;
 use winit::event_loop::*;
 
 mod background;
+mod utils;
+mod gpu_structs;
+
+use utils::{Orbit, PerspectiveView};
+use gpu_structs::*;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -32,7 +37,7 @@ fn main() -> anyhow::Result<()> {
             label: Some("device"),
             features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::DEPTH_CLAMPING,
             limits: wgpu::Limits {
-                max_push_constant_size: std::mem::size_of::<PushConstants>() as u32,
+                max_push_constant_size: std::mem::size_of::<GridPushConstants>() as u32,
                 ..Default::default()
             },
         },
@@ -78,11 +83,7 @@ fn main() -> anyhow::Result<()> {
         contents: bytemuck::cast_slice(&ship_instances),
     });
 
-    let mut orbit = Orbit {
-        latitude: 0.0,
-        longitude: 1.0,
-        distance: 10.0,
-    };
+    let mut orbit = Orbit::new();
 
     let perspective = ultraviolet::projection::perspective_wgpu_dx(
         59.0_f32.to_radians(),
@@ -475,89 +476,6 @@ fn make_effect_bind_group(
             },
         ],
     })
-}
-
-struct PerspectiveView {
-    perspective: Mat4,
-    view: Mat4,
-    view_without_movement: Mat4,
-    perspective_view: Mat4,
-    perspective_view_without_movement: Mat4,
-}
-
-impl PerspectiveView {
-    fn new(perspective: Mat4, eye: Vec3, center: Vec3) -> Self {
-        let view = Mat4::look_at(eye + center, center, Vec3::unit_y());
-        let view_without_movement = Mat4::look_at(Vec3::zero(), -eye, Vec3::unit_y());
-
-        Self {
-            view,
-            view_without_movement,
-            perspective,
-            perspective_view: perspective * view,
-            perspective_view_without_movement: perspective * view_without_movement,
-        }
-    }
-
-    fn set_perspective(&mut self, perspective: Mat4) {
-        self.perspective = perspective;
-        self.perspective_view = self.perspective * self.view;
-        self.perspective_view_without_movement = self.perspective * self.view_without_movement;
-    }
-
-    fn set_view(&mut self, eye: Vec3, center: Vec3) {
-        self.view = Mat4::look_at(eye + center, center, Vec3::unit_y());
-        self.perspective_view = self.perspective * self.view;
-        self.view_without_movement = Mat4::look_at(Vec3::zero(), -eye, Vec3::unit_y());
-        self.perspective_view_without_movement = self.perspective * self.view_without_movement;
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct PushConstants {
-    perspective_view: Mat4,
-    light_dir: Vec3,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Instance {
-    rotation: Mat3,
-    translation: Vec3,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct ModelVertex {
-    position: Vec3,
-    normal: Vec3,
-    uv: Vec2,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct BackgroundVertex {
-    position: Vec3,
-    colour: Vec3,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct BlurSettings {
-    scale: f32,
-    strength: f32,
-    direction: i32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GodraySettings {
-    density_div_num_samples: f32,
-    decay: f32,
-    weight: f32,
-    num_samples: u32,
-    uv_space_light_pos: Vec2,
 }
 
 struct Resources {
@@ -1095,33 +1013,4 @@ fn load_image(
             &*image,
         )
         .create_view(&wgpu::TextureViewDescriptor::default()))
-}
-
-pub struct Orbit {
-    pub longitude: f32,
-    pub latitude: f32,
-    distance: f32,
-}
-
-impl Orbit {
-    pub fn rotate(&mut self, delta: Vec2) {
-        use std::f32::consts::PI;
-        let speed = 0.15;
-        self.latitude -= delta.x.to_radians() * speed;
-        self.longitude = (self.longitude - delta.y.to_radians() * speed)
-            .max(std::f32::EPSILON)
-            .min(PI - std::f32::EPSILON);
-    }
-
-    pub fn zoom(&mut self, delta: f32) {
-        self.distance = (self.distance + delta * 0.5).max(1.0).min(10.0);
-    }
-
-    fn as_vector(&self) -> Vec3 {
-        let y = self.longitude.cos();
-        let horizontal_amount = self.longitude.sin();
-        let x = horizontal_amount * self.latitude.sin();
-        let z = horizontal_amount * self.latitude.cos();
-        Vec3::new(x, y, z) * self.distance
-    }
 }
