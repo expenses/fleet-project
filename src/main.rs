@@ -1,4 +1,4 @@
-use ultraviolet::{Isometry3, Mat3, Mat4, Vec2, Vec3, Vec4};
+use ultraviolet::{Isometry3, Mat3, Mat4, Rotor3, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::event::*;
 use winit::event_loop::*;
@@ -54,13 +54,28 @@ fn main() -> anyhow::Result<()> {
         &resources,
     )?;
 
+    let ship_transforms = [
+        Isometry3::new(
+            Vec3::new(0.1, 2.3, 0.2),
+            Rotor3::from_rotation_xz(66.0_f32.to_radians()),
+        ),
+        Isometry3::identity(),
+    ];
+
+    let ship_instances = ship_transforms
+        .iter()
+        .map(|transform| Instance {
+            rotation: transform.rotation.into_matrix(),
+            translation: transform.translation,
+        })
+        .collect::<Vec<_>>();
+
+    let num_instances = ship_instances.len() as u32;
+
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         usage: wgpu::BufferUsage::VERTEX,
-        contents: bytemuck::bytes_of(&Instance {
-            rotation: Mat3::identity(),
-            translation: Vec3::zero(),
-        }),
+        contents: bytemuck::cast_slice(&ship_instances),
     });
 
     let mut orbit = Orbit {
@@ -109,12 +124,12 @@ fn main() -> anyhow::Result<()> {
         usage: wgpu::BufferUsage::VERTEX,
     });
 
-    let line_vertices = bounding_box_lines(
-        carrier.bounding_box_line_points,
-        Vec3::unit_x(),
-        Isometry3::identity(),
-    )
-    .collect::<Vec<_>>();
+    let line_vertices = ship_transforms
+        .iter()
+        .flat_map(|transform| {
+            bounding_box_lines(carrier.bounding_box_line_points, Vec3::unit_x(), *transform)
+        })
+        .collect::<Vec<_>>();
     let num_line_vertices = line_vertices.len() as u32;
 
     let line_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -228,7 +243,7 @@ fn main() -> anyhow::Result<()> {
                         light_dir: sun_dir,
                     }),
                 );
-                render_pass.draw_indexed(0..carrier.num_indices, 0, 0..1);
+                render_pass.draw_indexed(0..carrier.num_indices, 0, 0..num_instances);
 
                 render_pass.set_pipeline(&pipelines.background);
                 render_pass.set_vertex_buffer(0, background_vertices.slice(..));
