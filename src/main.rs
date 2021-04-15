@@ -291,7 +291,7 @@ fn main() -> anyhow::Result<()> {
                     wgpu::ShaderStage::FRAGMENT,
                     0,
                     bytemuck::bytes_of(&GodraySettings {
-                        density: 1.0,
+                        density_div_num_samples: 1.0 / 100.0,
                         decay: 0.98,
                         weight: 0.01,
                         num_samples: 100,
@@ -498,7 +498,7 @@ pub struct BlurSettings {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GodraySettings {
-    density: f32,
+    density_div_num_samples: f32,
     decay: f32,
     weight: f32,
     num_samples: u32,

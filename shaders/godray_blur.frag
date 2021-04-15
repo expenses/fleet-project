@@ -8,7 +8,7 @@ layout(set = 0, binding = 1) uniform texture2D u_texture;
 layout (location = 0) out vec4 colour;
 
 layout(push_constant) uniform GodraySettings {
-    float density;
+    float density_div_num_samples;
     float decay;
     float weight;
     uint num_samples;
@@ -19,8 +19,7 @@ layout(push_constant) uniform GodraySettings {
 void main() {
     vec3 output_colour = vec3(0.0);
 
-	vec2 delta_uv = vec2(uv - uv_space_light_pos)
-        * (1.0 /  float(num_samples)) * density;
+	vec2 delta_uv = (uv - uv_space_light_pos) * density_div_num_samples;
 
 	float illumination_decay = 1.0;
 
