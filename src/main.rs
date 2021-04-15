@@ -1,4 +1,4 @@
-use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
+use ultraviolet::{Isometry3, Mat3, Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::event::*;
 use winit::event_loop::*;
@@ -96,12 +96,30 @@ fn main() -> anyhow::Result<()> {
     sun_dir.y = sun_dir.y.abs();
 
     let stars = background::create_stars(&mut rng)
-        .chain(background::star_points(sun_dir, 250.0, Vec3::broadcast(2.0)))
+        .chain(background::star_points(
+            sun_dir,
+            250.0,
+            Vec3::broadcast(2.0),
+        ))
         .collect::<Vec<_>>();
     let num_stars = stars.len() as u32;
     let star_vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("star vertices"),
         contents: bytemuck::cast_slice(&stars),
+        usage: wgpu::BufferUsage::VERTEX,
+    });
+
+    let line_vertices = bounding_box_lines(
+        carrier.bounding_box_line_points,
+        Vec3::unit_x(),
+        Isometry3::identity(),
+    )
+    .collect::<Vec<_>>();
+    let num_line_vertices = line_vertices.len() as u32;
+
+    let line_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("line"),
+        contents: bytemuck::cast_slice(&line_vertices),
         usage: wgpu::BufferUsage::VERTEX,
     });
 
@@ -187,6 +205,15 @@ fn main() -> anyhow::Result<()> {
                         stencil_ops: None,
                     }),
                 });
+
+                render_pass.set_pipeline(&pipelines.lines);
+                render_pass.set_vertex_buffer(0, line_buffer.slice(..));
+                render_pass.set_push_constants(
+                    wgpu::ShaderStage::VERTEX,
+                    0,
+                    bytemuck::bytes_of(&perspective_view.perspective_view),
+                );
+                render_pass.draw(0..num_line_vertices, 0..1);
 
                 render_pass.set_pipeline(&pipelines.ship);
                 render_pass.set_bind_group(0, &carrier.bind_group, &[]);
@@ -306,6 +333,19 @@ fn main() -> anyhow::Result<()> {
             }
         }
         _ => {}
+    })
+}
+
+fn bounding_box_lines(
+    mut points: [Vec3; 24],
+    colour: Vec3,
+    transform: Isometry3,
+) -> impl Iterator<Item = BackgroundVertex> {
+    transform.rotation.rotate_vecs(&mut points);
+
+    std::array::IntoIter::new(points).map(move |point| BackgroundVertex {
+        position: point + transform.translation,
+        colour,
     })
 }
 
@@ -570,6 +610,7 @@ struct Pipelines {
     background: wgpu::RenderPipeline,
     blur: wgpu::RenderPipeline,
     godray_blur: wgpu::RenderPipeline,
+    lines: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -630,6 +671,10 @@ impl Pipelines {
             "../shaders/compiled/fullscreen_tri.vert.spv"
         ));
 
+        let vs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
+            "../shaders/compiled/flat_colour.vert.spv"
+        ));
+
         let additive_colour_state = wgpu::ColorTargetState {
             format: display_format,
             write_mask: wgpu::ColorWrite::ALL,
@@ -647,6 +692,22 @@ impl Pipelines {
             format: display_format,
             write_mask: wgpu::ColorWrite::empty(),
             blend: None,
+        };
+
+        let perspective_view_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("perspective view pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[wgpu::PushConstantRange {
+                    stages: wgpu::ShaderStage::VERTEX,
+                    range: 0..std::mem::size_of::<Mat4>() as u32,
+                }],
+            });
+
+        let background_vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<BackgroundVertex>() as u64,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
         };
 
         Self {
@@ -676,7 +737,7 @@ impl Pipelines {
                         targets: &[
                             display_format.into(),
                             display_format.into(),
-                            ignore_colour_state,
+                            ignore_colour_state.clone(),
                         ],
                     }),
                     primitive: backface_culling.clone(),
@@ -685,37 +746,17 @@ impl Pipelines {
                 })
             },
             background: {
-                let background_vertex_buffer_layout = wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<BackgroundVertex>() as u64,
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
-                };
-
-                let background_pipeline_layout =
-                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("background pipeline layout"),
-                        bind_group_layouts: &[],
-                        push_constant_ranges: &[wgpu::PushConstantRange {
-                            stages: wgpu::ShaderStage::VERTEX,
-                            range: 0..std::mem::size_of::<Mat4>() as u32,
-                        }],
-                    });
-
-                let vs_background = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/background.vert.spv"
-                ));
-
                 let fs_background = device.create_shader_module(&wgpu::include_spirv!(
                     "../shaders/compiled/background.frag.spv"
                 ));
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("background pipeline"),
-                    layout: Some(&background_pipeline_layout),
+                    layout: Some(&perspective_view_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &vs_background,
+                        module: &vs_flat_colour,
                         entry_point: "main",
-                        buffers: &[background_vertex_buffer_layout],
+                        buffers: &[background_vertex_buffer_layout.clone()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_background,
@@ -801,6 +842,36 @@ impl Pipelines {
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
+            lines: {
+                let fs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/flat_colour.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("lines pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_flat_colour,
+                        entry_point: "main",
+                        buffers: &[background_vertex_buffer_layout],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[
+                            display_format.into(),
+                            ignore_colour_state.clone(),
+                            ignore_colour_state.clone(),
+                        ],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
         }
     }
 }
@@ -835,6 +906,7 @@ struct Model {
     indices: wgpu::Buffer,
     num_indices: u32,
     bind_group: wgpu::BindGroup,
+    bounding_box_line_points: [Vec3; 24],
 }
 
 fn load_ship_model(
@@ -886,6 +958,13 @@ fn load_ship_model(
         }
     }
 
+    let mut bounding_boxes = gltf
+        .meshes()
+        .flat_map(|mesh| mesh.primitives())
+        .map(|primitive| primitive.bounding_box());
+    assert_eq!(bounding_boxes.clone().count(), 1);
+    let bounding_box = bounding_boxes.next().unwrap();
+
     let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         usage: wgpu::BufferUsage::VERTEX,
@@ -935,6 +1014,28 @@ fn load_ship_model(
         indices,
         num_indices,
         bind_group,
+        bounding_box_line_points: {
+            let min: Vec3 = bounding_box.min.into();
+            let max: Vec3 = bounding_box.max.into();
+
+            [
+                // Zs
+                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z),
+                Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z),
+                Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z),
+                // Ys
+                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, max.y, min.z),
+                Vec3::new(min.x, min.y, max.z), Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z),
+                Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z),
+                // Xs
+                Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z),
+                Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z),
+                Vec3::new(min.x, max.y, min.z), Vec3::new(max.x, max.y, min.z),
+                Vec3::new(min.x, max.y, max.z), Vec3::new(max.x, max.y, max.z),
+            ]
+        }
     })
 }
 
