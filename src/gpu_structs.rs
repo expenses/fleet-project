@@ -8,7 +8,7 @@ pub struct PushConstants {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Instance {
     pub rotation: Mat3,
     pub translation: Vec3,
@@ -23,7 +23,7 @@ pub struct ModelVertex {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BackgroundVertex {
     pub position: Vec3,
     pub colour: Vec3,

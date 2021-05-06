@@ -5,6 +5,7 @@ use winit::event::*;
 use winit::event_loop::*;
 
 mod background;
+mod ecs;
 mod gpu_structs;
 mod utils;
 
@@ -47,8 +48,11 @@ fn main() -> anyhow::Result<()> {
 
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
-    let mut width = window_size.width;
-    let mut height = window_size.height;
+
+    let mut dimensions = ecs::Dimensions {
+        width: window_size.width,
+        height: window_size.height,
+    };
 
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
@@ -60,35 +64,11 @@ fn main() -> anyhow::Result<()> {
         &resources,
     )?;
 
-    let ship_transforms = [
-        Isometry3::new(
-            Vec3::new(0.1, 2.3, 0.2),
-            Rotor3::from_rotation_xz(66.0_f32.to_radians()),
-        ),
-        Isometry3::identity(),
-    ];
-
-    let ship_instances = ship_transforms
-        .iter()
-        .map(|transform| Instance {
-            rotation: transform.rotation.into_matrix(),
-            translation: transform.translation,
-        })
-        .collect::<Vec<_>>();
-
-    let num_instances = ship_instances.len() as u32;
-
-    let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        usage: wgpu::BufferUsage::VERTEX,
-        contents: bytemuck::cast_slice(&ship_instances),
-    });
-
     let mut orbit = Orbit::new();
 
     let perspective = ultraviolet::projection::perspective_wgpu_dx(
         59.0_f32.to_radians(),
-        width as f32 / height as f32,
+        dimensions.width as f32 / dimensions.height as f32,
         0.1,
         100.0,
     );
@@ -97,8 +77,14 @@ fn main() -> anyhow::Result<()> {
     let mut mouse_down = false;
     let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
 
-    let mut resizables =
-        Resizables::new(width, height, display_format, &device, &surface, &resources);
+    let mut resizables = Resizables::new(
+        dimensions.width,
+        dimensions.height,
+        display_format,
+        &device,
+        &surface,
+        &resources,
+    );
 
     let mut rng = rand::thread_rng();
     let background = background::make_background(&mut rng);
@@ -126,33 +112,75 @@ fn main() -> anyhow::Result<()> {
         usage: wgpu::BufferUsage::VERTEX,
     });
 
-    let line_vertices = ship_transforms
-        .iter()
-        .flat_map(|transform| {
-            bounding_box_lines(carrier.bounding_box_line_points, Vec3::unit_x(), *transform)
-        })
-        .collect::<Vec<_>>();
-    let num_line_vertices = line_vertices.len() as u32;
+    // ecs
+    let mut world = legion::world::World::default();
+    let transform_1 = ecs::ShipTransform(Isometry3::new(
+        Vec3::new(0.1, 2.3, 0.2),
+        Rotor3::from_rotation_xz(66.0_f32.to_radians()),
+    ));
+    world.push((transform_1.as_instance(), transform_1));
+    world.push((
+        ecs::ShipTransform(Isometry3::identity()),
+        Instance::default(),
+        ecs::Selected,
+    ));
 
-    let line_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("line"),
-        contents: bytemuck::cast_slice(&line_vertices),
-        usage: wgpu::BufferUsage::VERTEX,
-    });
+    let mut lr = legion::Resources::default();
+    lr.insert(ecs::GpuBuffer::<Instance>::new(
+        &device,
+        "ship instances",
+        wgpu::BufferUsage::VERTEX,
+    ));
+    lr.insert(ecs::GpuBuffer::<BackgroundVertex>::new(
+        &device,
+        "ship bounding boxes",
+        wgpu::BufferUsage::VERTEX,
+    ));
+    lr.insert(device);
+    lr.insert(ecs::Models { carrier });
+    lr.insert(dimensions);
+    lr.insert(orbit);
+    lr.insert(perspective_view);
+    lr.insert(ecs::MousePosition(Vec2::default()));
+    lr.insert(Ray::default());
+
+    let mut schedule = legion::Schedule::builder()
+        .add_system(ecs::clear_buffer_system::<Instance>())
+        .add_system(ecs::clear_buffer_system::<BackgroundVertex>())
+        .add_system(ecs::update_ship_instances_system())
+        .add_system(ecs::upload_ship_instances_system())
+        .add_system(ecs::update_ray_system())
+        .add_system(ecs::update_ship_bounding_boxes_system())
+        .add_system(ecs::update_ray_plane_point_system())
+        .add_system(ecs::upload_buffer_system::<Instance>())
+        .add_system(ecs::upload_buffer_system::<BackgroundVertex>())
+        .build();
+
+    dbg!(&schedule);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::Resized(size) => {
-                width = size.width as u32;
-                height = size.height as u32;
+                let mut dimensions = lr.get_mut::<ecs::Dimensions>().unwrap();
+                let mut perspective_view = lr.get_mut::<PerspectiveView>().unwrap();
+                let device = lr.get::<wgpu::Device>().unwrap();
 
-                resizables =
-                    Resizables::new(width, height, display_format, &device, &surface, &resources);
+                dimensions.width = size.width as u32;
+                dimensions.height = size.height as u32;
+
+                resizables = Resizables::new(
+                    dimensions.width,
+                    dimensions.height,
+                    display_format,
+                    &device,
+                    &surface,
+                    &resources,
+                );
 
                 perspective_view.set_perspective(ultraviolet::projection::perspective_wgpu_dx(
                     59.0_f32.to_radians(),
-                    width as f32 / height as f32,
+                    dimensions.width as f32 / dimensions.height as f32,
                     0.1,
                     100.0,
                 ))
@@ -171,6 +199,9 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 if mouse_down {
+                    let mut orbit = lr.get_mut::<Orbit>().unwrap();
+                    let mut perspective_view = lr.get_mut::<PerspectiveView>().unwrap();
+
                     let position = to_logical(position);
                     let previous_cursor_position = to_logical(&previous_cursor_position);
 
@@ -180,40 +211,26 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 previous_cursor_position = *position;
+
+                lr.insert(ecs::MousePosition(Vec2::new(
+                    position.x as f32,
+                    position.y as f32,
+                )));
             }
             _ => {}
         },
-        Event::MainEventsCleared => window.request_redraw(),
+        Event::MainEventsCleared => {
+            schedule.execute(&mut world, &mut lr);
+
+            window.request_redraw();
+        }
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
-                let position = Vec2::new(
-                    previous_cursor_position.x as f32,
-                    previous_cursor_position.y as f32,
-                );
-                let ray = Ray::new_from_screen(
-                    position,
-                    width,
-                    height,
-                    orbit.as_vector(),
-                    perspective_view,
-                );
-
-                let intersection_point = ray.plane_intersection(0.0).unwrap_or(Vec3::zero());
-
-                let ray_line = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("line"),
-                    contents: bytemuck::cast_slice(&[
-                        BackgroundVertex {
-                            position: intersection_point + Vec3::unit_y(),
-                            colour: Vec3::unit_x(),
-                        },
-                        BackgroundVertex {
-                            position: intersection_point,
-                            colour: Vec3::unit_y(),
-                        },
-                    ]),
-                    usage: wgpu::BufferUsage::VERTEX,
-                });
+                let device = lr.get::<wgpu::Device>().unwrap();
+                let ship_instance_buffer = lr.get::<ecs::GpuBuffer<Instance>>().unwrap();
+                let models = lr.get::<ecs::Models>().unwrap();
+                let line_buffer = lr.get::<ecs::GpuBuffer<BackgroundVertex>>().unwrap();
+                let perspective_view = lr.get::<PerspectiveView>().unwrap();
 
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("render encoder"),
@@ -257,22 +274,25 @@ fn main() -> anyhow::Result<()> {
                     }),
                 });
 
+                let (line_buffer, num_line_vertices) = line_buffer.slice();
+
                 render_pass.set_pipeline(&pipelines.lines);
-                render_pass.set_vertex_buffer(0, line_buffer.slice(..));
+                render_pass.set_vertex_buffer(0, line_buffer);
                 render_pass.set_push_constants(
                     wgpu::ShaderStage::VERTEX,
                     0,
                     bytemuck::bytes_of(&perspective_view.perspective_view),
                 );
                 render_pass.draw(0..num_line_vertices, 0..1);
-                render_pass.set_vertex_buffer(0, ray_line.slice(..));
-                render_pass.draw(0..2, 0..1);
+
+                let (instance_buffer, num_instances) = ship_instance_buffer.slice();
 
                 render_pass.set_pipeline(&pipelines.ship);
-                render_pass.set_bind_group(0, &carrier.bind_group, &[]);
-                render_pass.set_vertex_buffer(0, carrier.vertices.slice(..));
-                render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                render_pass.set_index_buffer(carrier.indices.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
+                render_pass.set_vertex_buffer(0, models.carrier.vertices.slice(..));
+                render_pass.set_vertex_buffer(1, instance_buffer);
+                render_pass
+                    .set_index_buffer(models.carrier.indices.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.set_push_constants(
                     wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                     0,
@@ -281,7 +301,7 @@ fn main() -> anyhow::Result<()> {
                         light_dir: sun_dir,
                     }),
                 );
-                render_pass.draw_indexed(0..carrier.num_indices, 0, 0..num_instances);
+                render_pass.draw_indexed(0..models.carrier.num_indices, 0, 0..num_instances);
 
                 render_pass.set_pipeline(&pipelines.background);
                 render_pass.set_vertex_buffer(0, background_vertices.slice(..));
@@ -389,8 +409,8 @@ fn main() -> anyhow::Result<()> {
     })
 }
 
-#[derive(Debug)]
-struct Ray {
+#[derive(Debug, Default)]
+pub struct Ray {
     origin: Vec3,
     direction: Vec3,
     inv_direction: Vec3,
@@ -403,7 +423,7 @@ impl Ray {
         width: u32,
         height: u32,
         origin: Vec3,
-        perspective_view: PerspectiveView,
+        perspective_view: &PerspectiveView,
     ) -> Self {
         let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
         let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
@@ -438,16 +458,16 @@ impl Ray {
 
     // https://tavianator.com/2011/ray_box.html
     fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> bool {
-        let t_mins = (min - self.origin) * self.inv_direction;
-        let t_maxs = (max - self.origin) * self.inv_direction;
+        let ts_1 = (min - self.origin) * self.inv_direction;
+        let ts_2 = (max - self.origin) * self.inv_direction;
 
-        let t_mins = t_mins.min_by_component(t_maxs);
-        let t_maxs = t_mins.max_by_component(t_maxs);
+        let t_mins = ts_1.min_by_component(ts_2);
+        let t_maxs = ts_1.max_by_component(ts_2);
 
         let t_min = t_mins.component_max();
         let t_max = t_maxs.component_min();
 
-        t_max > t_min
+        t_max >= t_min
     }
 }
 
@@ -455,13 +475,19 @@ fn bounding_box_lines(
     mut points: [Vec3; 24],
     colour: Vec3,
     transform: Isometry3,
-) -> impl Iterator<Item = BackgroundVertex> {
+) -> [BackgroundVertex; 24] {
     transform.rotation.rotate_vecs(&mut points);
 
-    std::array::IntoIter::new(points).map(move |point| BackgroundVertex {
-        position: point + transform.translation,
-        colour,
-    })
+    let mut lines = [BackgroundVertex::default(); 24];
+
+    for i in 0..24 {
+        lines[i] = BackgroundVertex {
+            position: points[i] + transform.translation,
+            colour,
+        };
+    }
+
+    lines
 }
 
 struct Resizables {
@@ -933,12 +959,14 @@ fn create_texture(
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
-struct Model {
+pub struct Model {
     vertices: wgpu::Buffer,
     indices: wgpu::Buffer,
     num_indices: u32,
     bind_group: wgpu::BindGroup,
     bounding_box_line_points: [Vec3; 24],
+    min: Vec3,
+    max: Vec3,
 }
 
 fn load_ship_model(
@@ -1041,15 +1069,17 @@ fn load_ship_model(
         ],
     });
 
+    let min: Vec3 = bounding_box.min.into();
+    let max: Vec3 = bounding_box.max.into();
+
     Ok(Model {
         vertices,
         indices,
         num_indices,
         bind_group,
+        min,
+        max,
         bounding_box_line_points: {
-            let min: Vec3 = bounding_box.min.into();
-            let max: Vec3 = bounding_box.max.into();
-
             [
                 // Zs
                 Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z),
@@ -1067,7 +1097,7 @@ fn load_ship_model(
                 Vec3::new(min.x, max.y, min.z), Vec3::new(max.x, max.y, min.z),
                 Vec3::new(min.x, max.y, max.z), Vec3::new(max.x, max.y, max.z),
             ]
-        }
+        },
     })
 }
 

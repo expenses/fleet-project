@@ -37,7 +37,7 @@ impl Orbit {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PerspectiveView {
     pub perspective: Mat4,
     pub view: Mat4,
