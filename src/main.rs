@@ -1126,22 +1126,34 @@ fn load_ship_model(
             usage: wgpu::BufferUsage::VERTEX,
             contents: bytemuck::cast_slice(&[
                 // Zs
-                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z),
-                Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z),
-                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z),
-                Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z),
+                Vec3::new(min.x, min.y, min.z),
+                Vec3::new(min.x, min.y, max.z),
+                Vec3::new(min.x, max.y, min.z),
+                Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, min.y, min.z),
+                Vec3::new(max.x, min.y, max.z),
+                Vec3::new(max.x, max.y, min.z),
+                Vec3::new(max.x, max.y, max.z),
                 // Ys
-                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, max.y, min.z),
-                Vec3::new(min.x, min.y, max.z), Vec3::new(min.x, max.y, max.z),
-                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z),
-                Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z),
+                Vec3::new(min.x, min.y, min.z),
+                Vec3::new(min.x, max.y, min.z),
+                Vec3::new(min.x, min.y, max.z),
+                Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, min.y, min.z),
+                Vec3::new(max.x, max.y, min.z),
+                Vec3::new(max.x, min.y, max.z),
+                Vec3::new(max.x, max.y, max.z),
                 // Xs
-                Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z),
-                Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z),
-                Vec3::new(min.x, max.y, min.z), Vec3::new(max.x, max.y, min.z),
-                Vec3::new(min.x, max.y, max.z), Vec3::new(max.x, max.y, max.z),
-            ]
-        },
+                Vec3::new(min.x, min.y, min.z),
+                Vec3::new(max.x, min.y, min.z),
+                Vec3::new(min.x, min.y, max.z),
+                Vec3::new(max.x, min.y, max.z),
+                Vec3::new(min.x, max.y, min.z),
+                Vec3::new(max.x, max.y, min.z),
+                Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, max.y, max.z),
+            ]),
+        }),
     })
 }
 

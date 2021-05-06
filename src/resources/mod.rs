@@ -1,6 +1,8 @@
+mod acceleration_tree;
 mod gpu_buffer;
 mod ray;
 
+pub use acceleration_tree::{AccelerationTree, ShipBoundingBox};
 pub use gpu_buffer::GpuBuffer;
 pub use ray::Ray;
 
