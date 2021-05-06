@@ -22,6 +22,8 @@ rand = "0.8.3"
 env_logger = "0.8.3"
 legion = { version = "0.4.0", default-features = false, features = ["codegen"] }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
+wide = "0.6.4"
+rayon = "1.5.0"
 
 [features]
 default = ["parallel"]

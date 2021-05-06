@@ -574,12 +574,14 @@ dependencies = [
  "noise",
  "pollster",
  "rand 0.8.3",
+ "rayon",
  "rstar",
  "spade",
  "tint",
  "ultraviolet",
  "web-sys",
  "wgpu",
+ "wide",
  "winit",
 ]
 

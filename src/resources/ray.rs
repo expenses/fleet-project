@@ -1,6 +1,8 @@
 use crate::resources::PerspectiveView;
 use crate::Triangle;
-use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat3, Vec2, Vec3, Vec4, Vec3x8, Mat3x8};
+use wide::*;
+
 
 #[derive(Debug, Default)]
 pub struct Ray {
@@ -49,6 +51,14 @@ impl Ray {
             inv_direction: Vec3::one() / direction,
         }
     }
+
+    pub fn as_wide(&self) -> WideRay {
+        WideRay {
+            origin: Vec3x8::splat(self.origin),
+            inv_direction: Vec3x8::splat(self.inv_direction),
+        }
+    }
+
 
     pub fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
         if (self.origin.y > plane_y && self.direction.y > 0.0)
@@ -128,4 +138,32 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for Ray {
     fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
         self.triangle_intersection(triangle)
     }
+}
+
+pub struct WideRay {
+    origin: Vec3x8,
+    inv_direction: Vec3x8,
+}
+
+impl WideRay {
+    pub fn bounding_box_intersection(&self, min: Vec3x8, max: Vec3x8) -> [bool; 8] {
+        let ts_1 = (min - self.origin) * self.inv_direction;
+        let ts_2 = (max - self.origin) * self.inv_direction;
+
+        let t_mins = ts_1.min_by_component(ts_2);
+        let t_maxs = ts_1.max_by_component(ts_2);
+
+        let t_min = t_mins.component_max();
+        let t_max = t_maxs.component_min();
+
+        let result: [f32; 8] = t_max.cmp_ge(t_min).into();
+        map_8(result, |float| float != 0.0)
+    }
+}
+
+fn map_8<I: Copy, O, F: Fn(I) -> O>(input: [I; 8], func: F) -> [O; 8] {
+    [
+        func(input[0]), func(input[1]), func(input[2]), func(input[3]),
+        func(input[4]), func(input[5]), func(input[6]), func(input[7])
+    ]
 }

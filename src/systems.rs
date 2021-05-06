@@ -67,6 +67,8 @@ pub fn upload_ship_instances(
     }]);
 }
 
+use rayon::iter::ParallelIterator;
+
 #[system]
 pub fn find_ship_under_cursor(
     world: &legion::world::SubWorld,
@@ -76,7 +78,7 @@ pub fn find_ship_under_cursor(
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
     ship_under_cursor.0 = query
-        .iter(world)
+        .par_iter(world)
         .filter(|(_, position, rotation)| {
             ray.bounding_box_intersection(
                 position.0 + rotation.rotated_model_min,
@@ -84,7 +86,7 @@ pub fn find_ship_under_cursor(
             )
             .is_some()
         })
-        .flat_map(|(entity, position, rotation)| {
+        .flat_map_iter(|(entity, position, rotation)| {
             let ray = ray.centered_around_transform(position.0, rotation.reversed);
 
             models
