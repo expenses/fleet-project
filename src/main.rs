@@ -1,4 +1,5 @@
-use ultraviolet::{Isometry3, Mat4, Rotor3, Vec2, Vec3, Vec4};
+use rand::Rng;
+use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
@@ -105,16 +106,22 @@ fn main() -> anyhow::Result<()> {
 
     // ecs
     let mut world = legion::world::World::default();
-    let transform_1 = components::ShipTransform(Isometry3::new(
-        Vec3::new(0.1, 2.3, 0.2),
-        Rotor3::from_rotation_xz(66.0_f32.to_radians()),
-    ));
-    world.push((transform_1.as_instance(), transform_1));
-    world.push((
-        components::ShipTransform(Isometry3::identity()),
-        Instance::default(),
-        components::Selected,
-    ));
+
+    for _ in 0..10000 {
+        let position = Vec3::new(
+            rng.gen_range(-400.0..400.0),
+            rng.gen_range(-50.0..=10.0),
+            rng.gen_range(-400.0..400.0),
+        );
+        let rotation = Rotor3::from_rotation_xz(rng.gen_range(0.0..=360.0_f32).to_radians());
+
+        world.push((
+            Instance::default(),
+            components::Position(position),
+            components::Rotation(rotation),
+            components::RotationMatrix::default(),
+        ));
+    }
 
     let mut lr = legion::Resources::default();
     lr.insert(resources::GpuBuffer::<Instance>::new(
@@ -149,11 +156,11 @@ fn main() -> anyhow::Result<()> {
     let mut schedule = legion::Schedule::builder()
         .add_system(systems::clear_buffer_system::<Instance>())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
-        .add_system(systems::update_ship_instances_system())
+        .add_system(systems::update_ship_rotation_matrix_system())
+        .add_system(systems::move_ships_system())
         .add_system(systems::upload_ship_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
-        .add_system(systems::update_ship_bounding_boxes_system())
         .add_system(systems::update_ray_plane_point_system())
         .add_system(systems::upload_buffer_system::<Instance>())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
@@ -307,6 +314,11 @@ fn main() -> anyhow::Result<()> {
 
                 let (instance_buffer, num_instances) = ship_instance_buffer.slice();
 
+                render_pass.set_pipeline(&pipelines.bounding_boxes);
+                render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, instance_buffer);
+                render_pass.draw(0..24, 0..num_instances);
+
                 render_pass.set_pipeline(&pipelines.ship);
                 render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
                 render_pass.set_vertex_buffer(0, models.carrier.vertices.slice(..));
@@ -427,25 +439,6 @@ fn main() -> anyhow::Result<()> {
         }
         _ => {}
     })
-}
-
-fn bounding_box_lines(
-    mut points: [Vec3; 24],
-    colour: Vec3,
-    transform: Isometry3,
-) -> [BackgroundVertex; 24] {
-    transform.rotation.rotate_vecs(&mut points);
-
-    let mut lines = [BackgroundVertex::default(); 24];
-
-    for i in 0..24 {
-        lines[i] = BackgroundVertex {
-            position: points[i] + transform.translation,
-            colour,
-        };
-    }
-
-    lines
 }
 
 struct Resizables {
@@ -627,6 +620,7 @@ struct Pipelines {
     blur: wgpu::RenderPipeline,
     godray_blur: wgpu::RenderPipeline,
     lines: wgpu::RenderPipeline,
+    bounding_boxes: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -725,6 +719,10 @@ impl Pipelines {
             step_mode: wgpu::InputStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
         };
+
+        let fs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
+            "../shaders/compiled/flat_colour.frag.spv"
+        ));
 
         Self {
             ship: {
@@ -859,10 +857,6 @@ impl Pipelines {
                 })
             },
             lines: {
-                let fs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/flat_colour.frag.spv"
-                ));
-
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("lines pipeline"),
                     layout: Some(&perspective_view_pipeline_layout),
@@ -870,6 +864,51 @@ impl Pipelines {
                         module: &vs_flat_colour,
                         entry_point: "main",
                         buffers: &[background_vertex_buffer_layout],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[
+                            display_format.into(),
+                            ignore_colour_state.clone(),
+                            ignore_colour_state.clone(),
+                        ],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            bounding_boxes: {
+                let vs_bounding_box = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/bounding_box.vert.spv"
+                ));
+
+                let line_vertex_buffer_layout = wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vec3>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x3],
+                };
+
+                let instance_buffer_layout = wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Instance>() as u64,
+                    step_mode: wgpu::InputStepMode::Instance,
+                    attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32x3, 3 => Float32x3, 4 => Float32x3, 5 => Float32x3],
+                };
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("bounding boxes pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_bounding_box,
+                        entry_point: "main",
+                        buffers: &[
+                            line_vertex_buffer_layout.clone(),
+                            instance_buffer_layout.clone(),
+                        ],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,
@@ -956,7 +995,7 @@ pub struct Model {
     indices: wgpu::Buffer,
     num_indices: u32,
     bind_group: wgpu::BindGroup,
-    bounding_box_line_points: [Vec3; 24],
+    bounding_box_buffer: wgpu::Buffer,
     acceleration_tree: rstar::RTree<Triangle>,
 }
 
@@ -1082,8 +1121,10 @@ fn load_ship_model(
         num_indices,
         bind_group,
         acceleration_tree,
-        bounding_box_line_points: {
-            [
+        bounding_box_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsage::VERTEX,
+            contents: bytemuck::cast_slice(&[
                 // Zs
                 Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z),
                 Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z),

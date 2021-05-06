@@ -35,6 +35,10 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
     }
 
     pub fn upload(&mut self, device: &wgpu::Device) {
+        if self.staging.is_empty() {
+            return;
+        }
+
         self.buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(self.label),
             contents: bytemuck::cast_slice(&self.staging),
