@@ -48,25 +48,60 @@ pub fn upload_ship_instances(
 
 #[system(for_each)]
 pub fn update_ship_bounding_boxes(
+    entity: &Entity,
     transform: &ShipTransform,
     selected: Option<&Selected>,
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
     #[resource] models: &Models,
-    #[resource] ray: &crate::Ray,
+    #[resource] ship_under_cursor: &ShipUnderCursor,
 ) {
-    let ray_hits = ray.bounding_box_intersection(models.carrier.min, models.carrier.max);
-
-    let colour = if ray_hits {
-        Vec3::one()
+    let colour = if ship_under_cursor.0 == Some(*entity) {
+        Some(Vec3::one())
     } else if selected.is_some() {
-        Vec3::unit_y()
+        Some(Vec3::unit_y())
     } else {
-        Vec3::unit_x()
+        None
     };
 
-    let lines =
-        crate::bounding_box_lines(models.carrier.bounding_box_line_points, colour, transform.0);
-    lines_buffer.stage(&lines);
+    if let Some(colour) = colour {
+        let lines =
+            crate::bounding_box_lines(models.carrier.bounding_box_line_points, colour, transform.0);
+        lines_buffer.stage(&lines);
+    }
+
+    // For Debugging the ray transform
+    /*
+    lines_buffer.stage(&[
+        BackgroundVertex {
+            colour: Vec3::one(),
+            position: ray.origin,
+        },
+        BackgroundVertex {
+            colour: Vec3::zero(),
+            position: ray.origin + ray.direction * 10.0,
+        }
+    ])
+    */
+}
+
+#[system]
+pub fn find_ship_under_cursor(
+    world: &legion::world::SubWorld,
+    query: &mut Query<(Entity, &ShipTransform)>,
+    #[resource] ray: &crate::Ray,
+    #[resource] models: &Models,
+    #[resource] ship_under_cursor: &mut ShipUnderCursor,
+) {
+    ship_under_cursor.0 = query
+        .iter(world)
+        .filter_map(|(entity, transform)| {
+            let mut ray = ray.clone();
+            ray.center_around_transform(transform.0);
+            ray.bounding_box_intersection(models.carrier.min, models.carrier.max)
+                .map(|t| (entity, t))
+        })
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(entity, _)| *entity);
 }
 
 #[system]
@@ -91,7 +126,10 @@ pub fn update_ray_plane_point(
     #[resource] ray: &crate::Ray,
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
 ) {
-    if let Some(intersection_point) = ray.plane_intersection(0.0) {
+    if let Some(intersection_point) = ray
+        .plane_intersection(0.0)
+        .map(|t| ray.get_intersection_point(t))
+    {
         lines_buffer.stage(&[
             BackgroundVertex {
                 position: intersection_point + Vec3::unit_y(),
@@ -104,6 +142,9 @@ pub fn update_ray_plane_point(
         ]);
     }
 }
+
+#[derive(Default)]
+pub struct ShipUnderCursor(Option<Entity>);
 
 pub struct Models {
     pub carrier: crate::Model,

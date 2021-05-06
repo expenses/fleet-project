@@ -143,6 +143,7 @@ fn main() -> anyhow::Result<()> {
     lr.insert(perspective_view);
     lr.insert(ecs::MousePosition(Vec2::default()));
     lr.insert(Ray::default());
+    lr.insert(ecs::ShipUnderCursor::default());
 
     let mut schedule = legion::Schedule::builder()
         .add_system(ecs::clear_buffer_system::<Instance>())
@@ -150,6 +151,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(ecs::update_ship_instances_system())
         .add_system(ecs::upload_ship_instances_system())
         .add_system(ecs::update_ray_system())
+        .add_system(ecs::find_ship_under_cursor_system())
         .add_system(ecs::update_ship_bounding_boxes_system())
         .add_system(ecs::update_ray_plane_point_system())
         .add_system(ecs::upload_buffer_system::<Instance>())
@@ -409,11 +411,10 @@ fn main() -> anyhow::Result<()> {
     })
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Ray {
     origin: Vec3,
     direction: Vec3,
-    inv_direction: Vec3,
 }
 
 impl Ray {
@@ -436,14 +437,21 @@ impl Ray {
             .truncated()
             .normalized();
 
-        Self {
-            origin,
-            direction,
-            inv_direction: Vec3::broadcast(1.0) / direction,
-        }
+        Self { origin, direction }
     }
 
-    fn plane_intersection(&self, plane_y: f32) -> Option<Vec3> {
+    fn get_intersection_point(&self, t: f32) -> Vec3 {
+        self.origin + self.direction * t
+    }
+
+    fn center_around_transform(&mut self, transform: Isometry3) {
+        let inversed = transform.inversed();
+
+        self.origin = inversed * self.origin;
+        self.direction = inversed.rotation * self.direction;
+    }
+
+    fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
         if (self.origin.y > plane_y && self.direction.y > 0.0)
             || (self.origin.y < plane_y && self.direction.y < 0.0)
         {
@@ -453,13 +461,13 @@ impl Ray {
         let y_delta = plane_y - self.origin.y;
         let t = y_delta / self.direction.y;
 
-        Some(self.origin + self.direction * t)
+        Some(t)
     }
 
     // https://tavianator.com/2011/ray_box.html
-    fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> bool {
-        let ts_1 = (min - self.origin) * self.inv_direction;
-        let ts_2 = (max - self.origin) * self.inv_direction;
+    fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> Option<f32> {
+        let ts_1 = (min - self.origin) / self.direction;
+        let ts_2 = (max - self.origin) / self.direction;
 
         let t_mins = ts_1.min_by_component(ts_2);
         let t_maxs = ts_1.max_by_component(ts_2);
@@ -467,7 +475,11 @@ impl Ray {
         let t_min = t_mins.component_max();
         let t_max = t_maxs.component_min();
 
-        t_max >= t_min
+        if t_max >= t_min {
+            Some(t_min)
+        } else {
+            None
+        }
     }
 }
 
