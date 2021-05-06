@@ -6,6 +6,7 @@ use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
+    pub inv_direction: Vec3,
 }
 
 impl Ray {
@@ -28,7 +29,11 @@ impl Ray {
             .truncated()
             .normalized();
 
-        Self { origin, direction }
+        Self {
+            origin,
+            direction,
+            inv_direction: Vec3::one() / direction,
+        }
     }
 
     pub fn get_intersection_point(&self, t: f32) -> Vec3 {
@@ -36,9 +41,12 @@ impl Ray {
     }
 
     pub fn centered_around_transform(&self, position: Vec3, reversed_rotation: Mat3) -> Self {
+        let direction = reversed_rotation * self.direction;
+
         Self {
             origin: reversed_rotation * (self.origin - position),
-            direction: reversed_rotation * self.direction,
+            direction,
+            inv_direction: Vec3::one() / direction,
         }
     }
 
@@ -57,8 +65,8 @@ impl Ray {
 
     // https://tavianator.com/2011/ray_box.html
     pub fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> Option<f32> {
-        let ts_1 = (min - self.origin) / self.direction;
-        let ts_2 = (max - self.origin) / self.direction;
+        let ts_1 = (min - self.origin) * self.inv_direction;
+        let ts_2 = (max - self.origin) * self.inv_direction;
 
         let t_mins = ts_1.min_by_component(ts_2);
         let t_maxs = ts_1.max_by_component(ts_2);

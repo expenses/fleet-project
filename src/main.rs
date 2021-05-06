@@ -128,13 +128,15 @@ fn main() -> anyhow::Result<()> {
         &device,
         "ship instances",
         wgpu::BufferUsage::VERTEX,
+        10,
     ));
     lr.insert(resources::GpuBuffer::<BackgroundVertex>::new(
         &device,
-        "ship bounding boxes",
+        "lines",
         wgpu::BufferUsage::VERTEX,
+        10,
     ));
-    lr.insert(device);
+    lr.insert(resources::GpuInterface { device, queue });
     lr.insert(resources::Models { carrier });
     lr.insert(resources::MousePosition(Vec2::default()));
     lr.insert(resources::Ray::default());
@@ -174,7 +176,7 @@ fn main() -> anyhow::Result<()> {
             WindowEvent::Resized(size) => {
                 let mut dimensions = lr.get_mut::<resources::Dimensions>().unwrap();
                 let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
-                let device = lr.get::<wgpu::Device>().unwrap();
+                let gpu_interface = lr.get::<resources::GpuInterface>().unwrap();
 
                 dimensions.width = size.width as u32;
                 dimensions.height = size.height as u32;
@@ -183,7 +185,7 @@ fn main() -> anyhow::Result<()> {
                     dimensions.width,
                     dimensions.height,
                     display_format,
-                    &device,
+                    &gpu_interface.device,
                     &surface,
                     &resources,
                 );
@@ -253,15 +255,18 @@ fn main() -> anyhow::Result<()> {
         }
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
-                let device = lr.get::<wgpu::Device>().unwrap();
+                let gpu_interface = lr.get::<resources::GpuInterface>().unwrap();
                 let ship_instance_buffer = lr.get::<resources::GpuBuffer<Instance>>().unwrap();
                 let models = lr.get::<resources::Models>().unwrap();
                 let line_buffer = lr.get::<resources::GpuBuffer<BackgroundVertex>>().unwrap();
                 let perspective_view = lr.get::<resources::PerspectiveView>().unwrap();
 
-                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("render encoder"),
-                });
+                let mut encoder =
+                    gpu_interface
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("render encoder"),
+                        });
 
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("main render pass"),
@@ -434,7 +439,7 @@ fn main() -> anyhow::Result<()> {
 
                 drop(render_pass);
 
-                queue.submit(Some(encoder.finish()));
+                gpu_interface.queue.submit(Some(encoder.finish()));
             }
         }
         _ => {}

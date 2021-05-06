@@ -7,6 +7,11 @@ pub use ray::Ray;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+pub struct GpuInterface {
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+}
+
 #[derive(Default)]
 pub struct ShipUnderCursor(pub Option<Entity>);
 

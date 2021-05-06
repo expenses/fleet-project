@@ -38,9 +38,9 @@ pub fn clear_buffer<T: 'static + Copy + bytemuck::Pod>(#[resource] buffer: &mut 
 #[system]
 pub fn upload_buffer<T: 'static + Copy + bytemuck::Pod>(
     #[resource] buffer: &mut GpuBuffer<T>,
-    #[resource] device: &wgpu::Device,
+    #[resource] gpu_interface: &GpuInterface,
 ) {
-    buffer.upload(device);
+    buffer.upload(&gpu_interface.device, &gpu_interface.queue);
 }
 
 #[system(for_each)]
