@@ -835,13 +835,9 @@ impl Pipelines {
                         }],
                     });
 
-                let fs_godray_blur = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                    label: Some("fs godray blur"),
-                    source: wgpu::util::make_spirv(include_bytes!(
-                        "../shaders/compiled/godray_blur.frag.spv"
-                    )),
-                    flags: wgpu::ShaderFlags::empty(),
-                });
+                let fs_godray_blur = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/godray_blur.frag.spv"
+                ));
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("godray blur pipeline"),
