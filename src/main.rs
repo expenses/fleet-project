@@ -997,6 +997,8 @@ pub struct Model {
     bind_group: wgpu::BindGroup,
     bounding_box_buffer: wgpu::Buffer,
     acceleration_tree: rstar::RTree<Triangle>,
+    min: Vec3,
+    max: Vec3,
 }
 
 fn load_ship_model(
@@ -1121,6 +1123,8 @@ fn load_ship_model(
         num_indices,
         bind_group,
         acceleration_tree,
+        min,
+        max,
         bounding_box_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             usage: wgpu::BufferUsage::VERTEX,

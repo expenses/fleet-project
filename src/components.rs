@@ -6,6 +6,8 @@ pub struct Rotation(pub Rotor3);
 pub struct RotationMatrix {
     pub matrix: Mat3,
     pub reversed: Mat3,
+    pub rotated_model_min: Vec3,
+    pub rotated_model_max: Vec3,
 }
 
 pub struct Selected;

@@ -7,9 +7,22 @@ use legion::*;
 
 #[system(for_each)]
 #[filter(maybe_changed::<Rotation>())]
-pub fn update_ship_rotation_matrix(rotation: &Rotation, matrix: &mut RotationMatrix) {
-    matrix.matrix = rotation.0.into_matrix();
-    matrix.reversed = rotation.0.reversed().into_matrix();
+pub fn update_ship_rotation_matrix(
+    rotation: &Rotation,
+    rotation_matrix: &mut RotationMatrix,
+    #[resource] models: &Models,
+) {
+    let matrix = rotation.0.into_matrix();
+
+    let min_rotated = matrix * models.carrier.min;
+    let max_rotated = matrix * models.carrier.max;
+
+    *rotation_matrix = RotationMatrix {
+        matrix,
+        reversed: rotation.0.reversed().into_matrix(),
+        rotated_model_min: min_rotated.min_by_component(max_rotated),
+        rotated_model_max: min_rotated.max_by_component(max_rotated),
+    };
 }
 
 #[system(for_each)]
@@ -64,6 +77,13 @@ pub fn find_ship_under_cursor(
 ) {
     ship_under_cursor.0 = query
         .iter(world)
+        .filter(|(_, position, rotation)| {
+            ray.bounding_box_intersection(
+                position.0 + rotation.rotated_model_min,
+                position.0 + rotation.rotated_model_max,
+            )
+            .is_some()
+        })
         .flat_map(|(entity, position, rotation)| {
             let ray = ray.centered_around_transform(position.0, rotation.reversed);
 

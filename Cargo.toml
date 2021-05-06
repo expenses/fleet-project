@@ -20,8 +20,12 @@ tint = "1.0.1"
 noise = "0.7.0"
 rand = "0.8.3"
 env_logger = "0.8.3"
-legion = "0.4.0"
+legion = { version = "0.4.0", default-features = false, features = ["codegen"] }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
+
+[features]
+default = ["parallel"]
+parallel = ["legion/parallel"]
 
 # Compile all dependencies in release mode
 [profile.dev.package."*"]
