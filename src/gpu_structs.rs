@@ -1,4 +1,4 @@
-use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat3, Mat4, Vec2, Vec3};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]

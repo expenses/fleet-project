@@ -1,4 +1,25 @@
+mod gpu_buffer;
+mod ray;
+
+pub use gpu_buffer::GpuBuffer;
+pub use ray::Ray;
+
+use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
+
+#[derive(Default)]
+pub struct ShipUnderCursor(pub Option<Entity>);
+
+pub struct Models {
+    pub carrier: crate::Model,
+}
+
+pub struct MousePosition(pub Vec2);
+
+pub struct Dimensions {
+    pub width: u32,
+    pub height: u32,
+}
 
 pub struct Orbit {
     pub longitude: f32,

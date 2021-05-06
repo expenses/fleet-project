@@ -1,16 +1,16 @@
-use ultraviolet::{Isometry3, Mat3, Mat4, Rotor3, Vec2, Vec3, Vec4};
+use ultraviolet::{Isometry3, Mat4, Rotor3, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::event_loop::*;
 
 mod background;
-mod ecs;
+mod components;
 mod gpu_structs;
-mod utils;
+mod resources;
+mod systems;
 
 use gpu_structs::*;
-use utils::{Orbit, PerspectiveView};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -49,11 +49,6 @@ fn main() -> anyhow::Result<()> {
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
 
-    let mut dimensions = ecs::Dimensions {
-        width: window_size.width,
-        height: window_size.height,
-    };
-
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
@@ -64,18 +59,13 @@ fn main() -> anyhow::Result<()> {
         &resources,
     )?;
 
-    let mut orbit = Orbit::new();
-
-    let perspective = ultraviolet::projection::perspective_wgpu_dx(
-        59.0_f32.to_radians(),
-        dimensions.width as f32 / dimensions.height as f32,
-        0.1,
-        100.0,
-    );
-
-    let mut perspective_view = PerspectiveView::new(perspective, orbit.as_vector(), Vec3::zero());
     let mut mouse_down = false;
     let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
+
+    let dimensions = resources::Dimensions {
+        width: window_size.width,
+        height: window_size.height,
+    };
 
     let mut resizables = Resizables::new(
         dimensions.width,
@@ -114,48 +104,58 @@ fn main() -> anyhow::Result<()> {
 
     // ecs
     let mut world = legion::world::World::default();
-    let transform_1 = ecs::ShipTransform(Isometry3::new(
+    let transform_1 = components::ShipTransform(Isometry3::new(
         Vec3::new(0.1, 2.3, 0.2),
         Rotor3::from_rotation_xz(66.0_f32.to_radians()),
     ));
     world.push((transform_1.as_instance(), transform_1));
     world.push((
-        ecs::ShipTransform(Isometry3::identity()),
+        components::ShipTransform(Isometry3::identity()),
         Instance::default(),
-        ecs::Selected,
+        components::Selected,
     ));
 
     let mut lr = legion::Resources::default();
-    lr.insert(ecs::GpuBuffer::<Instance>::new(
+    lr.insert(resources::GpuBuffer::<Instance>::new(
         &device,
         "ship instances",
         wgpu::BufferUsage::VERTEX,
     ));
-    lr.insert(ecs::GpuBuffer::<BackgroundVertex>::new(
+    lr.insert(resources::GpuBuffer::<BackgroundVertex>::new(
         &device,
         "ship bounding boxes",
         wgpu::BufferUsage::VERTEX,
     ));
     lr.insert(device);
-    lr.insert(ecs::Models { carrier });
-    lr.insert(dimensions);
+    lr.insert(resources::Models { carrier });
+    lr.insert(resources::MousePosition(Vec2::default()));
+    lr.insert(resources::Ray::default());
+    lr.insert(resources::ShipUnderCursor::default());
+    let orbit = resources::Orbit::new();
+    lr.insert(resources::PerspectiveView::new(
+        ultraviolet::projection::perspective_wgpu_dx(
+            59.0_f32.to_radians(),
+            dimensions.width as f32 / dimensions.height as f32,
+            0.1,
+            100.0,
+        ),
+        orbit.as_vector(),
+        Vec3::zero(),
+    ));
     lr.insert(orbit);
-    lr.insert(perspective_view);
-    lr.insert(ecs::MousePosition(Vec2::default()));
-    lr.insert(Ray::default());
-    lr.insert(ecs::ShipUnderCursor::default());
+    lr.insert(dimensions);
 
     let mut schedule = legion::Schedule::builder()
-        .add_system(ecs::clear_buffer_system::<Instance>())
-        .add_system(ecs::clear_buffer_system::<BackgroundVertex>())
-        .add_system(ecs::update_ship_instances_system())
-        .add_system(ecs::upload_ship_instances_system())
-        .add_system(ecs::update_ray_system())
-        .add_system(ecs::find_ship_under_cursor_system())
-        .add_system(ecs::update_ship_bounding_boxes_system())
-        .add_system(ecs::update_ray_plane_point_system())
-        .add_system(ecs::upload_buffer_system::<Instance>())
-        .add_system(ecs::upload_buffer_system::<BackgroundVertex>())
+        .add_system(systems::clear_buffer_system::<Instance>())
+        .add_system(systems::clear_buffer_system::<BackgroundVertex>())
+        .add_system(systems::update_ship_instances_system())
+        .add_system(systems::upload_ship_instances_system())
+        .add_system(systems::update_ray_system())
+        .add_system(systems::find_ship_under_cursor_system())
+        .add_system(systems::update_ship_bounding_boxes_system())
+        .add_system(systems::update_ray_plane_point_system())
+        .add_system(systems::upload_buffer_system::<Instance>())
+        .add_system(systems::upload_buffer_system::<BackgroundVertex>())
         .build();
 
     dbg!(&schedule);
@@ -164,8 +164,8 @@ fn main() -> anyhow::Result<()> {
         Event::WindowEvent { ref event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::Resized(size) => {
-                let mut dimensions = lr.get_mut::<ecs::Dimensions>().unwrap();
-                let mut perspective_view = lr.get_mut::<PerspectiveView>().unwrap();
+                let mut dimensions = lr.get_mut::<resources::Dimensions>().unwrap();
+                let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
                 let device = lr.get::<wgpu::Device>().unwrap();
 
                 dimensions.width = size.width as u32;
@@ -201,8 +201,8 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 if mouse_down {
-                    let mut orbit = lr.get_mut::<Orbit>().unwrap();
-                    let mut perspective_view = lr.get_mut::<PerspectiveView>().unwrap();
+                    let mut orbit = lr.get_mut::<resources::Orbit>().unwrap();
+                    let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
 
                     let position = to_logical(position);
                     let previous_cursor_position = to_logical(&previous_cursor_position);
@@ -214,7 +214,7 @@ fn main() -> anyhow::Result<()> {
 
                 previous_cursor_position = *position;
 
-                lr.insert(ecs::MousePosition(Vec2::new(
+                lr.insert(resources::MousePosition(Vec2::new(
                     position.x as f32,
                     position.y as f32,
                 )));
@@ -229,10 +229,10 @@ fn main() -> anyhow::Result<()> {
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
                 let device = lr.get::<wgpu::Device>().unwrap();
-                let ship_instance_buffer = lr.get::<ecs::GpuBuffer<Instance>>().unwrap();
-                let models = lr.get::<ecs::Models>().unwrap();
-                let line_buffer = lr.get::<ecs::GpuBuffer<BackgroundVertex>>().unwrap();
-                let perspective_view = lr.get::<PerspectiveView>().unwrap();
+                let ship_instance_buffer = lr.get::<resources::GpuBuffer<Instance>>().unwrap();
+                let models = lr.get::<resources::Models>().unwrap();
+                let line_buffer = lr.get::<resources::GpuBuffer<BackgroundVertex>>().unwrap();
+                let perspective_view = lr.get::<resources::PerspectiveView>().unwrap();
 
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("render encoder"),
@@ -409,78 +409,6 @@ fn main() -> anyhow::Result<()> {
         }
         _ => {}
     })
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Ray {
-    origin: Vec3,
-    direction: Vec3,
-}
-
-impl Ray {
-    // https://antongerdelan.net/opengl/raycasting.html
-    fn new_from_screen(
-        mouse_position: Vec2,
-        width: u32,
-        height: u32,
-        origin: Vec3,
-        perspective_view: &PerspectiveView,
-    ) -> Self {
-        let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
-        let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
-
-        let clip = Vec4::new(x, y, -1.0, 1.0);
-        let eye = perspective_view.perspective.inversed() * clip;
-        let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
-
-        let direction = (perspective_view.view.inversed() * eye)
-            .truncated()
-            .normalized();
-
-        Self { origin, direction }
-    }
-
-    fn get_intersection_point(&self, t: f32) -> Vec3 {
-        self.origin + self.direction * t
-    }
-
-    fn center_around_transform(&mut self, transform: Isometry3) {
-        let inversed = transform.inversed();
-
-        self.origin = inversed * self.origin;
-        self.direction = inversed.rotation * self.direction;
-    }
-
-    fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
-        if (self.origin.y > plane_y && self.direction.y > 0.0)
-            || (self.origin.y < plane_y && self.direction.y < 0.0)
-        {
-            return None;
-        }
-
-        let y_delta = plane_y - self.origin.y;
-        let t = y_delta / self.direction.y;
-
-        Some(t)
-    }
-
-    // https://tavianator.com/2011/ray_box.html
-    fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> Option<f32> {
-        let ts_1 = (min - self.origin) / self.direction;
-        let ts_2 = (max - self.origin) / self.direction;
-
-        let t_mins = ts_1.min_by_component(ts_2);
-        let t_maxs = ts_1.max_by_component(ts_2);
-
-        let t_min = t_mins.component_max();
-        let t_max = t_maxs.component_min();
-
-        if t_max >= t_min {
-            Some(t_min)
-        } else {
-            None
-        }
-    }
 }
 
 fn bounding_box_lines(

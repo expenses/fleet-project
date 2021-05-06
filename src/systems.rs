@@ -1,22 +1,9 @@
+use crate::components::*;
 use crate::gpu_structs::{BackgroundVertex, Instance};
-use ultraviolet::{Isometry3, Vec2, Vec3};
+use crate::resources::*;
+use ultraviolet::Vec3;
 
 use legion::*;
-use wgpu::util::DeviceExt;
-
-#[derive(Default)]
-pub struct ShipTransform(pub Isometry3);
-
-impl ShipTransform {
-    pub fn as_instance(&self) -> Instance {
-        Instance {
-            rotation: self.0.rotation.into_matrix(),
-            translation: self.0.translation,
-        }
-    }
-}
-
-pub struct Selected;
 
 #[system(for_each)]
 #[filter(maybe_changed::<ShipTransform>())]
@@ -88,7 +75,7 @@ pub fn update_ship_bounding_boxes(
 pub fn find_ship_under_cursor(
     world: &legion::world::SubWorld,
     query: &mut Query<(Entity, &ShipTransform)>,
-    #[resource] ray: &crate::Ray,
+    #[resource] ray: &Ray,
     #[resource] models: &Models,
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
@@ -107,12 +94,12 @@ pub fn find_ship_under_cursor(
 #[system]
 pub fn update_ray(
     #[resource] dimensions: &Dimensions,
-    #[resource] orbit: &crate::Orbit,
-    #[resource] perspective_view: &crate::utils::PerspectiveView,
+    #[resource] orbit: &Orbit,
+    #[resource] perspective_view: &PerspectiveView,
     #[resource] mouse_position: &MousePosition,
-    #[resource] ray: &mut crate::Ray,
+    #[resource] ray: &mut Ray,
 ) {
-    *ray = crate::Ray::new_from_screen(
+    *ray = Ray::new_from_screen(
         mouse_position.0,
         dimensions.width,
         dimensions.height,
@@ -123,7 +110,7 @@ pub fn update_ray(
 
 #[system]
 pub fn update_ray_plane_point(
-    #[resource] ray: &crate::Ray,
+    #[resource] ray: &Ray,
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
 ) {
     if let Some(intersection_point) = ray
@@ -140,62 +127,5 @@ pub fn update_ray_plane_point(
                 colour: Vec3::unit_y(),
             },
         ]);
-    }
-}
-
-#[derive(Default)]
-pub struct ShipUnderCursor(Option<Entity>);
-
-pub struct Models {
-    pub carrier: crate::Model,
-}
-
-pub struct MousePosition(pub Vec2);
-
-pub struct Dimensions {
-    pub width: u32,
-    pub height: u32,
-}
-
-pub struct GpuBuffer<T> {
-    staging: Vec<T>,
-    buffer: wgpu::Buffer,
-    label: &'static str,
-    usage: wgpu::BufferUsage,
-}
-
-impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
-    pub fn new(device: &wgpu::Device, label: &'static str, usage: wgpu::BufferUsage) -> Self {
-        Self {
-            staging: Vec::new(),
-            buffer: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(label),
-                size: 0,
-                usage: wgpu::BufferUsage::COPY_DST | usage,
-                mapped_at_creation: false,
-            }),
-            label,
-            usage,
-        }
-    }
-
-    pub fn slice(&self) -> (wgpu::BufferSlice, u32) {
-        (self.buffer.slice(..), self.staging.len() as u32)
-    }
-
-    fn clear(&mut self) {
-        self.staging.clear();
-    }
-
-    fn stage(&mut self, slice: &[T]) {
-        self.staging.extend_from_slice(slice);
-    }
-
-    fn upload(&mut self, device: &wgpu::Device) {
-        self.buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(self.label),
-            contents: bytemuck::cast_slice(&self.staging),
-            usage: wgpu::BufferUsage::COPY_DST | self.usage,
-        });
     }
 }
