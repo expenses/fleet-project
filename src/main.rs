@@ -1,14 +1,15 @@
 use ultraviolet::{Isometry3, Mat3, Mat4, Rotor3, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
+use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::event_loop::*;
 
 mod background;
-mod utils;
 mod gpu_structs;
+mod utils;
 
-use utils::{Orbit, PerspectiveView};
 use gpu_structs::*;
+use utils::{Orbit, PerspectiveView};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -37,7 +38,7 @@ fn main() -> anyhow::Result<()> {
             label: Some("device"),
             features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::DEPTH_CLAMPING,
             limits: wgpu::Limits {
-                max_push_constant_size: std::mem::size_of::<GridPushConstants>() as u32,
+                max_push_constant_size: std::mem::size_of::<PushConstants>() as u32,
                 ..Default::default()
             },
         },
@@ -46,8 +47,8 @@ fn main() -> anyhow::Result<()> {
 
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
-    let width = window_size.width;
-    let height = window_size.height;
+    let mut width = window_size.width;
+    let mut height = window_size.height;
 
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
@@ -94,7 +95,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut perspective_view = PerspectiveView::new(perspective, orbit.as_vector(), Vec3::zero());
     let mut mouse_down = false;
-    let mut previous_cursor_position = Vec2::zero();
+    let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
 
     let mut resizables =
         Resizables::new(width, height, display_format, &device, &surface, &resources);
@@ -143,8 +144,8 @@ fn main() -> anyhow::Result<()> {
         Event::WindowEvent { ref event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::Resized(size) => {
-                let width = size.width as u32;
-                let height = size.height as u32;
+                width = size.width as u32;
+                height = size.height as u32;
 
                 resizables =
                     Resizables::new(width, height, display_format, &device, &surface, &resources);
@@ -164,22 +165,56 @@ fn main() -> anyhow::Result<()> {
                 mouse_down = *state == ElementState::Pressed;
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let position = position.to_logical::<f32>(window.scale_factor());
-                let position = Vec2::new(position.x, position.y);
+                let to_logical = |position: &PhysicalPosition<f64>| {
+                    let position = position.to_logical::<f32>(window.scale_factor());
+                    Vec2::new(position.x, position.y)
+                };
 
                 if mouse_down {
+                    let position = to_logical(position);
+                    let previous_cursor_position = to_logical(&previous_cursor_position);
+
                     let delta = position - previous_cursor_position;
                     orbit.rotate(delta);
                     perspective_view.set_view(orbit.as_vector(), Vec3::zero());
                 }
 
-                previous_cursor_position = position;
+                previous_cursor_position = *position;
             }
             _ => {}
         },
         Event::MainEventsCleared => window.request_redraw(),
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
+                let position = Vec2::new(
+                    previous_cursor_position.x as f32,
+                    previous_cursor_position.y as f32,
+                );
+                let ray = Ray::new_from_screen(
+                    position,
+                    width,
+                    height,
+                    orbit.as_vector(),
+                    perspective_view,
+                );
+
+                let intersection_point = ray.plane_intersection(0.0).unwrap_or(Vec3::zero());
+
+                let ray_line = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("line"),
+                    contents: bytemuck::cast_slice(&[
+                        BackgroundVertex {
+                            position: intersection_point + Vec3::unit_y(),
+                            colour: Vec3::unit_x(),
+                        },
+                        BackgroundVertex {
+                            position: intersection_point,
+                            colour: Vec3::unit_y(),
+                        },
+                    ]),
+                    usage: wgpu::BufferUsage::VERTEX,
+                });
+
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("render encoder"),
                 });
@@ -230,6 +265,8 @@ fn main() -> anyhow::Result<()> {
                     bytemuck::bytes_of(&perspective_view.perspective_view),
                 );
                 render_pass.draw(0..num_line_vertices, 0..1);
+                render_pass.set_vertex_buffer(0, ray_line.slice(..));
+                render_pass.draw(0..2, 0..1);
 
                 render_pass.set_pipeline(&pipelines.ship);
                 render_pass.set_bind_group(0, &carrier.bind_group, &[]);
@@ -350,6 +387,68 @@ fn main() -> anyhow::Result<()> {
         }
         _ => {}
     })
+}
+
+#[derive(Debug)]
+struct Ray {
+    origin: Vec3,
+    direction: Vec3,
+    inv_direction: Vec3,
+}
+
+impl Ray {
+    // https://antongerdelan.net/opengl/raycasting.html
+    fn new_from_screen(
+        mouse_position: Vec2,
+        width: u32,
+        height: u32,
+        origin: Vec3,
+        perspective_view: PerspectiveView,
+    ) -> Self {
+        let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
+        let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
+
+        let clip = Vec4::new(x, y, -1.0, 1.0);
+        let eye = perspective_view.perspective.inversed() * clip;
+        let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
+
+        let direction = (perspective_view.view.inversed() * eye)
+            .truncated()
+            .normalized();
+
+        Self {
+            origin,
+            direction,
+            inv_direction: Vec3::broadcast(1.0) / direction,
+        }
+    }
+
+    fn plane_intersection(&self, plane_y: f32) -> Option<Vec3> {
+        if (self.origin.y > plane_y && self.direction.y > 0.0)
+            || (self.origin.y < plane_y && self.direction.y < 0.0)
+        {
+            return None;
+        }
+
+        let y_delta = plane_y - self.origin.y;
+        let t = y_delta / self.direction.y;
+
+        Some(self.origin + self.direction * t)
+    }
+
+    // https://tavianator.com/2011/ray_box.html
+    fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> bool {
+        let t_mins = (min - self.origin) * self.inv_direction;
+        let t_maxs = (max - self.origin) * self.inv_direction;
+
+        let t_mins = t_mins.min_by_component(t_maxs);
+        let t_maxs = t_mins.max_by_component(t_maxs);
+
+        let t_min = t_mins.component_max();
+        let t_max = t_maxs.component_min();
+
+        t_max > t_min
+    }
 }
 
 fn bounding_box_lines(
@@ -498,11 +597,11 @@ impl Resources {
             count: None,
         };
 
-        let sampler = |binding, shader_stage| wgpu::BindGroupLayoutEntry {
+        let sampler = |binding, shader_stage, filtering| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: shader_stage,
             ty: wgpu::BindingType::Sampler {
-                filtering: false,
+                filtering,
                 comparison: false,
             },
             count: None,
@@ -512,7 +611,7 @@ impl Resources {
             ship_bgl: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("ship bind group layout"),
                 entries: &[
-                    sampler(0, wgpu::ShaderStage::FRAGMENT),
+                    sampler(0, wgpu::ShaderStage::FRAGMENT, false),
                     texture(1, wgpu::ShaderStage::FRAGMENT),
                     texture(2, wgpu::ShaderStage::FRAGMENT),
                 ],
@@ -520,7 +619,7 @@ impl Resources {
             effect_bgl: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("effect bind group layout"),
                 entries: &[
-                    sampler(0, wgpu::ShaderStage::FRAGMENT),
+                    sampler(0, wgpu::ShaderStage::FRAGMENT, true),
                     texture(1, wgpu::ShaderStage::FRAGMENT),
                 ],
             }),

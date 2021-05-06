@@ -1,5 +1,4 @@
-use ultraviolet::{Vec2, Vec3, Vec4, Mat3, Mat4};
-
+use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -46,12 +45,4 @@ pub struct GodraySettings {
     pub weight: f32,
     pub num_samples: u32,
     pub uv_space_light_pos: Vec2,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GridPushConstants {
-    pub perspective_view: Mat4,
-    pub grid_center: Vec3,
-    pub num_vertices: u32,
 }

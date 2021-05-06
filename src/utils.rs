@@ -1,4 +1,4 @@
-use ultraviolet::{Vec2, Vec3, Mat4};
+use ultraviolet::{Mat4, Vec2, Vec3};
 
 pub struct Orbit {
     pub longitude: f32,
@@ -37,9 +37,10 @@ impl Orbit {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct PerspectiveView {
-    perspective: Mat4,
-    view: Mat4,
+    pub perspective: Mat4,
+    pub view: Mat4,
     view_without_movement: Mat4,
     pub perspective_view: Mat4,
     pub perspective_view_without_movement: Mat4,
