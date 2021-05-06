@@ -6,10 +6,15 @@ use ultraviolet::Vec3;
 use legion::*;
 
 #[system(for_each)]
-#[filter(maybe_changed::<ShipTransform>())]
-pub fn update_ship_instances(transform: &ShipTransform, instance: &mut Instance) {
-    *instance = transform.as_instance();
-    println!("Updated");
+#[filter(maybe_changed::<Rotation>())]
+pub fn update_ship_rotation_matrix(rotation: &Rotation, matrix: &mut RotationMatrix) {
+    matrix.matrix = rotation.0.into_matrix();
+    matrix.reversed = rotation.0.reversed().into_matrix();
+}
+
+#[system(for_each)]
+pub fn move_ships(position: &mut Position, rotation: &RotationMatrix) {
+    position.0 += rotation.matrix * Vec3::new(0.0, 0.0, 0.01);
 }
 
 #[system]
@@ -27,64 +32,40 @@ pub fn upload_buffer<T: 'static + Copy + bytemuck::Pod>(
 
 #[system(for_each)]
 pub fn upload_ship_instances(
-    instance: &Instance,
+    entity: &Entity,
+    selected: Option<&Selected>,
+    position: &Position,
+    rotation_matrix: &RotationMatrix,
+    #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_instance_buffer: &mut GpuBuffer<Instance>,
 ) {
-    ship_instance_buffer.stage(&[*instance]);
-}
-
-#[system(for_each)]
-pub fn update_ship_bounding_boxes(
-    entity: &Entity,
-    transform: &ShipTransform,
-    selected: Option<&Selected>,
-    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
-    #[resource] models: &Models,
-    #[resource] ship_under_cursor: &ShipUnderCursor,
-) {
     let colour = if ship_under_cursor.0 == Some(*entity) {
-        Some(Vec3::one())
+        Vec3::one()
     } else if selected.is_some() {
-        Some(Vec3::unit_y())
+        Vec3::unit_y()
     } else {
-        None
+        Vec3::zero()
     };
 
-    if let Some(colour) = colour {
-        let lines =
-            crate::bounding_box_lines(models.carrier.bounding_box_line_points, colour, transform.0);
-        lines_buffer.stage(&lines);
-    }
-
-    // For Debugging the ray transform
-    /*
-    lines_buffer.stage(&[
-        BackgroundVertex {
-            colour: Vec3::one(),
-            position: ray.origin,
-        },
-        BackgroundVertex {
-            colour: Vec3::zero(),
-            position: ray.origin + ray.direction * 10.0,
-        }
-    ])
-    */
+    ship_instance_buffer.stage(&[Instance {
+        translation: position.0,
+        rotation: rotation_matrix.matrix,
+        colour,
+    }]);
 }
 
 #[system]
 pub fn find_ship_under_cursor(
     world: &legion::world::SubWorld,
-    query: &mut Query<(Entity, &ShipTransform)>,
+    query: &mut Query<(Entity, &Position, &RotationMatrix)>,
     #[resource] ray: &Ray,
     #[resource] models: &Models,
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
-    let mut ray_triangle_intersections = 0;
-
     ship_under_cursor.0 = query
         .iter(world)
-        .flat_map(|(entity, transform)| {
-            let ray = ray.centered_around_transform(transform.0);
+        .flat_map(|(entity, position, rotation)| {
+            let ray = ray.centered_around_transform(position.0, rotation.reversed);
 
             models
                 .carrier
@@ -92,13 +73,8 @@ pub fn find_ship_under_cursor(
                 .locate_with_selection_function_with_data(ray)
                 .map(move |(_, t)| (entity, t))
         })
-        .inspect(|_| {
-            ray_triangle_intersections += 1;
-        })
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(entity, _)| *entity);
-
-    //dbg!(ray_triangle_intersections);
 }
 
 #[system]

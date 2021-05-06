@@ -12,6 +12,7 @@ pub struct PushConstants {
 pub struct Instance {
     pub rotation: Mat3,
     pub translation: Vec3,
+    pub colour: Vec3,
 }
 
 #[repr(C)]

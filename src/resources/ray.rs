@@ -1,6 +1,6 @@
 use crate::resources::PerspectiveView;
 use crate::Triangle;
-use ultraviolet::{Isometry3, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Default)]
 pub struct Ray {
@@ -35,12 +35,10 @@ impl Ray {
         self.origin + self.direction * t
     }
 
-    pub fn centered_around_transform(&self, transform: Isometry3) -> Self {
-        let inversed = transform.inversed();
-
+    pub fn centered_around_transform(&self, position: Vec3, reversed_rotation: Mat3) -> Self {
         Self {
-            origin: inversed * self.origin,
-            direction: inversed.rotation * self.direction,
+            origin: reversed_rotation * (self.origin - position),
+            direction: reversed_rotation * self.direction,
         }
     }
 
