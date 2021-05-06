@@ -61,6 +61,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut mouse_down = false;
     let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
+    let mut paused = false;
 
     let dimensions = resources::Dimensions {
         width: window_size.width,
@@ -187,6 +188,21 @@ fn main() -> anyhow::Result<()> {
                     100.0,
                 ))
             }
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(key),
+                        ..
+                    },
+                ..
+            } => {
+                let pressed = *state == ElementState::Pressed;
+                match key {
+                    VirtualKeyCode::P if pressed => paused = !paused,
+                    _ => {}
+                }
+            }
             WindowEvent::MouseInput {
                 state,
                 button: MouseButton::Left,
@@ -222,7 +238,9 @@ fn main() -> anyhow::Result<()> {
             _ => {}
         },
         Event::MainEventsCleared => {
-            schedule.execute(&mut world, &mut lr);
+            if !paused {
+                schedule.execute(&mut world, &mut lr);
+            }
 
             window.request_redraw();
         }
@@ -899,14 +917,47 @@ fn create_texture(
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
+#[derive(Debug)]
+pub struct Triangle {
+    a: Vec3,
+    edge_b_a: Vec3,
+    edge_c_a: Vec3,
+    aabb: rstar::AABB<[f32; 3]>,
+}
+
+impl Triangle {
+    fn new(a: Vec3, b: Vec3, c: Vec3) -> Self {
+        let edge_b_a = b - a;
+        let edge_c_a = c - a;
+
+        let min = a.min_by_component(b).min_by_component(c);
+        let max = a.max_by_component(b).max_by_component(c);
+        let aabb = rstar::AABB::from_corners(min.into(), max.into());
+
+        Self {
+            a,
+            edge_b_a,
+            edge_c_a,
+            aabb,
+        }
+    }
+}
+
+impl rstar::RTreeObject for Triangle {
+    type Envelope = rstar::AABB<[f32; 3]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        self.aabb
+    }
+}
+
 pub struct Model {
     vertices: wgpu::Buffer,
     indices: wgpu::Buffer,
     num_indices: u32,
     bind_group: wgpu::BindGroup,
     bounding_box_line_points: [Vec3; 24],
-    min: Vec3,
-    max: Vec3,
+    acceleration_tree: rstar::RTree<Triangle>,
 }
 
 fn load_ship_model(
@@ -965,6 +1016,19 @@ fn load_ship_model(
     assert_eq!(bounding_boxes.clone().count(), 1);
     let bounding_box = bounding_boxes.next().unwrap();
 
+    let acceleration_tree = rstar::RTree::bulk_load(
+        indices
+            .chunks(3)
+            .map(|chunk| {
+                Triangle::new(
+                    vertices[chunk[0] as usize].position,
+                    vertices[chunk[1] as usize].position,
+                    vertices[chunk[2] as usize].position,
+                )
+            })
+            .collect(),
+    );
+
     let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         usage: wgpu::BufferUsage::VERTEX,
@@ -1017,8 +1081,7 @@ fn load_ship_model(
         indices,
         num_indices,
         bind_group,
-        min,
-        max,
+        acceleration_tree,
         bounding_box_line_points: {
             [
                 // Zs

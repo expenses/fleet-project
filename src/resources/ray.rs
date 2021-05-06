@@ -1,10 +1,11 @@
 use crate::resources::PerspectiveView;
+use crate::Triangle;
 use ultraviolet::{Isometry3, Vec2, Vec3, Vec4};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct Ray {
-    origin: Vec3,
-    direction: Vec3,
+    pub origin: Vec3,
+    pub direction: Vec3,
 }
 
 impl Ray {
@@ -34,11 +35,13 @@ impl Ray {
         self.origin + self.direction * t
     }
 
-    pub fn center_around_transform(&mut self, transform: Isometry3) {
+    pub fn centered_around_transform(&self, transform: Isometry3) -> Self {
         let inversed = transform.inversed();
 
-        self.origin = inversed * self.origin;
-        self.direction = inversed.rotation * self.direction;
+        Self {
+            origin: inversed * self.origin,
+            direction: inversed.rotation * self.direction,
+        }
     }
 
     pub fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
@@ -70,5 +73,53 @@ impl Ray {
         } else {
             None
         }
+    }
+
+    // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+    // Explained:
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+    pub fn triangle_intersection(&self, triangle: &Triangle) -> Option<f32> {
+        let h = self.direction.cross(triangle.edge_c_a);
+        let a = triangle.edge_b_a.dot(h);
+
+        if a > -f32::EPSILON && a < f32::EPSILON {
+            return None;
+        }
+
+        // Note: we compute the reciprocal here so we have 1 div and 3 muls instead of 3 divs.
+        let f = 1.0 / a;
+        let s = self.origin - triangle.a;
+        let u = f * s.dot(h);
+
+        if u < 0.0 || u > 1.0 {
+            return None;
+        }
+
+        let q = s.cross(triangle.edge_b_a);
+        let v = f * self.direction.dot(q);
+
+        // Note: U + V > 1.0 NOT v > 1.0 !!
+        if v < 0.0 || u + v > 1.0 {
+            return None;
+        }
+
+        let t = f * triangle.edge_c_a.dot(q);
+
+        if t > f32::EPSILON {
+            Some(t)
+        } else {
+            None
+        }
+    }
+}
+
+impl rstar::SelectionFunctionWithData<Triangle, f32> for Ray {
+    fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
+        self.bounding_box_intersection(envelope.lower().into(), envelope.upper().into())
+            .is_some()
+    }
+
+    fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
+        self.triangle_intersection(triangle)
     }
 }

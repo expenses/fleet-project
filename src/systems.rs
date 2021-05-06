@@ -79,16 +79,26 @@ pub fn find_ship_under_cursor(
     #[resource] models: &Models,
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
+    let mut ray_triangle_intersections = 0;
+
     ship_under_cursor.0 = query
         .iter(world)
-        .filter_map(|(entity, transform)| {
-            let mut ray = ray.clone();
-            ray.center_around_transform(transform.0);
-            ray.bounding_box_intersection(models.carrier.min, models.carrier.max)
-                .map(|t| (entity, t))
+        .flat_map(|(entity, transform)| {
+            let ray = ray.centered_around_transform(transform.0);
+
+            models
+                .carrier
+                .acceleration_tree
+                .locate_with_selection_function_with_data(ray)
+                .map(move |(_, t)| (entity, t))
+        })
+        .inspect(|_| {
+            ray_triangle_intersections += 1;
         })
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(entity, _)| *entity);
+
+    //dbg!(ray_triangle_intersections);
 }
 
 #[system]
@@ -126,6 +136,16 @@ pub fn update_ray_plane_point(
                 position: intersection_point,
                 colour: Vec3::unit_y(),
             },
+            /*
+            BackgroundVertex {
+                position: ray.origin,
+                colour: Vec3::unit_x(),
+            },
+            BackgroundVertex {
+                position: ray.origin + ray.direction * 20.0,
+                colour: Vec3::unit_y(),
+            },
+            */
         ]);
     }
 }
