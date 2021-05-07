@@ -4,6 +4,7 @@ use crate::resources::*;
 use ultraviolet::Vec3;
 
 use legion::*;
+use legion::query::*;
 
 #[system(for_each)]
 #[filter(maybe_changed::<Rotation>())]
@@ -130,13 +131,21 @@ pub fn update_ray(
     );
 }
 
+type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
+
 #[system]
 pub fn handle_clicks(
+    world: &legion::world::SubWorld,
     command_buffer: &mut legion::systems::CommandBuffer,
+    selected: &mut Query<Entity, HasComponent<Selected>>,
     #[resource] mouse_button: &MouseState,
     #[resource] ship_under_cursor: &ShipUnderCursor,
 ) {
     if mouse_button.left_state.was_clicked() {
+        selected.for_each(world, |entity| {
+            command_buffer.remove_component::<Selected>(*entity);
+        });
+
         if let Some(entity) = ship_under_cursor.0 {
             command_buffer.add_component(entity, Selected);
         }
