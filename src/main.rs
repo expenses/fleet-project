@@ -53,13 +53,6 @@ fn main() -> anyhow::Result<()> {
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
-    let carrier = load_ship_model(
-        include_bytes!("../models/carrier.glb"),
-        &device,
-        &queue,
-        &resources,
-    )?;
-
     let mut mouse_down = false;
     let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
     let mut paused = false;
@@ -124,20 +117,21 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mut lr = legion::Resources::default();
-    lr.insert(resources::GpuBuffer::<Instance>::new(
-        &device,
-        "ship instances",
-        wgpu::BufferUsage::VERTEX,
-        10,
-    ));
+    lr.insert(resources::ShipBuffer::new(&device));
     lr.insert(resources::GpuBuffer::<BackgroundVertex>::new(
         &device,
         "lines",
         wgpu::BufferUsage::VERTEX,
-        10,
     ));
+    lr.insert(resources::Models {
+        carrier: load_ship_model(
+            include_bytes!("../models/carrier.glb"),
+            &device,
+            &queue,
+            &resources,
+        )?,
+    });
     lr.insert(resources::GpuInterface { device, queue });
-    lr.insert(resources::Models { carrier });
     lr.insert(resources::MousePosition(Vec2::default()));
     lr.insert(resources::Ray::default());
     lr.insert(resources::ShipUnderCursor::default());
@@ -156,7 +150,7 @@ fn main() -> anyhow::Result<()> {
     lr.insert(dimensions);
 
     let mut schedule = legion::Schedule::builder()
-        .add_system(systems::clear_buffer_system::<Instance>())
+        .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_ship_rotation_matrix_system())
         .add_system(systems::move_ships_system())
@@ -164,7 +158,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
         .add_system(systems::update_ray_plane_point_system())
-        .add_system(systems::upload_buffer_system::<Instance>())
+        .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
         .build();
 
@@ -256,7 +250,7 @@ fn main() -> anyhow::Result<()> {
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
                 let gpu_interface = lr.get::<resources::GpuInterface>().unwrap();
-                let ship_instance_buffer = lr.get::<resources::GpuBuffer<Instance>>().unwrap();
+                let ship_buffer = lr.get::<resources::ShipBuffer>().unwrap();
                 let models = lr.get::<resources::Models>().unwrap();
                 let line_buffer = lr.get::<resources::GpuBuffer<BackgroundVertex>>().unwrap();
                 let perspective_view = lr.get::<resources::PerspectiveView>().unwrap();
@@ -317,12 +311,12 @@ fn main() -> anyhow::Result<()> {
                 );
                 render_pass.draw(0..num_line_vertices, 0..1);
 
-                let (instance_buffer, num_instances) = ship_instance_buffer.slice();
+                let (instance_buffer, num_instances) = ship_buffer.slice();
 
                 render_pass.set_pipeline(&pipelines.bounding_boxes);
                 render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
                 render_pass.set_vertex_buffer(1, instance_buffer);
-                render_pass.draw(0..24, 0..num_instances);
+                render_pass.draw(0..24, 0..num_instances[0]);
 
                 render_pass.set_pipeline(&pipelines.ship);
                 render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
@@ -338,7 +332,7 @@ fn main() -> anyhow::Result<()> {
                         light_dir: sun_dir,
                     }),
                 );
-                render_pass.draw_indexed(0..models.carrier.num_indices, 0, 0..num_instances);
+                render_pass.draw_indexed(0..models.carrier.num_indices, 0, 0..num_instances[0]);
 
                 render_pass.set_pipeline(&pipelines.background);
                 render_pass.set_vertex_buffer(0, background_vertices.slice(..));

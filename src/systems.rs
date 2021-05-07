@@ -43,6 +43,19 @@ pub fn upload_buffer<T: 'static + Copy + bytemuck::Pod>(
     buffer.upload(&gpu_interface.device, &gpu_interface.queue);
 }
 
+#[system]
+pub fn clear_ship_buffer(#[resource] buffer: &mut ShipBuffer) {
+    buffer.clear();
+}
+
+#[system]
+pub fn upload_ship_buffer(
+    #[resource] buffer: &mut ShipBuffer,
+    #[resource] gpu_interface: &GpuInterface,
+) {
+    buffer.upload(&gpu_interface.device, &gpu_interface.queue);
+}
+
 #[system(for_each)]
 pub fn upload_ship_instances(
     entity: &Entity,
@@ -50,7 +63,7 @@ pub fn upload_ship_instances(
     position: &Position,
     rotation_matrix: &RotationMatrix,
     #[resource] ship_under_cursor: &ShipUnderCursor,
-    #[resource] ship_instance_buffer: &mut GpuBuffer<Instance>,
+    #[resource] ship_buffer: &mut ShipBuffer,
 ) {
     let colour = if ship_under_cursor.0 == Some(*entity) {
         Vec3::one()
@@ -60,11 +73,14 @@ pub fn upload_ship_instances(
         Vec3::zero()
     };
 
-    ship_instance_buffer.stage(&[Instance {
-        translation: position.0,
-        rotation: rotation_matrix.matrix,
-        colour,
-    }]);
+    ship_buffer.stage(
+        Instance {
+            translation: position.0,
+            rotation: rotation_matrix.matrix,
+            colour,
+        },
+        0,
+    );
 }
 
 #[system]

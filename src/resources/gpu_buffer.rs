@@ -1,3 +1,5 @@
+use crate::gpu_structs::Instance;
+
 pub struct GpuBuffer<T> {
     staging: Vec<T>,
     capacity_in_bytes: usize,
@@ -7,16 +9,11 @@ pub struct GpuBuffer<T> {
 }
 
 impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
-    pub fn new(
-        device: &wgpu::Device,
-        label: &'static str,
-        usage: wgpu::BufferUsage,
-        initial_capacity: usize,
-    ) -> Self {
-        let capacity_in_bytes = initial_capacity * std::mem::size_of::<T>();
+    pub fn new(device: &wgpu::Device, label: &'static str, usage: wgpu::BufferUsage) -> Self {
+        let capacity_in_bytes = std::mem::size_of::<T>();
 
         Self {
-            staging: Vec::with_capacity(initial_capacity),
+            staging: Vec::with_capacity(1),
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
                 size: capacity_in_bytes as u64,
@@ -65,6 +62,84 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
             self.buffer.unmap();
         } else {
             queue.write_buffer(&self.buffer, 0, bytes)
+        }
+    }
+}
+
+const NUM_SHIPS: usize = 6;
+
+pub struct ShipBuffer {
+    staging: [Vec<Instance>; NUM_SHIPS],
+    buffer: wgpu::Buffer,
+    capacity_in_bytes: usize,
+}
+
+impl ShipBuffer {
+    const LABEL: &'static str = "ship instance buffer";
+
+    pub fn new(device: &wgpu::Device) -> Self {
+        let capacity_in_bytes = std::mem::size_of::<Instance>() * NUM_SHIPS;
+
+        Self {
+            staging: Default::default(),
+            capacity_in_bytes,
+            buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(Self::LABEL),
+                size: capacity_in_bytes as u64,
+                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::VERTEX,
+                mapped_at_creation: false,
+            }),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for buffer in &mut self.staging {
+            buffer.clear();
+        }
+    }
+
+    pub fn slice(&self) -> (wgpu::BufferSlice, [u32; NUM_SHIPS]) {
+        let mut lengths = [0; NUM_SHIPS];
+        for i in 0..NUM_SHIPS {
+            lengths[i] = self.staging[i].len() as u32;
+        }
+
+        (self.buffer.slice(..), lengths)
+    }
+
+    pub fn stage(&mut self, instance: Instance, ty: usize) {
+        self.staging[ty].push(instance);
+    }
+
+    pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let sum_length = self
+            .staging
+            .iter()
+            .map(|buffer| buffer.len())
+            .sum::<usize>()
+            * std::mem::size_of::<Instance>();
+
+        if sum_length == 0 {
+            return;
+        }
+
+        if sum_length > self.capacity_in_bytes {
+            self.capacity_in_bytes = sum_length.max(self.capacity_in_bytes * 2);
+
+            self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(Self::LABEL),
+                size: self.capacity_in_bytes as u64,
+                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::VERTEX,
+                mapped_at_creation: false,
+            });
+        }
+
+        let mut offset = 0;
+
+        for buffer in &self.staging {
+            let bytes = bytemuck::cast_slice(buffer);
+            queue.write_buffer(&self.buffer, offset, bytes);
+            offset += bytes.len() as u64;
         }
     }
 }

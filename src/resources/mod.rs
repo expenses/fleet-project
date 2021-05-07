@@ -1,7 +1,7 @@
 mod gpu_buffer;
 mod ray;
 
-pub use gpu_buffer::GpuBuffer;
+pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use ray::Ray;
 
 use legion::Entity;
