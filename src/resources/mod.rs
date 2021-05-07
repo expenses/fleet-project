@@ -1,7 +1,9 @@
 mod gpu_buffer;
+mod mouse;
 mod ray;
 
 pub use gpu_buffer::{GpuBuffer, ShipBuffer};
+pub use mouse::{MouseButtonState, MouseState};
 pub use ray::Ray;
 
 use legion::Entity;
@@ -18,8 +20,6 @@ pub struct ShipUnderCursor(pub Option<Entity>);
 pub struct Models {
     pub carrier: crate::Model,
 }
-
-pub struct MousePosition(pub Vec2);
 
 pub struct Dimensions {
     pub width: u32,

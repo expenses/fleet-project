@@ -1,7 +1,6 @@
 use rand::Rng;
 use ultraviolet::{Mat4, Rotor3, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
-use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::event_loop::*;
 
@@ -53,8 +52,6 @@ fn main() -> anyhow::Result<()> {
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
-    let mut mouse_down = false;
-    let mut previous_cursor_position = PhysicalPosition { x: 0.0, y: 0.0 };
     let mut paused = false;
 
     let dimensions = resources::Dimensions {
@@ -132,7 +129,7 @@ fn main() -> anyhow::Result<()> {
         )?,
     });
     lr.insert(resources::GpuInterface { device, queue });
-    lr.insert(resources::MousePosition(Vec2::default()));
+    lr.insert(resources::MouseState::default());
     lr.insert(resources::Ray::default());
     lr.insert(resources::ShipUnderCursor::default());
     let orbit = resources::Orbit::new();
@@ -157,9 +154,11 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::upload_ship_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
+        .add_system(systems::handle_clicks_system())
         .add_system(systems::update_ray_plane_point_system())
         .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
+        .add_system(systems::update_mouse_state_system())
         .build();
 
     dbg!(&schedule);
@@ -206,37 +205,33 @@ fn main() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } => {
-                mouse_down = *state == ElementState::Pressed;
+            WindowEvent::MouseInput { state, button, .. } => {
+                let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
+
+                let pressed = *state == ElementState::Pressed;
+                let position = mouse_state.position;
+
+                match button {
+                    MouseButton::Left => mouse_state.left_state.handle(position, pressed),
+                    MouseButton::Right => mouse_state.right_state.handle(position, pressed),
+                    _ => {}
+                }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let to_logical = |position: &PhysicalPosition<f64>| {
-                    let position = position.to_logical::<f32>(window.scale_factor());
-                    Vec2::new(position.x, position.y)
-                };
+                let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
 
-                if mouse_down {
+                let position = Vec2::new(position.x as f32, position.y as f32);
+
+                if mouse_state.right_state.is_being_dragged().is_some() {
                     let mut orbit = lr.get_mut::<resources::Orbit>().unwrap();
                     let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
 
-                    let position = to_logical(position);
-                    let previous_cursor_position = to_logical(&previous_cursor_position);
-
-                    let delta = position - previous_cursor_position;
+                    let delta = position - mouse_state.position;
                     orbit.rotate(delta);
                     perspective_view.set_view(orbit.as_vector(), Vec3::zero());
                 }
 
-                previous_cursor_position = *position;
-
-                lr.insert(resources::MousePosition(Vec2::new(
-                    position.x as f32,
-                    position.y as f32,
-                )));
+                mouse_state.position = position;
             }
             _ => {}
         },

@@ -118,16 +118,36 @@ pub fn update_ray(
     #[resource] dimensions: &Dimensions,
     #[resource] orbit: &Orbit,
     #[resource] perspective_view: &PerspectiveView,
-    #[resource] mouse_position: &MousePosition,
+    #[resource] mouse_state: &MouseState,
     #[resource] ray: &mut Ray,
 ) {
     *ray = Ray::new_from_screen(
-        mouse_position.0,
+        mouse_state.position,
         dimensions.width,
         dimensions.height,
         orbit.as_vector(),
         perspective_view,
     );
+}
+
+#[system]
+pub fn handle_clicks(
+    command_buffer: &mut legion::systems::CommandBuffer,
+    #[resource] mouse_button: &MouseState,
+    #[resource] ship_under_cursor: &ShipUnderCursor,
+) {
+    if mouse_button.left_state.was_clicked() {
+        if let Some(entity) = ship_under_cursor.0 {
+            command_buffer.add_component(entity, Selected);
+        }
+    }
+}
+
+#[system]
+pub fn update_mouse_state(#[resource] mouse_state: &mut MouseState) {
+    let delta_time = 1.0 / 60.0;
+    mouse_state.left_state.update(delta_time, 0.1);
+    mouse_state.right_state.update(delta_time, 0.0);
 }
 
 #[system]
