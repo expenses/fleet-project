@@ -1,4 +1,5 @@
 use crate::gpu_structs::Instance;
+use crate::resources::Models;
 
 pub struct GpuBuffer<T> {
     staging: Vec<T>,
@@ -66,10 +67,8 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
     }
 }
 
-const NUM_SHIPS: usize = 6;
-
 pub struct ShipBuffer {
-    staging: [Vec<Instance>; NUM_SHIPS],
+    staging: [Vec<Instance>; Models::COUNT],
     buffer: wgpu::Buffer,
     capacity_in_bytes: usize,
 }
@@ -78,7 +77,7 @@ impl ShipBuffer {
     const LABEL: &'static str = "ship instance buffer";
 
     pub fn new(device: &wgpu::Device) -> Self {
-        let capacity_in_bytes = std::mem::size_of::<Instance>() * NUM_SHIPS;
+        let capacity_in_bytes = std::mem::size_of::<Instance>() * Models::COUNT;
 
         Self {
             staging: Default::default(),
@@ -98,9 +97,9 @@ impl ShipBuffer {
         }
     }
 
-    pub fn slice(&self) -> (wgpu::BufferSlice, [u32; NUM_SHIPS]) {
-        let mut lengths = [0; NUM_SHIPS];
-        for i in 0..NUM_SHIPS {
+    pub fn slice(&self) -> (wgpu::BufferSlice, [u32; Models::COUNT]) {
+        let mut lengths = [0; Models::COUNT];
+        for i in 0..Models::COUNT {
             lengths[i] = self.staging[i].len() as u32;
         }
 

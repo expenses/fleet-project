@@ -6,6 +6,7 @@ pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use mouse::{MouseButtonState, MouseState};
 pub use ray::Ray;
 
+use crate::components::ModelId;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
@@ -19,6 +20,17 @@ pub struct ShipUnderCursor(pub Option<Entity>);
 
 pub struct Models {
     pub carrier: crate::Model,
+}
+
+impl Models {
+    pub const COUNT: usize = 2;
+
+    pub fn get(&self, id: ModelId) -> &crate::Model {
+        match id {
+            ModelId::Carrier => &self.carrier,
+            ModelId::Fighter => todo!(),
+        }
+    }
 }
 
 pub struct Dimensions {

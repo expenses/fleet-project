@@ -110,6 +110,7 @@ fn main() -> anyhow::Result<()> {
             components::Position(position),
             components::Rotation(rotation),
             components::RotationMatrix::default(),
+            components::ModelId::Carrier,
         ));
     }
 

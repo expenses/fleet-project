@@ -3,20 +3,23 @@ use crate::gpu_structs::{BackgroundVertex, Instance};
 use crate::resources::*;
 use ultraviolet::Vec3;
 
-use legion::*;
 use legion::query::*;
+use legion::*;
 
 #[system(for_each)]
 #[filter(maybe_changed::<Rotation>())]
 pub fn update_ship_rotation_matrix(
     rotation: &Rotation,
     rotation_matrix: &mut RotationMatrix,
+    model_id: &ModelId,
     #[resource] models: &Models,
 ) {
     let matrix = rotation.0.into_matrix();
 
-    let min_rotated = matrix * models.carrier.min;
-    let max_rotated = matrix * models.carrier.max;
+    let model = models.get(*model_id);
+
+    let min_rotated = matrix * model.min;
+    let max_rotated = matrix * model.max;
 
     *rotation_matrix = RotationMatrix {
         matrix,
@@ -63,6 +66,7 @@ pub fn upload_ship_instances(
     selected: Option<&Selected>,
     position: &Position,
     rotation_matrix: &RotationMatrix,
+    model_id: &ModelId,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
@@ -80,32 +84,32 @@ pub fn upload_ship_instances(
             rotation: rotation_matrix.matrix,
             colour,
         },
-        0,
+        *model_id as usize,
     );
 }
 
 #[system]
 pub fn find_ship_under_cursor(
     world: &legion::world::SubWorld,
-    query: &mut Query<(Entity, &Position, &RotationMatrix)>,
+    query: &mut Query<(Entity, &ModelId, &Position, &RotationMatrix)>,
     #[resource] ray: &Ray,
     #[resource] models: &Models,
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
     ship_under_cursor.0 = query
         .iter(world)
-        .filter(|(_, position, rotation)| {
+        .filter(|(.., position, rotation)| {
             ray.bounding_box_intersection(
                 position.0 + rotation.rotated_model_min,
                 position.0 + rotation.rotated_model_max,
             )
             .is_some()
         })
-        .flat_map(|(entity, position, rotation)| {
+        .flat_map(|(entity, model_id, position, rotation)| {
             let ray = ray.centered_around_transform(position.0, rotation.reversed);
 
             models
-                .carrier
+                .get(*model_id)
                 .acceleration_tree
                 .locate_with_selection_function_with_data(ray)
                 .map(move |(_, t)| (entity, t))
