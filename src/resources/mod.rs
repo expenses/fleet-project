@@ -1,10 +1,12 @@
 mod gpu_buffer;
 mod mouse;
 mod ray;
+mod keyboard;
 
 pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use mouse::{MouseButtonState, MouseState};
 pub use ray::Ray;
+pub use keyboard::KeyboardState;
 
 use crate::components::ModelId;
 use legion::Entity;
@@ -32,6 +34,8 @@ impl Models {
         }
     }
 }
+
+pub struct CameraCenter(pub Vec3);
 
 pub struct Dimensions {
     pub width: u32,
@@ -104,10 +108,10 @@ impl PerspectiveView {
         self.perspective_view_without_movement = self.perspective * self.view_without_movement;
     }
 
-    pub fn set_view(&mut self, eye: Vec3, center: Vec3) {
-        self.view = Mat4::look_at(eye + center, center, Vec3::unit_y());
+    pub fn set_view(&mut self, orbit: Vec3, center: Vec3) {
+        self.view = Mat4::look_at(orbit + center, center, Vec3::unit_y());
         self.perspective_view = self.perspective * self.view;
-        self.view_without_movement = Mat4::look_at(Vec3::zero(), -eye, Vec3::unit_y());
+        self.view_without_movement = Mat4::look_at(Vec3::zero(), -orbit, Vec3::unit_y());
         self.perspective_view_without_movement = self.perspective * self.view_without_movement;
     }
 }

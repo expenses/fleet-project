@@ -125,12 +125,13 @@ pub fn update_ray(
     #[resource] perspective_view: &PerspectiveView,
     #[resource] mouse_state: &MouseState,
     #[resource] ray: &mut Ray,
+    #[resource] camera_center: &CameraCenter,
 ) {
     *ray = Ray::new_from_screen(
         mouse_state.position,
         dimensions.width,
         dimensions.height,
-        orbit.as_vector(),
+        orbit.as_vector() + camera_center.0,
         perspective_view,
     );
 }
@@ -193,4 +194,15 @@ pub fn update_ray_plane_point(
             */
         ]);
     }
+}
+
+#[system]
+pub fn move_camera(
+    #[resource] keyboard_state: &KeyboardState,
+    #[resource] orbit: &Orbit,
+    #[resource] perspective_view: &mut PerspectiveView,
+    #[resource] camera_center: &mut CameraCenter,
+) {
+    keyboard_state.move_camera(camera_center, orbit);
+    perspective_view.set_view(orbit.as_vector(), camera_center.0);
 }

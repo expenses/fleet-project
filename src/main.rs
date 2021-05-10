@@ -15,7 +15,7 @@ use gpu_structs::*;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const HDR_FRAMEBUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
-const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -168,19 +168,21 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::ShipUnderCursor::default());
     let orbit = resources::Orbit::new();
     lr.insert(resources::PerspectiveView::new(
-        ultraviolet::projection::perspective_wgpu_dx(
+        ultraviolet::projection::perspective_infinite_z_wgpu_dx(
             59.0_f32.to_radians(),
             dimensions.width as f32 / dimensions.height as f32,
             0.1,
-            100.0,
         ),
         orbit.as_vector(),
         Vec3::zero(),
     ));
     lr.insert(orbit);
     lr.insert(dimensions);
+    lr.insert(resources::KeyboardState::default());
+    lr.insert(resources::CameraCenter(Vec3::zero()));
 
     let mut schedule = legion::Schedule::builder()
+        .add_system(systems::move_camera_system())
         .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_ship_rotation_matrix_system())
@@ -217,11 +219,10 @@ fn main() -> anyhow::Result<()> {
                     &resources,
                 );
 
-                perspective_view.set_perspective(ultraviolet::projection::perspective_wgpu_dx(
+                perspective_view.set_perspective(ultraviolet::projection::perspective_infinite_z_wgpu_dx(
                     59.0_f32.to_radians(),
                     dimensions.width as f32 / dimensions.height as f32,
                     0.1,
-                    100.0,
                 ))
             }
             WindowEvent::KeyboardInput {
@@ -236,7 +237,10 @@ fn main() -> anyhow::Result<()> {
                 let pressed = *state == ElementState::Pressed;
                 match key {
                     VirtualKeyCode::P if pressed => paused = !paused,
-                    _ => {}
+                    _ => {
+                        let mut keyboard_state = lr.get_mut::<resources::KeyboardState>().unwrap();
+                        keyboard_state.handle(*key, pressed);
+                    }
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -258,11 +262,9 @@ fn main() -> anyhow::Result<()> {
 
                 if mouse_state.right_state.is_being_dragged().is_some() {
                     let mut orbit = lr.get_mut::<resources::Orbit>().unwrap();
-                    let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
 
                     let delta = position - mouse_state.position;
                     orbit.rotate(delta);
-                    perspective_view.set_view(orbit.as_vector(), Vec3::zero());
                 }
 
                 mouse_state.position = position;
