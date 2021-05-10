@@ -125,13 +125,13 @@ pub fn update_ray(
     #[resource] perspective_view: &PerspectiveView,
     #[resource] mouse_state: &MouseState,
     #[resource] ray: &mut Ray,
-    #[resource] camera_center: &CameraCenter,
+    #[resource] camera: &Camera,
 ) {
     *ray = Ray::new_from_screen(
         mouse_state.position,
         dimensions.width,
         dimensions.height,
-        orbit.as_vector() + camera_center.0,
+        orbit.as_vector() + camera.center,
         perspective_view,
     );
 }
@@ -201,8 +201,39 @@ pub fn move_camera(
     #[resource] keyboard_state: &KeyboardState,
     #[resource] orbit: &Orbit,
     #[resource] perspective_view: &mut PerspectiveView,
-    #[resource] camera_center: &mut CameraCenter,
+    #[resource] camera: &mut Camera,
 ) {
-    keyboard_state.move_camera(camera_center, orbit);
-    perspective_view.set_view(orbit.as_vector(), camera_center.0);
+    keyboard_state.move_camera(camera, orbit);
+    perspective_view.set_view(orbit.as_vector(), camera.center);
+}
+
+#[system]
+pub fn update_keyboard_state(#[resource] keyboard_state: &mut KeyboardState) {
+    keyboard_state.update();
+}
+
+#[system]
+pub fn set_camera_following(
+    #[resource] keyboard_state: &KeyboardState,
+    #[resource] camera: &mut Camera,
+    selected: &mut Query<Entity, HasComponent<Selected>>,
+    world: &legion::world::SubWorld,
+) {
+    if keyboard_state.center_camera.0 {
+        camera.following = selected.iter(world).next().cloned();
+    }
+}
+
+#[system]
+pub fn move_camera_around_following(
+    #[resource] camera: &mut Camera,
+    positions: &mut Query<&Position>,
+    world: &legion::world::SubWorld,
+) {
+    if let Some(following) = camera.following {
+        match positions.get(world, following) {
+            Ok(position) => camera.center = position.0,
+            Err(_) => camera.following = None,
+        }
+    }
 }

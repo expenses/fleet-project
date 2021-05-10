@@ -179,10 +179,12 @@ fn main() -> anyhow::Result<()> {
     lr.insert(orbit);
     lr.insert(dimensions);
     lr.insert(resources::KeyboardState::default());
-    lr.insert(resources::CameraCenter(Vec3::zero()));
+    lr.insert(resources::Camera::default());
 
     let mut schedule = legion::Schedule::builder()
         .add_system(systems::move_camera_system())
+        .add_system(systems::set_camera_following_system())
+        .add_system(systems::move_camera_around_following_system())
         .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_ship_rotation_matrix_system())
@@ -195,6 +197,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_mouse_state_system())
+        .add_system(systems::update_keyboard_state_system())
         .build();
 
     dbg!(&schedule);
@@ -219,11 +222,13 @@ fn main() -> anyhow::Result<()> {
                     &resources,
                 );
 
-                perspective_view.set_perspective(ultraviolet::projection::perspective_infinite_z_wgpu_dx(
-                    59.0_f32.to_radians(),
-                    dimensions.width as f32 / dimensions.height as f32,
-                    0.1,
-                ))
+                perspective_view.set_perspective(
+                    ultraviolet::projection::perspective_infinite_z_wgpu_dx(
+                        59.0_f32.to_radians(),
+                        dimensions.width as f32 / dimensions.height as f32,
+                        0.1,
+                    ),
+                )
             }
             WindowEvent::KeyboardInput {
                 input:

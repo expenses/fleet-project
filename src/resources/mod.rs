@@ -1,12 +1,12 @@
 mod gpu_buffer;
+mod keyboard;
 mod mouse;
 mod ray;
-mod keyboard;
 
 pub use gpu_buffer::{GpuBuffer, ShipBuffer};
+pub use keyboard::KeyboardState;
 pub use mouse::{MouseButtonState, MouseState};
 pub use ray::Ray;
-pub use keyboard::KeyboardState;
 
 use crate::components::ModelId;
 use legion::Entity;
@@ -35,7 +35,11 @@ impl Models {
     }
 }
 
-pub struct CameraCenter(pub Vec3);
+#[derive(Default)]
+pub struct Camera {
+    pub center: Vec3,
+    pub following: Option<Entity>,
+}
 
 pub struct Dimensions {
     pub width: u32,
