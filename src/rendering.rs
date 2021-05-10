@@ -1,5 +1,5 @@
+use crate::gpu_structs::{BackgroundVertex, BlurSettings, GodraySettings, PushConstants};
 use crate::resources;
-use crate::gpu_structs::{BackgroundVertex, PushConstants, BlurSettings, GodraySettings};
 use crate::{Pipelines, Resizables};
 use ultraviolet::{Vec2, Vec3, Vec4};
 
@@ -11,6 +11,10 @@ pub struct StarSystem {
     pub num_stars: u32,
 }
 
+pub struct Constants {
+    pub bounding_box_indices: wgpu::Buffer,
+}
+
 pub fn run_render_passes(
     frame: &wgpu::SwapChainFrame,
     encoder: &mut wgpu::CommandEncoder,
@@ -19,11 +23,14 @@ pub fn run_render_passes(
     resources: &legion::Resources,
     star_system: &StarSystem,
     tonemapper: &colstodian::LottesTonemapper,
+    constants: &Constants,
     draw_godrays: bool,
 ) {
     let ship_buffer = resources.get::<resources::ShipBuffer>().unwrap();
     let models = resources.get::<resources::Models>().unwrap();
-    let line_buffer = resources.get::<resources::GpuBuffer<BackgroundVertex>>().unwrap();
+    let line_buffer = resources
+        .get::<resources::GpuBuffer<BackgroundVertex>>()
+        .unwrap();
     let perspective_view = resources.get::<resources::PerspectiveView>().unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -70,8 +77,7 @@ pub fn run_render_passes(
     render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
     render_pass.set_vertex_buffer(0, models.carrier.vertices.slice(..));
     render_pass.set_vertex_buffer(1, instance_buffer);
-    render_pass
-        .set_index_buffer(models.carrier.indices.slice(..), wgpu::IndexFormat::Uint16);
+    render_pass.set_index_buffer(models.carrier.indices.slice(..), wgpu::IndexFormat::Uint16);
     render_pass.set_push_constants(
         wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
         0,
@@ -213,8 +219,12 @@ pub fn run_render_passes(
 
     render_pass.set_pipeline(&pipelines.bounding_boxes);
     render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
+    render_pass.set_index_buffer(
+        constants.bounding_box_indices.slice(..),
+        wgpu::IndexFormat::Uint16,
+    );
     render_pass.set_vertex_buffer(1, instance_buffer);
-    render_pass.draw(0..24, 0..num_instances[0]);
+    render_pass.draw_indexed(0..24, 0, 0..num_instances[0]);
 
     drop(render_pass);
 }

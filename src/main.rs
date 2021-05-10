@@ -7,9 +7,9 @@ use winit::event_loop::*;
 mod background;
 mod components;
 mod gpu_structs;
+mod rendering;
 mod resources;
 mod systems;
-mod rendering;
 
 use gpu_structs::*;
 
@@ -105,6 +105,25 @@ fn main() -> anyhow::Result<()> {
             label: Some("star vertices"),
             contents: bytemuck::cast_slice(&stars),
             usage: wgpu::BufferUsage::VERTEX,
+        }),
+    };
+
+    let bounding_box_indices_for_model_id = |id: u16| {
+        let mut bounding_box_indices: [u16; 24] = [
+            0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7,
+        ];
+        let offset = id * 24;
+        for i in 0..24 {
+            bounding_box_indices[i] += offset;
+        }
+        bounding_box_indices
+    };
+
+    let constants = rendering::Constants {
+        bounding_box_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("bounding box vertices"),
+            contents: bytemuck::cast_slice(&bounding_box_indices_for_model_id(0)),
+            usage: wgpu::BufferUsage::INDEX,
         }),
     };
 
@@ -276,7 +295,8 @@ fn main() -> anyhow::Result<()> {
                     &lr,
                     &star_system,
                     &tonemapper,
-                    draw_godrays
+                    &constants,
+                    draw_godrays,
                 );
 
                 gpu_interface.queue.submit(Some(encoder.finish()));
@@ -1026,22 +1046,15 @@ fn load_ship_model(
             label: None,
             usage: wgpu::BufferUsage::VERTEX,
             contents: bytemuck::cast_slice(&[
-                // Zs
-                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z),
-                Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z),
-                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z),
-                Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z),
-                // Ys
-                Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, max.y, min.z),
-                Vec3::new(min.x, min.y, max.z), Vec3::new(min.x, max.y, max.z),
-                Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z),
-                Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z),
-                // Xs
-                Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z),
-                Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z),
-                Vec3::new(min.x, max.y, min.z), Vec3::new(max.x, max.y, min.z),
-                Vec3::new(min.x, max.y, max.z), Vec3::new(max.x, max.y, max.z),
-            ])
+                Vec3::new(min.x, min.y, min.z),
+                Vec3::new(min.x, min.y, max.z),
+                Vec3::new(min.x, max.y, min.z),
+                Vec3::new(min.x, max.y, max.z),
+                Vec3::new(max.x, min.y, min.z),
+                Vec3::new(max.x, min.y, max.z),
+                Vec3::new(max.x, max.y, min.z),
+                Vec3::new(max.x, max.y, max.z),
+            ]),
         }),
     })
 }
