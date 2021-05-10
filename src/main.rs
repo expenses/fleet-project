@@ -311,12 +311,16 @@ pub struct Resizables {
     hdr_framebuffer: wgpu::TextureView,
     depth_buffer: wgpu::TextureView,
     bloom_buffer: wgpu::TextureView,
-    intermediate_bloom_buffer: wgpu::TextureView,
     hdr_pass: wgpu::BindGroup,
-    first_bloom_blur_pass: wgpu::BindGroup,
-    second_bloom_blur_pass: wgpu::BindGroup,
     godray_buffer: wgpu::TextureView,
     godray_bind_group: wgpu::BindGroup,
+
+    kawase_bloom_buffer_1: wgpu::TextureView,
+    kawase_downsample_pass_1: wgpu::BindGroup,
+    kawase_upsample_pass_1: wgpu::BindGroup,
+    kawase_bloom_buffer_2: wgpu::TextureView,
+    kawase_downsample_pass_2: wgpu::BindGroup,
+    kawase_upsample_pass_2: wgpu::BindGroup,
 }
 
 impl Resizables {
@@ -331,15 +335,6 @@ impl Resizables {
         let bloom_buffer = create_texture(
             device,
             "bloom buffer",
-            width,
-            height,
-            EFFECT_BUFFER_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-        );
-
-        let intermediate_bloom_buffer = create_texture(
-            device,
-            "intermediate bloom buffer",
             width,
             height,
             EFFECT_BUFFER_FORMAT,
@@ -364,6 +359,24 @@ impl Resizables {
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
+        let kawase_bloom_buffer_1 = create_texture(
+            &device,
+            "kawase bloom buffer 1",
+            width / 2,
+            height / 2,
+            EFFECT_BUFFER_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
+        let kawase_bloom_buffer_2 = create_texture(
+            &device,
+            "kawase bloom buffer 2",
+            width / 4,
+            height / 4,
+            EFFECT_BUFFER_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
         Self {
             swapchain: device.create_swap_chain(
                 surface,
@@ -385,20 +398,6 @@ impl Resizables {
                 DEPTH_FORMAT,
                 wgpu::TextureUsage::RENDER_ATTACHMENT,
             ),
-            first_bloom_blur_pass: make_effect_bind_group(
-                &device,
-                &resources,
-                &bloom_buffer,
-                "first bloom blur pass bind group",
-            ),
-            bloom_buffer,
-            second_bloom_blur_pass: make_effect_bind_group(
-                &device,
-                &resources,
-                &intermediate_bloom_buffer,
-                "second bloom blur pass bind group",
-            ),
-            intermediate_bloom_buffer,
             godray_bind_group: make_effect_bind_group(
                 &device,
                 &resources,
@@ -406,6 +405,33 @@ impl Resizables {
                 "godray blur bind group",
             ),
             godray_buffer,
+            kawase_downsample_pass_1: make_effect_bind_group(
+                &device,
+                &resources,
+                &bloom_buffer,
+                "kawase downsample pass 1",
+            ),
+            kawase_downsample_pass_2: make_effect_bind_group(
+                &device,
+                &resources,
+                &kawase_bloom_buffer_1,
+                "kawase downsample pass 2",
+            ),
+            kawase_upsample_pass_1: make_effect_bind_group(
+                &device,
+                &resources,
+                &kawase_bloom_buffer_2,
+                "kawase upsample pass 1"
+            ),
+            kawase_upsample_pass_2: make_effect_bind_group(
+                &device,
+                &resources,
+                &kawase_bloom_buffer_1,
+                "kawase upsample pass 1"
+            ),
+            bloom_buffer,
+            kawase_bloom_buffer_1,
+            kawase_bloom_buffer_2,
         }
     }
 }
@@ -495,12 +521,12 @@ impl Resources {
 pub struct Pipelines {
     ship: wgpu::RenderPipeline,
     background: wgpu::RenderPipeline,
-    first_bloom_blur: wgpu::RenderPipeline,
-    second_bloom_blur: wgpu::RenderPipeline,
     godray_blur: wgpu::RenderPipeline,
     lines: wgpu::RenderPipeline,
     bounding_boxes: wgpu::RenderPipeline,
     tonemapper: wgpu::RenderPipeline,
+    kawase_downsample: wgpu::RenderPipeline,
+    kawase_upsample: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -618,18 +644,15 @@ impl Pipelines {
             "../shaders/compiled/flat_colour.frag.spv"
         ));
 
-        let bloom_blur_pipeline_layout =
+        let kawase_blur_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("bloom blur pipeline layout"),
+                label: Some("kawase blur pipeline layout"),
                 bind_group_layouts: &[&resources.effect_bgl],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStage::FRAGMENT,
-                    range: 0..std::mem::size_of::<BlurSettings>() as u32,
+                    range: 0..std::mem::size_of::<KawaseSettings>() as u32,
                 }],
             });
-
-        let fs_blur =
-            device.create_shader_module(&wgpu::include_spirv!("../shaders/compiled/blur.frag.spv"));
 
         Self {
             ship: {
@@ -690,36 +713,6 @@ impl Pipelines {
                     }),
                     primitive: clamp_depth.clone(),
                     depth_stencil: Some(depth_read.clone()),
-                    multisample: wgpu::MultisampleState::default(),
-                })
-            },
-            first_bloom_blur: {
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("first bloom blur pipeline"),
-                    layout: Some(&bloom_blur_pipeline_layout),
-                    vertex: fullscreen_tri_vertex.clone(),
-                    fragment: Some(wgpu::FragmentState {
-                        module: &fs_blur,
-                        entry_point: "main",
-                        targets: &[additive_colour_state(EFFECT_BUFFER_FORMAT)],
-                    }),
-                    primitive: wgpu::PrimitiveState::default(),
-                    depth_stencil: None,
-                    multisample: wgpu::MultisampleState::default(),
-                })
-            },
-            second_bloom_blur: {
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("second bloom blur pipeline"),
-                    layout: Some(&bloom_blur_pipeline_layout),
-                    vertex: fullscreen_tri_vertex.clone(),
-                    fragment: Some(wgpu::FragmentState {
-                        module: &fs_blur,
-                        entry_point: "main",
-                        targets: &[additive_colour_state(HDR_FRAMEBUFFER_FORMAT)],
-                    }),
-                    primitive: wgpu::PrimitiveState::default(),
-                    depth_stencil: None,
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
@@ -833,7 +826,7 @@ impl Pipelines {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("tonemapper pipeline"),
                     layout: Some(&pipeline_layout),
-                    vertex: fullscreen_tri_vertex,
+                    vertex: fullscreen_tri_vertex.clone(),
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_tonemap,
                         entry_point: "main",
@@ -841,6 +834,44 @@ impl Pipelines {
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: Some(depth_ignore),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            kawase_downsample: {
+                let fs_kawase_downsample = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/kawase_downsample.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("kawase downsample pipeline"),
+                    layout: Some(&kawase_blur_pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_kawase_downsample,
+                        entry_point: "main",
+                        targets: &[EFFECT_BUFFER_FORMAT.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            kawase_upsample: {
+                let fs_kawase_upsample = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/kawase_upsample.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("kawase upsample pipeline"),
+                    layout: Some(&kawase_blur_pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_kawase_upsample,
+                        entry_point: "main",
+                        targets: &[additive_colour_state(EFFECT_BUFFER_FORMAT)],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
                     multisample: wgpu::MultisampleState::default(),
                 })
             },

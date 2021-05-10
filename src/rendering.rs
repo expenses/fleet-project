@@ -1,4 +1,4 @@
-use crate::gpu_structs::{BackgroundVertex, BlurSettings, GodraySettings, PushConstants};
+use crate::gpu_structs::{BackgroundVertex, KawaseSettings, GodraySettings, PushConstants};
 use crate::resources;
 use crate::{Pipelines, Resizables};
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -32,6 +32,8 @@ pub fn run_render_passes(
         .get::<resources::GpuBuffer<BackgroundVertex>>()
         .unwrap();
     let perspective_view = resources.get::<resources::PerspectiveView>().unwrap();
+    let dimensions = resources.get::<resources::Dimensions>().unwrap();
+    let resolution = Vec2::new(dimensions.width as f32, dimensions.height as f32);
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("main render pass"),
@@ -102,36 +104,85 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
+    let settings = KawaseSettings { half_offset_per_pixel: Vec2::broadcast(1.5) / resolution };
+    let settings_bytes = bytemuck::bytes_of(&settings);
+
+    {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("kawase downsample render pass 1"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.kawase_bloom_buffer_1,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&pipelines.kawase_downsample);
+        render_pass.set_bind_group(0, &resizables.kawase_downsample_pass_1, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::FRAGMENT,
+            0,
+            settings_bytes,
+        );
+        render_pass.draw(0..3, 0..1);
+
+        drop(render_pass);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("kawase downsample render pass 2"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.kawase_bloom_buffer_2,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&pipelines.kawase_downsample);
+        render_pass.set_bind_group(0, &resizables.kawase_downsample_pass_2, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::FRAGMENT,
+            0,
+            settings_bytes,
+        );
+        render_pass.draw(0..3, 0..1);
+
+        drop(render_pass);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("kawase upsample render pass 1"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.kawase_bloom_buffer_1,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&pipelines.kawase_upsample);
+        render_pass.set_bind_group(0, &resizables.kawase_upsample_pass_1, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::FRAGMENT,
+            0,
+            settings_bytes,
+        );
+        render_pass.draw(0..3, 0..1);
+
+        drop(render_pass);
+    }
+
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("first bloom blur render pass"),
-        color_attachments: &[wgpu::RenderPassColorAttachment {
-            view: &resizables.intermediate_bloom_buffer,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: true,
-            },
-        }],
-        depth_stencil_attachment: None,
-    });
-
-    render_pass.set_pipeline(&pipelines.first_bloom_blur);
-    render_pass.set_bind_group(0, &resizables.first_bloom_blur_pass, &[]);
-    render_pass.set_push_constants(
-        wgpu::ShaderStage::FRAGMENT,
-        0,
-        bytemuck::bytes_of(&BlurSettings {
-            direction: 0,
-            strength: 1.0,
-            scale: 2.0,
-        }),
-    );
-    render_pass.draw(0..3, 0..1);
-
-    drop(render_pass);
-
-    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("second bloom blur render pass"),
+        label: Some("kawase upsample final"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
             view: &resizables.hdr_framebuffer,
             resolve_target: None,
@@ -143,16 +194,12 @@ pub fn run_render_passes(
         depth_stencil_attachment: None,
     });
 
-    render_pass.set_pipeline(&pipelines.second_bloom_blur);
-    render_pass.set_bind_group(0, &resizables.second_bloom_blur_pass, &[]);
+    render_pass.set_pipeline(&pipelines.kawase_upsample);
+    render_pass.set_bind_group(0, &resizables.kawase_upsample_pass_2, &[]);
     render_pass.set_push_constants(
         wgpu::ShaderStage::FRAGMENT,
         0,
-        bytemuck::bytes_of(&BlurSettings {
-            direction: 1,
-            strength: 1.0,
-            scale: 2.0,
-        }),
+        settings_bytes,
     );
     render_pass.draw(0..3, 0..1);
 

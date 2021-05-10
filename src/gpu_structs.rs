@@ -32,10 +32,8 @@ pub struct BackgroundVertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct BlurSettings {
-    pub scale: f32,
-    pub strength: f32,
-    pub direction: i32,
+pub struct KawaseSettings {
+    pub half_offset_per_pixel: Vec2,
 }
 
 #[repr(C)]
