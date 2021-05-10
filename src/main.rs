@@ -13,6 +13,7 @@ mod systems;
 use gpu_structs::*;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -357,7 +358,7 @@ fn main() -> anyhow::Result<()> {
                     depth_stencil_attachment: None,
                 });
 
-                render_pass.set_pipeline(&pipelines.blur);
+                render_pass.set_pipeline(&pipelines.first_bloom_blur);
                 render_pass.set_bind_group(0, &resizables.first_bloom_blur_pass, &[]);
                 render_pass.set_push_constants(
                     wgpu::ShaderStage::FRAGMENT,
@@ -385,7 +386,7 @@ fn main() -> anyhow::Result<()> {
                     depth_stencil_attachment: None,
                 });
 
-                render_pass.set_pipeline(&pipelines.blur);
+                render_pass.set_pipeline(&pipelines.second_bloom_blur);
                 render_pass.set_bind_group(0, &resizables.second_bloom_blur_pass, &[]);
                 render_pass.set_push_constants(
                     wgpu::ShaderStage::FRAGMENT,
@@ -461,7 +462,7 @@ impl Resizables {
             "bloom buffer",
             width,
             height,
-            display_format,
+            EFFECT_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
@@ -470,7 +471,7 @@ impl Resizables {
             "intermediate bloom buffer",
             width,
             height,
-            display_format,
+            EFFECT_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
@@ -479,7 +480,7 @@ impl Resizables {
             "godray buffer",
             width,
             height,
-            display_format,
+            EFFECT_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
@@ -612,7 +613,8 @@ impl Resources {
 struct Pipelines {
     ship: wgpu::RenderPipeline,
     background: wgpu::RenderPipeline,
-    blur: wgpu::RenderPipeline,
+    first_bloom_blur: wgpu::RenderPipeline,
+    second_bloom_blur: wgpu::RenderPipeline,
     godray_blur: wgpu::RenderPipeline,
     lines: wgpu::RenderPipeline,
     bounding_boxes: wgpu::RenderPipeline,
@@ -676,12 +678,18 @@ impl Pipelines {
             "../shaders/compiled/fullscreen_tri.vert.spv"
         ));
 
+        let fullscreen_tri_vertex = wgpu::VertexState {
+            module: &vs_fullscreen_tri,
+            entry_point: "main",
+            buffers: &[],
+        };
+
         let vs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
             "../shaders/compiled/flat_colour.vert.spv"
         ));
 
-        let additive_colour_state = wgpu::ColorTargetState {
-            format: display_format,
+        let additive_colour_state = |target| wgpu::ColorTargetState {
+            format: target,
             write_mask: wgpu::ColorWrite::ALL,
             blend: Some(wgpu::BlendState {
                 color: wgpu::BlendComponent {
@@ -693,8 +701,8 @@ impl Pipelines {
             }),
         };
 
-        let ignore_colour_state = wgpu::ColorTargetState {
-            format: display_format,
+        let ignore_colour_state = |format| wgpu::ColorTargetState {
+            format,
             write_mask: wgpu::ColorWrite::empty(),
             blend: None,
         };
@@ -718,6 +726,19 @@ impl Pipelines {
         let fs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
             "../shaders/compiled/flat_colour.frag.spv"
         ));
+
+        let bloom_blur_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("bloom blur pipeline layout"),
+                bind_group_layouts: &[&resources.effect_bgl],
+                push_constant_ranges: &[wgpu::PushConstantRange {
+                    stages: wgpu::ShaderStage::FRAGMENT,
+                    range: 0..std::mem::size_of::<BlurSettings>() as u32,
+                }],
+            });
+
+        let fs_blur =
+            device.create_shader_module(&wgpu::include_spirv!("../shaders/compiled/blur.frag.spv"));
 
         Self {
             ship: {
@@ -745,8 +766,8 @@ impl Pipelines {
                         entry_point: "main",
                         targets: &[
                             display_format.into(),
-                            display_format.into(),
-                            ignore_colour_state.clone(),
+                            EFFECT_BUFFER_FORMAT.into(),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
                         ],
                     }),
                     primitive: backface_culling.clone(),
@@ -772,8 +793,8 @@ impl Pipelines {
                         entry_point: "main",
                         targets: &[
                             display_format.into(),
-                            display_format.into(),
-                            display_format.into(),
+                            EFFECT_BUFFER_FORMAT.into(),
+                            EFFECT_BUFFER_FORMAT.into(),
                         ],
                     }),
                     primitive: clamp_depth.clone(),
@@ -781,33 +802,30 @@ impl Pipelines {
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
-            blur: {
-                let pipeline_layout =
-                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("bloom blur pipeline layout"),
-                        bind_group_layouts: &[&resources.effect_bgl],
-                        push_constant_ranges: &[wgpu::PushConstantRange {
-                            stages: wgpu::ShaderStage::FRAGMENT,
-                            range: 0..std::mem::size_of::<BlurSettings>() as u32,
-                        }],
-                    });
-
-                let fs_blur = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/blur.frag.spv"
-                ));
-
+            first_bloom_blur: {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("bloom blur pipeline"),
-                    layout: Some(&pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &vs_fullscreen_tri,
-                        entry_point: "main",
-                        buffers: &[],
-                    },
+                    label: Some("first bloom blur pipeline"),
+                    layout: Some(&bloom_blur_pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_blur,
                         entry_point: "main",
-                        targets: &[additive_colour_state.clone()],
+                        targets: &[additive_colour_state(EFFECT_BUFFER_FORMAT)],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            second_bloom_blur: {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("second bloom blur pipeline"),
+                    layout: Some(&bloom_blur_pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_blur,
+                        entry_point: "main",
+                        targets: &[additive_colour_state(display_format)],
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: None,
@@ -832,15 +850,11 @@ impl Pipelines {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("godray blur pipeline"),
                     layout: Some(&pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &vs_fullscreen_tri,
-                        entry_point: "main",
-                        buffers: &[],
-                    },
+                    vertex: fullscreen_tri_vertex,
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_godray_blur,
                         entry_point: "main",
-                        targets: &[additive_colour_state],
+                        targets: &[additive_colour_state(display_format)],
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: None,
@@ -861,8 +875,8 @@ impl Pipelines {
                         entry_point: "main",
                         targets: &[
                             display_format.into(),
-                            ignore_colour_state.clone(),
-                            ignore_colour_state.clone(),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
                         ],
                     }),
                     primitive: wgpu::PrimitiveState {
@@ -906,8 +920,8 @@ impl Pipelines {
                         entry_point: "main",
                         targets: &[
                             display_format.into(),
-                            ignore_colour_state.clone(),
-                            ignore_colour_state.clone(),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
                         ],
                     }),
                     primitive: wgpu::PrimitiveState {
