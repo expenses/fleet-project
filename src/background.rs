@@ -135,7 +135,7 @@ pub fn uniform_sphere_distribution_from_coords(x: f64, y: f64) -> Vec3 {
 pub fn create_stars(rng: &mut ThreadRng) -> impl Iterator<Item = BackgroundVertex> + '_ {
     (0..2000).flat_map(move |_| {
         let unit_pos = uniform_sphere_distribution(rng);
-        star_points(unit_pos, 1.0, Vec3::one())
+        std::array::IntoIter::new(star_points(unit_pos, 1.0, Vec3::one()))
     })
 }
 
@@ -143,7 +143,7 @@ pub fn star_points(
     unit_pos: Vec3,
     scale: f32,
     colour: Vec3,
-) -> impl Iterator<Item = BackgroundVertex> {
+) -> [BackgroundVertex; 6] {
     let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), unit_pos);
 
     let mut points = [
@@ -157,8 +157,11 @@ pub fn star_points(
 
     rotation.rotate_vecs(&mut points);
 
-    std::array::IntoIter::new(points).map(move |point| BackgroundVertex {
-        position: point + unit_pos * 1500.0,
-        colour,
-    })
+    let mut vertices = [BackgroundVertex::default(); 6];
+
+    for i in 0 .. 6 {
+        vertices[i] = BackgroundVertex { position: points[i] + unit_pos * 1500.0, colour };
+    }
+
+    vertices
 }

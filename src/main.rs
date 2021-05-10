@@ -16,6 +16,7 @@ use gpu_structs::*;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const HDR_FRAMEBUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
+const GODRAY_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -56,7 +57,7 @@ fn main() -> anyhow::Result<()> {
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
     let mut paused = false;
-    let draw_godrays = false;
+    let draw_godrays = true;
 
     let tonemapper = colstodian::LottesTonemapper::new(colstodian::LottesTonemaperParams {
         gray_point_in: 0.15,
@@ -84,12 +85,14 @@ fn main() -> anyhow::Result<()> {
     let mut sun_dir = background::uniform_sphere_distribution(&mut rng);
     sun_dir.y = sun_dir.y.abs();
 
+    let sun_vertices = background::star_points(
+        sun_dir,
+        250.0,
+        Vec3::broadcast(2.0) * Vec3::new(1.0, 0.8, 1.0 / 3.0),
+    );
+
     let stars = background::create_stars(&mut rng)
-        .chain(background::star_points(
-            sun_dir,
-            250.0,
-            Vec3::broadcast(2.0) * Vec3::new(1.0, 0.8, 1.0 / 3.0),
-        ))
+        .chain(std::array::IntoIter::new(sun_vertices))
         .collect::<Vec<_>>();
 
     let star_system = rendering::StarSystem {
@@ -106,6 +109,11 @@ fn main() -> anyhow::Result<()> {
             contents: bytemuck::cast_slice(&stars),
             usage: wgpu::BufferUsage::VERTEX,
         }),
+        sun_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("sun vertices"),
+            contents: bytemuck::cast_slice(&sun_vertices),
+            usage: wgpu::BufferUsage::VERTEX
+        })
     };
 
     let bounding_box_indices_for_model_id = |id: u16| {
@@ -319,6 +327,10 @@ pub struct Resizables {
     second_bloom_blur_pass: wgpu::BindGroup,
     godray_buffer: wgpu::TextureView,
     godray_bind_group: wgpu::BindGroup,
+    intermediate_godray_buffer: wgpu::TextureView,
+    blurred_godray_bind_group: wgpu::BindGroup,
+    intermediate_godray_buffer_2: wgpu::TextureView,
+    blurred_godray_bind_group_2: wgpu::BindGroup
 }
 
 impl Resizables {
@@ -353,7 +365,7 @@ impl Resizables {
             "godray buffer",
             width,
             height,
-            EFFECT_BUFFER_FORMAT,
+            GODRAY_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
@@ -363,6 +375,24 @@ impl Resizables {
             width,
             height,
             HDR_FRAMEBUFFER_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
+        let intermediate_godray_buffer = create_texture(
+            &device,
+            "intermediate godray buffer",
+            width / 3,
+            height / 3,
+            EFFECT_BUFFER_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
+        let intermediate_godray_buffer_2 = create_texture(
+            &device,
+            "intermediate godray buffer 2",
+            width / 3,
+            height / 3,
+            EFFECT_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
@@ -408,6 +438,20 @@ impl Resizables {
                 "godray blur bind group",
             ),
             godray_buffer,
+            blurred_godray_bind_group: make_effect_bind_group(
+                &device,
+                &resources,
+                &intermediate_godray_buffer,
+                "blurred godray bind group",
+            ),
+            intermediate_godray_buffer,
+            blurred_godray_bind_group_2: make_effect_bind_group(
+                &device,
+                &resources,
+                &intermediate_godray_buffer_2,
+                "blurred godray bind group 2",
+            ),
+            intermediate_godray_buffer_2,
         }
     }
 }
@@ -503,6 +547,8 @@ pub struct Pipelines {
     lines: wgpu::RenderPipeline,
     bounding_boxes: wgpu::RenderPipeline,
     tonemapper: wgpu::RenderPipeline,
+    godray_sun: wgpu::RenderPipeline,
+    godray_blit: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -660,7 +706,7 @@ impl Pipelines {
                         targets: &[
                             HDR_FRAMEBUFFER_FORMAT.into(),
                             EFFECT_BUFFER_FORMAT.into(),
-                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
+                            ignore_colour_state(GODRAY_BUFFER_FORMAT),
                         ],
                     }),
                     primitive: backface_culling.clone(),
@@ -687,7 +733,7 @@ impl Pipelines {
                         targets: &[
                             HDR_FRAMEBUFFER_FORMAT.into(),
                             EFFECT_BUFFER_FORMAT.into(),
-                            EFFECT_BUFFER_FORMAT.into(),
+                            GODRAY_BUFFER_FORMAT.into(),
                         ],
                     }),
                     primitive: clamp_depth.clone(),
@@ -725,35 +771,6 @@ impl Pipelines {
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
-            godray_blur: {
-                let pipeline_layout =
-                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("godray blur pipeline layout"),
-                        bind_group_layouts: &[&resources.effect_bgl],
-                        push_constant_ranges: &[wgpu::PushConstantRange {
-                            stages: wgpu::ShaderStage::FRAGMENT,
-                            range: 0..std::mem::size_of::<GodraySettings>() as u32,
-                        }],
-                    });
-
-                let fs_godray_blur = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/godray_blur.frag.spv"
-                ));
-
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("godray blur pipeline"),
-                    layout: Some(&pipeline_layout),
-                    vertex: fullscreen_tri_vertex.clone(),
-                    fragment: Some(wgpu::FragmentState {
-                        module: &fs_godray_blur,
-                        entry_point: "main",
-                        targets: &[additive_colour_state(HDR_FRAMEBUFFER_FORMAT)],
-                    }),
-                    primitive: wgpu::PrimitiveState::default(),
-                    depth_stencil: None,
-                    multisample: wgpu::MultisampleState::default(),
-                })
-            },
             lines: {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("lines pipeline"),
@@ -761,7 +778,7 @@ impl Pipelines {
                     vertex: wgpu::VertexState {
                         module: &vs_flat_colour,
                         entry_point: "main",
-                        buffers: &[background_vertex_buffer_layout],
+                        buffers: &[background_vertex_buffer_layout.clone()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,
@@ -835,7 +852,7 @@ impl Pipelines {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("tonemapper pipeline"),
                     layout: Some(&pipeline_layout),
-                    vertex: fullscreen_tri_vertex,
+                    vertex: fullscreen_tri_vertex.clone(),
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_tonemap,
                         entry_point: "main",
@@ -846,6 +863,103 @@ impl Pipelines {
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
+            godray_sun: {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("godray sun pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_flat_colour,
+                        entry_point: "main",
+                        buffers: &[background_vertex_buffer_layout.clone()],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[
+                            EFFECT_BUFFER_FORMAT.into(),
+                        ],
+                    }),
+                    primitive: clamp_depth.clone(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            godray_ships: {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("godray sun pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_godray_ships,
+                        entry_point: "main",
+                        buffers: &[background_vertex_buffer_layout.clone()],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[
+                            EFFECT_BUFFER_FORMAT.into(),
+                        ],
+                    }),
+                    primitive: clamp_depth.clone(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            godray_blur: {
+                let pipeline_layout =
+                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("godray blur pipeline layout"),
+                        bind_group_layouts: &[&resources.effect_bgl],
+                        push_constant_ranges: &[wgpu::PushConstantRange {
+                            stages: wgpu::ShaderStage::FRAGMENT,
+                            range: 0..std::mem::size_of::<GodraySettings>() as u32,
+                        }],
+                    });
+
+                let fs_godray_blur = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/godray_blur.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("godray blur pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_godray_blur,
+                        entry_point: "main",
+                        targets: &[EFFECT_BUFFER_FORMAT.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            godray_blit: {
+                let pipeline_layout =
+                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("effect pipeline layout"),
+                        bind_group_layouts: &[&resources.effect_bgl],
+                        push_constant_ranges: &[],
+                    });
+
+                let fs_blit = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/blit.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("godray blit pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: fullscreen_tri_vertex.clone(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_blit,
+                        entry_point: "main",
+                        targets: &[additive_colour_state(HDR_FRAMEBUFFER_FORMAT)],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ pub struct StarSystem {
     pub num_background_vertices: u32,
     pub star_vertices: wgpu::Buffer,
     pub num_stars: u32,
+    pub sun_vertices: wgpu::Buffer,
 }
 
 pub struct Constants {
@@ -102,6 +103,66 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
+    {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("xyz render pass"),
+            color_attachments: &[
+                wgpu::RenderPassColorAttachment {
+                    view: &resizables.intermediate_godray_buffer,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                },
+            ],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&pipelines.godray_sun);
+        render_pass.set_vertex_buffer(0, star_system.sun_vertices.slice(..));
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::VERTEX,
+            0,
+            bytemuck::bytes_of(&perspective_view.perspective_view_without_movement),
+        );
+        render_pass.draw(0..6, 0..1);
+
+        drop(render_pass);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("xyz render pass"),
+            color_attachments: &[
+                wgpu::RenderPassColorAttachment {
+                    view: &resizables.intermediate_godray_buffer_2,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                },
+            ],
+            depth_stencil_attachment: None,
+        });
+
+        let uv_space_light_pos = uv_space_light_pos(&perspective_view, star_system.sun_dir);
+
+        render_pass.set_pipeline(&pipelines.godray_blur);
+        render_pass.set_bind_group(0, &resizables.blurred_godray_bind_group, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::FRAGMENT,
+            0,
+            bytemuck::bytes_of(&GodraySettings {
+                density_div_num_samples: 1.0 / 100.0,
+                decay: 0.98,
+                weight: 0.01,
+                num_samples: 50,
+                uv_space_light_pos,
+            }),
+        );
+        render_pass.draw(0..3, 0..1);
+    }
+
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("first bloom blur render pass"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -157,21 +218,8 @@ pub fn run_render_passes(
     render_pass.draw(0..3, 0..1);
 
     if draw_godrays {
-        let uv_space_light_pos = uv_space_light_pos(&perspective_view, star_system.sun_dir);
-
-        render_pass.set_pipeline(&pipelines.godray_blur);
-        render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);
-        render_pass.set_push_constants(
-            wgpu::ShaderStage::FRAGMENT,
-            0,
-            bytemuck::bytes_of(&GodraySettings {
-                density_div_num_samples: 1.0 / 100.0,
-                decay: 0.98,
-                weight: 0.01,
-                num_samples: 100,
-                uv_space_light_pos,
-            }),
-        );
+        render_pass.set_pipeline(&pipelines.godray_blit);
+        render_pass.set_bind_group(0, &resizables.blurred_godray_bind_group_2, &[]);
         render_pass.draw(0..3, 0..1);
     }
 
