@@ -151,7 +151,7 @@ pub fn run_render_passes(
         bytemuck::bytes_of(&BlurSettings {
             direction: 1,
             strength: 1.0,
-            scale: 2.0,
+            scale: 1.0,
         }),
     );
     render_pass.draw(0..3, 0..1);

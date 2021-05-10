@@ -342,8 +342,8 @@ impl Resizables {
         let intermediate_bloom_buffer = create_texture(
             device,
             "intermediate bloom buffer",
-            width,
-            height,
+            width / 2,
+            height / 2,
             EFFECT_BUFFER_FORMAT,
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );

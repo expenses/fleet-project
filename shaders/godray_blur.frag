@@ -19,21 +19,21 @@ layout(push_constant) uniform GodraySettings {
 void main() {
     vec3 output_colour = vec3(0.0);
 
-	vec2 delta_uv = (uv - uv_space_light_pos) * density_div_num_samples;
+    vec2 delta_uv = (uv - uv_space_light_pos) * density_div_num_samples;
 
-	float illumination_decay = 1.0;
+    float illumination_decay = 1.0;
 
     vec2 sample_uv = uv;
 
-	for(uint i = 0; i < num_samples; i += 1){
-		sample_uv -= delta_uv;
-		vec3 contribution = textureLod(sampler2D(u_texture, u_sampler), sample_uv, 0).rgb
+    for(uint i = 0; i < num_samples; i += 1){
+        sample_uv -= delta_uv;
+        vec3 contribution = textureLod(sampler2D(u_texture, u_sampler), sample_uv, 0).rgb
             * illumination_decay;
-		output_colour += contribution;
-		illumination_decay *= decay;
-	}
+        output_colour += contribution;
+        illumination_decay *= decay;
+    }
 
-	output_colour *= weight;
+    output_colour *= weight;
 
     colour = vec4(output_colour, 1.0);
 }
