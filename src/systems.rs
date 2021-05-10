@@ -220,7 +220,13 @@ pub fn set_camera_following(
     world: &legion::world::SubWorld,
 ) {
     if keyboard_state.center_camera.0 {
-        camera.following = selected.iter(world).next().cloned();
+        camera.following = selected
+            .iter(world)
+            .next()
+            .cloned()
+            // If we deselect everything and press 'center camera while following
+            // something, it makes the most sense to keep following that thing.
+            .or(camera.following);
     }
 }
 
