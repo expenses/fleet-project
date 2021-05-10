@@ -19,7 +19,11 @@ float ambient_factor = 1.0 / 3.0;
 
 void main() {
     vec3 normal = normalize(in_normal);
-    float diffuse_factor = max(dot(normal, light_dir), 0.0);
+
+    // Hacky way to get the sun to light up the tops of ships when it's at a 90'
+    // angle.
+    float diffuse_bias = 0.15;
+    float diffuse_factor = clamp(dot(normal, light_dir) + diffuse_bias, 0.0, 1.0);
 
     vec3 diffuse = texture(sampler2D(u_diffuse, u_sampler), in_uv).rgb;
 
