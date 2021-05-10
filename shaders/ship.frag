@@ -15,7 +15,7 @@ layout(push_constant) uniform PushConstants {
 layout(location = 0) out vec4 colour;
 layout(location = 1) out vec4 bloom;
 
-float ambient_factor = 0.075;
+float ambient_factor = 1.0 / 3.0;
 
 void main() {
     vec3 normal = normalize(in_normal);

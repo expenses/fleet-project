@@ -7,8 +7,13 @@ use ultraviolet::{Rotor3, Vec2, Vec3};
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 pub fn make_background(rng: &mut ThreadRng) -> Vec<BackgroundVertex> {
-    let nebula_colour =
-        Colour::new(rng.gen_range(0.0..360.0), 1.0, rng.gen_range(0.5..1.0), 1.0).from_hsv();
+    let nebula_colour = Colour::new(
+        rng.gen_range(0.0..360.0),
+        1.0,
+        rng.gen_range(0.5..1.0),
+        0.75,
+    )
+    .from_hsv();
     let nebula_colour = Vec3::new(
         nebula_colour.red as f32,
         nebula_colour.green as f32,

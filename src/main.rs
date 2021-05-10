@@ -13,6 +13,7 @@ mod systems;
 use gpu_structs::*;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const HDR_FRAMEBUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 fn main() -> anyhow::Result<()> {
@@ -54,6 +55,12 @@ fn main() -> anyhow::Result<()> {
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
     let mut paused = false;
+    let draw_godrays = false;
+
+    let tonemapper = colstodian::LottesTonemapper::new(colstodian::LottesTonemaperParams {
+        crosstalk: 10.0,
+        ..Default::default()
+    });
 
     let dimensions = resources::Dimensions {
         width: window_size.width,
@@ -85,7 +92,7 @@ fn main() -> anyhow::Result<()> {
         .chain(background::star_points(
             sun_dir,
             250.0,
-            Vec3::broadcast(2.0),
+            Vec3::broadcast(2.0) * Vec3::new(1.0, 0.8, 1.0 / 3.0),
         ))
         .collect::<Vec<_>>();
     let num_stars = stars.len() as u32;
@@ -263,7 +270,7 @@ fn main() -> anyhow::Result<()> {
                     label: Some("main render pass"),
                     color_attachments: &[
                         wgpu::RenderPassColorAttachment {
-                            view: &frame.output.view,
+                            view: &resizables.hdr_framebuffer,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -297,23 +304,7 @@ fn main() -> anyhow::Result<()> {
                     }),
                 });
 
-                let (line_buffer, num_line_vertices) = line_buffer.slice();
-
-                render_pass.set_pipeline(&pipelines.lines);
-                render_pass.set_vertex_buffer(0, line_buffer);
-                render_pass.set_push_constants(
-                    wgpu::ShaderStage::VERTEX,
-                    0,
-                    bytemuck::bytes_of(&perspective_view.perspective_view),
-                );
-                render_pass.draw(0..num_line_vertices, 0..1);
-
                 let (instance_buffer, num_instances) = ship_buffer.slice();
-
-                render_pass.set_pipeline(&pipelines.bounding_boxes);
-                render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
-                render_pass.set_vertex_buffer(1, instance_buffer);
-                render_pass.draw(0..24, 0..num_instances[0]);
 
                 render_pass.set_pipeline(&pipelines.ship);
                 render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
@@ -376,7 +367,7 @@ fn main() -> anyhow::Result<()> {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("second bloom blur render pass"),
                     color_attachments: &[wgpu::RenderPassColorAttachment {
-                        view: &frame.output.view,
+                        view: &resizables.hdr_framebuffer,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
@@ -413,20 +404,69 @@ fn main() -> anyhow::Result<()> {
                     wgpu_corrected
                 };
 
-                render_pass.set_pipeline(&pipelines.godray_blur);
-                render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);
+                if draw_godrays {
+                    render_pass.set_pipeline(&pipelines.godray_blur);
+                    render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);
+                    render_pass.set_push_constants(
+                        wgpu::ShaderStage::FRAGMENT,
+                        0,
+                        bytemuck::bytes_of(&GodraySettings {
+                            density_div_num_samples: 1.0 / 100.0,
+                            decay: 0.98,
+                            weight: 0.01,
+                            num_samples: 100,
+                            uv_space_light_pos,
+                        }),
+                    );
+                    render_pass.draw(0..3, 0..1);
+                }
+
+                drop(render_pass);
+
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("tonemap and ui render pass"),
+                    color_attachments: &[wgpu::RenderPassColorAttachment {
+                        view: &frame.output.view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: true,
+                        },
+                    }],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &resizables.depth_buffer,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: true,
+                        }),
+                        stencil_ops: None,
+                    }),
+                });
+
+                render_pass.set_pipeline(&pipelines.tonemapper);
+                render_pass.set_bind_group(0, &resizables.hdr_pass, &[]);
                 render_pass.set_push_constants(
                     wgpu::ShaderStage::FRAGMENT,
                     0,
-                    bytemuck::bytes_of(&GodraySettings {
-                        density_div_num_samples: 1.0 / 100.0,
-                        decay: 0.98,
-                        weight: 0.01,
-                        num_samples: 100,
-                        uv_space_light_pos,
-                    }),
+                    bytemuck::bytes_of(&tonemapper),
                 );
                 render_pass.draw(0..3, 0..1);
+
+                let (line_buffer, num_line_vertices) = line_buffer.slice();
+
+                render_pass.set_pipeline(&pipelines.lines);
+                render_pass.set_vertex_buffer(0, line_buffer);
+                render_pass.set_push_constants(
+                    wgpu::ShaderStage::VERTEX,
+                    0,
+                    bytemuck::bytes_of(&perspective_view.perspective_view),
+                );
+                render_pass.draw(0..num_line_vertices, 0..1);
+
+                render_pass.set_pipeline(&pipelines.bounding_boxes);
+                render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, instance_buffer);
+                render_pass.draw(0..24, 0..num_instances[0]);
 
                 drop(render_pass);
 
@@ -439,9 +479,11 @@ fn main() -> anyhow::Result<()> {
 
 struct Resizables {
     swapchain: wgpu::SwapChain,
+    hdr_framebuffer: wgpu::TextureView,
     depth_buffer: wgpu::TextureView,
     bloom_buffer: wgpu::TextureView,
     intermediate_bloom_buffer: wgpu::TextureView,
+    hdr_pass: wgpu::BindGroup,
     first_bloom_blur_pass: wgpu::BindGroup,
     second_bloom_blur_pass: wgpu::BindGroup,
     godray_buffer: wgpu::TextureView,
@@ -484,6 +526,15 @@ impl Resizables {
             wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         );
 
+        let hdr_framebuffer = create_texture(
+            &device,
+            "hdr framebuffer",
+            width,
+            height,
+            HDR_FRAMEBUFFER_FORMAT,
+            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        );
+
         Self {
             swapchain: device.create_swap_chain(
                 surface,
@@ -495,6 +546,8 @@ impl Resizables {
                     present_mode: wgpu::PresentMode::Fifo,
                 },
             ),
+            hdr_pass: make_effect_bind_group(&device, &resources, &hdr_framebuffer, "hdr pass"),
+            hdr_framebuffer,
             depth_buffer: create_texture(
                 &device,
                 "depth buffer",
@@ -618,6 +671,7 @@ struct Pipelines {
     godray_blur: wgpu::RenderPipeline,
     lines: wgpu::RenderPipeline,
     bounding_boxes: wgpu::RenderPipeline,
+    tonemapper: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -660,6 +714,14 @@ impl Pipelines {
             format: DEPTH_FORMAT,
             depth_write_enabled: false,
             depth_compare: wgpu::CompareFunction::LessEqual,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        };
+
+        let depth_ignore = wgpu::DepthStencilState {
+            format: DEPTH_FORMAT,
+            depth_write_enabled: false,
+            depth_compare: wgpu::CompareFunction::Always,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         };
@@ -765,7 +827,7 @@ impl Pipelines {
                         module: &fs_ship,
                         entry_point: "main",
                         targets: &[
-                            display_format.into(),
+                            HDR_FRAMEBUFFER_FORMAT.into(),
                             EFFECT_BUFFER_FORMAT.into(),
                             ignore_colour_state(EFFECT_BUFFER_FORMAT),
                         ],
@@ -792,7 +854,7 @@ impl Pipelines {
                         module: &fs_background,
                         entry_point: "main",
                         targets: &[
-                            display_format.into(),
+                            HDR_FRAMEBUFFER_FORMAT.into(),
                             EFFECT_BUFFER_FORMAT.into(),
                             EFFECT_BUFFER_FORMAT.into(),
                         ],
@@ -825,7 +887,7 @@ impl Pipelines {
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_blur,
                         entry_point: "main",
-                        targets: &[additive_colour_state(display_format)],
+                        targets: &[additive_colour_state(HDR_FRAMEBUFFER_FORMAT)],
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: None,
@@ -850,11 +912,11 @@ impl Pipelines {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("godray blur pipeline"),
                     layout: Some(&pipeline_layout),
-                    vertex: fullscreen_tri_vertex,
+                    vertex: fullscreen_tri_vertex.clone(),
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_godray_blur,
                         entry_point: "main",
-                        targets: &[additive_colour_state(display_format)],
+                        targets: &[additive_colour_state(HDR_FRAMEBUFFER_FORMAT)],
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: None,
@@ -873,11 +935,7 @@ impl Pipelines {
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,
                         entry_point: "main",
-                        targets: &[
-                            display_format.into(),
-                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
-                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
-                        ],
+                        targets: &[display_format.into()],
                     }),
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::LineList,
@@ -918,17 +976,42 @@ impl Pipelines {
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,
                         entry_point: "main",
-                        targets: &[
-                            display_format.into(),
-                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
-                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
-                        ],
+                        targets: &[display_format.into()],
                     }),
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::LineList,
                         ..Default::default()
                     },
                     depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            tonemapper: {
+                let pipeline_layout =
+                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("tonemapper pipeline layout"),
+                        bind_group_layouts: &[&resources.effect_bgl],
+                        push_constant_ranges: &[wgpu::PushConstantRange {
+                            stages: wgpu::ShaderStage::FRAGMENT,
+                            range: 0..std::mem::size_of::<colstodian::LottesTonemapper>() as u32,
+                        }],
+                    });
+
+                let fs_tonemap = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/tonemap.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("tonemapper pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: fullscreen_tri_vertex,
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_tonemap,
+                        entry_point: "main",
+                        targets: &[display_format.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: Some(depth_ignore),
                     multisample: wgpu::MultisampleState::default(),
                 })
             },

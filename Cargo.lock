@@ -298,6 +298,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
+name = "colstodian"
+version = "0.1.0-alpha.2"
+source = "git+https://github.com/expenses/colstodian?branch=bytemuck#e2064dd3d396e8abdbb176c0041346a43c16d6b3"
+dependencies = [
+ "bytemuck",
+ "derivative",
+ "kolor",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "copyless"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -567,6 +579,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytemuck",
+ "colstodian",
  "env_logger",
  "gltf",
  "image",
@@ -846,6 +859,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70155b56080764b8b758e91e4c63d06da0262c0c939f2cd991cd1382087147df"
+dependencies = [
+ "serde",
+ "spirv-std",
+]
+
+[[package]]
 name = "glow"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -959,6 +982,15 @@ dependencies = [
  "generic-array 0.14.4",
  "hash32",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "heck"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
+dependencies = [
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1107,6 +1139,16 @@ checksum = "8c2352bd1d0bceb871cb9d40f24360c8133c11d7486b68b5381c1dd1a32015e3"
 dependencies = [
  "libc",
  "libloading 0.7.0",
+]
+
+[[package]]
+name = "kolor"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a27c132223fcf93bd2ba36d8b3fb1bbe78508cdf35c92b81996f4093b84da700"
+dependencies = [
+ "glam",
+ "serde",
 ]
 
 [[package]]
@@ -2083,6 +2125,9 @@ name = "serde"
 version = "1.0.125"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "558dc50e1a5a5fa7112ca2ce4effcb321b0300c0d4ccf0776a9f60cd89031171"
+dependencies = [
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_derive"
@@ -2156,6 +2201,37 @@ dependencies = [
  "pdqselect",
  "smallvec",
 ]
+
+[[package]]
+name = "spirv-std"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726c4c71ff802a9754ffae31c04c4d867aa23b49f883a56202dce285066ad792"
+dependencies = [
+ "bitflags",
+ "num-traits",
+ "spirv-std-macros",
+ "spirv-types",
+]
+
+[[package]]
+name = "spirv-std-macros"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eabd1540fccc466b5ae0b261972572fe9b8544c974610248de08a98ae4b813a"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "spirv-types",
+ "syn",
+]
+
+[[package]]
+name = "spirv-types"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d7f880a5540c04261e7454b5f3a342b5540283911ca9ebfec83eba9fb607ca0"
 
 [[package]]
 name = "spirv_cross"
@@ -2295,6 +2371,12 @@ dependencies = [
  "bytemuck",
  "wide",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb0d2e7be6ae3a5fa87eed5fb451aff96f2573d2694942e40543ae0bbe19c796"
 
 [[package]]
 name = "unicode-width"
