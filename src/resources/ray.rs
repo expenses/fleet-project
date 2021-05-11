@@ -2,7 +2,7 @@ use crate::resources::PerspectiveView;
 use crate::Triangle;
 use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
@@ -64,9 +64,9 @@ impl Ray {
     }
 
     // https://tavianator.com/2011/ray_box.html
-    pub fn bounding_box_intersection(&self, min: Vec3, max: Vec3) -> Option<f32> {
-        let ts_1 = (min - self.origin) * self.inv_direction;
-        let ts_2 = (max - self.origin) * self.inv_direction;
+    pub fn bounding_box_intersection(&self, bounding_box: BoundingBox) -> Option<f32> {
+        let ts_1 = (bounding_box.min - self.origin) * self.inv_direction;
+        let ts_2 = (bounding_box.max - self.origin) * self.inv_direction;
 
         let t_mins = ts_1.min_by_component(ts_2);
         let t_maxs = ts_1.max_by_component(ts_2);
@@ -119,13 +119,141 @@ impl Ray {
     }
 }
 
+impl std::ops::Neg for &Ray {
+    type Output = Ray;
+
+    fn neg(self) -> Ray {
+        Ray {
+            origin: self.origin,
+            direction: -self.direction,
+            inv_direction: -self.inv_direction,
+        }
+    }
+}
+
 impl rstar::SelectionFunctionWithData<Triangle, f32> for Ray {
     fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
-        self.bounding_box_intersection(envelope.lower().into(), envelope.upper().into())
-            .is_some()
+        let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
+        self.bounding_box_intersection(bounding_box).is_some()
     }
 
     fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
         self.triangle_intersection(triangle)
+    }
+}
+
+pub struct Projectile {
+    flipped_ray: Ray,
+    velocity: f32,
+}
+
+impl Projectile {
+    pub fn new(ray: &Ray, velocity: f32) -> Self {
+        Self {
+            flipped_ray: -ray,
+            velocity,
+        }
+    }
+
+    pub fn max_t(&self, delta_time: f32) -> f32 {
+        self.velocity * delta_time
+    }
+
+    pub fn update(&mut self, delta_time: f32) {
+        self.flipped_ray.origin -= self.flipped_ray.direction * self.max_t(delta_time);
+    }
+
+    pub fn bounding_box(&self, delta_time: f32) -> BoundingBox {
+        let max_t = self.max_t(delta_time);
+        let end_point = self.flipped_ray.get_intersection_point(max_t);
+
+        BoundingBox::new_checked(self.flipped_ray.origin, end_point)
+    }
+
+    pub fn line_points(&self, trail_length: f32) -> (Vec3, Vec3) {
+        (
+            self.flipped_ray.origin,
+            self.flipped_ray
+                .get_intersection_point(self.velocity * trail_length),
+        )
+    }
+
+    pub fn as_limited_ray(&self, delta_time: f32) -> LimitedRay {
+        LimitedRay {
+            ray: self.flipped_ray.clone(),
+            max_t: self.max_t(delta_time),
+        }
+    }
+}
+
+pub struct LimitedRay {
+    ray: Ray,
+    max_t: f32,
+}
+
+impl LimitedRay {
+    pub fn centered_around_transform(&self, position: Vec3, reversed_rotation: Mat3) -> Self {
+        Self {
+            ray: self
+                .ray
+                .centered_around_transform(position, reversed_rotation),
+            max_t: self.max_t,
+        }
+    }
+}
+
+impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
+    fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
+        let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
+        self.ray
+            .bounding_box_intersection(bounding_box)
+            //.filter(|&t| t <= self.max_t)
+            .is_some()
+    }
+
+    fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
+        self.ray
+            .triangle_intersection(triangle)
+            .filter(|&t| t <= self.max_t)
+    }
+}
+
+#[derive(Copy, Clone, Default)]
+pub struct BoundingBox {
+    min: Vec3,
+    max: Vec3,
+}
+
+impl BoundingBox {
+    pub fn new(min: Vec3, max: Vec3) -> Self {
+        Self { min, max }
+    }
+
+    fn new_checked(a: Vec3, b: Vec3) -> Self {
+        Self::new(a.min_by_component(b), a.max_by_component(b))
+    }
+
+    pub fn rotate(self, matrix: Mat3) -> Self {
+        let min_rotated = matrix * self.min;
+        let max_rotated = matrix * self.max;
+
+        Self::new_checked(min_rotated, max_rotated)
+    }
+
+    pub fn intersects(self, other: Self) -> bool {
+        self.min.x <= other.max.x
+            && self.min.y <= other.max.y
+            && self.min.z <= other.max.z
+            && self.max.x >= other.min.x
+            && self.max.y >= other.min.y
+            && self.max.z >= other.min.z
+    }
+}
+
+impl std::ops::Add<Vec3> for BoundingBox {
+    type Output = Self;
+
+    fn add(self, adjustment: Vec3) -> Self {
+        Self::new(self.min + adjustment, self.max + adjustment)
     }
 }

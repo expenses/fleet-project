@@ -57,7 +57,7 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
             });
 
             self.buffer
-                .slice(..)
+                .slice(..bytes.len() as u64)
                 .get_mapped_range_mut()
                 .copy_from_slice(bytes);
             self.buffer.unmap();

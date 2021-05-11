@@ -182,18 +182,22 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::Camera::default());
 
     let mut schedule = legion::Schedule::builder()
+        .add_system(systems::spawn_projectiles_system())
+        .add_system(systems::update_projectiles_system())
+        .add_system(systems::collide_projectiles_system())
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
-        .add_system(systems::move_camera_around_following_system())
         .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_ship_rotation_matrix_system())
         .add_system(systems::move_ships_system())
+        .add_system(systems::move_camera_around_following_system())
         .add_system(systems::upload_ship_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
         .add_system(systems::handle_clicks_system())
         .add_system(systems::update_ray_plane_point_system())
+        .add_system(systems::render_projectiles_system())
         .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_mouse_state_system())
@@ -921,8 +925,7 @@ pub struct Model {
     bind_group: wgpu::BindGroup,
     bounding_box_buffer: wgpu::Buffer,
     acceleration_tree: rstar::RTree<Triangle>,
-    min: Vec3,
-    max: Vec3,
+    bounding_box: resources::BoundingBox,
 }
 
 fn load_ship_model(
@@ -1047,8 +1050,7 @@ fn load_ship_model(
         num_indices,
         bind_group,
         acceleration_tree,
-        min,
-        max,
+        bounding_box: resources::BoundingBox::new(min, max),
         bounding_box_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             usage: wgpu::BufferUsage::VERTEX,

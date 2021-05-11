@@ -6,7 +6,7 @@ mod ray;
 pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use keyboard::KeyboardState;
 pub use mouse::{MouseButtonState, MouseState};
-pub use ray::Ray;
+pub use ray::{BoundingBox, Projectile, Ray};
 
 use crate::components::ModelId;
 use legion::Entity;

@@ -18,14 +18,10 @@ pub fn update_ship_rotation_matrix(
 
     let model = models.get(*model_id);
 
-    let min_rotated = matrix * model.min;
-    let max_rotated = matrix * model.max;
-
     *rotation_matrix = RotationMatrix {
         matrix,
         reversed: rotation.0.reversed().into_matrix(),
-        rotated_model_min: min_rotated.min_by_component(max_rotated),
-        rotated_model_max: min_rotated.max_by_component(max_rotated),
+        rotated_model_bounding_box: model.bounding_box.rotate(matrix),
     };
 }
 
@@ -99,11 +95,8 @@ pub fn find_ship_under_cursor(
     ship_under_cursor.0 = query
         .iter(world)
         .filter(|(.., position, rotation)| {
-            ray.bounding_box_intersection(
-                position.0 + rotation.rotated_model_min,
-                position.0 + rotation.rotated_model_max,
-            )
-            .is_some()
+            ray.bounding_box_intersection(rotation.rotated_model_bounding_box + position.0)
+                .is_some()
         })
         .flat_map(|(entity, model_id, position, rotation)| {
             let ray = ray.centered_around_transform(position.0, rotation.reversed);
@@ -242,4 +235,80 @@ pub fn move_camera_around_following(
             Err(_) => camera.following = None,
         }
     }
+}
+
+#[system]
+pub fn spawn_projectiles(
+    #[resource] ray: &Ray,
+    #[resource] keyboard_state: &KeyboardState,
+    command_buffer: &mut legion::systems::CommandBuffer,
+) {
+    if keyboard_state.fire {
+        command_buffer.push((Projectile::new(ray, 10.0),));
+    }
+}
+
+#[system(for_each)]
+pub fn render_projectiles(
+    projectile: &Projectile,
+    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+) {
+    let (start, end) = projectile.line_points(5.0);
+
+    lines_buffer.stage(&[
+        BackgroundVertex {
+            position: start,
+            colour: Vec3::unit_x(),
+        },
+        BackgroundVertex {
+            position: end,
+            colour: Vec3::unit_y(),
+        },
+    ]);
+}
+
+#[system(for_each)]
+pub fn update_projectiles(projectile: &mut Projectile) {
+    let delta_time = 1.0 / 60.0;
+    projectile.update(delta_time);
+}
+
+#[system]
+pub fn collide_projectiles(
+    projectiles: &mut Query<(Entity, &Projectile)>,
+    ships: &mut Query<(Entity, &Position, &RotationMatrix, &ModelId)>,
+    world: &legion::world::SubWorld,
+    #[resource] models: &Models,
+    command_buffer: &mut legion::systems::CommandBuffer,
+) {
+    let delta_time = 1.0 / 60.0;
+
+    projectiles.for_each(world, |(entity, projectile)| {
+        let bounding_box = projectile.bounding_box(delta_time);
+
+        let first_hit = ships
+            .iter(world)
+            .filter(|(_, position, rotation, _)| {
+                let ship_bounding_box = rotation.rotated_model_bounding_box + position.0;
+                bounding_box.intersects(ship_bounding_box)
+            })
+            .flat_map(|(entity, position, rotation, model_id)| {
+                let ray = projectile
+                    .as_limited_ray(delta_time)
+                    .centered_around_transform(position.0, rotation.reversed);
+
+                models
+                    .get(*model_id)
+                    .acceleration_tree
+                    .locate_with_selection_function_with_data(ray)
+                    .map(move |(_, t)| (entity, t))
+            })
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(entity, _)| *entity);
+
+        if let Some(first_hit) = first_hit {
+            command_buffer.remove(*entity);
+            command_buffer.remove(first_hit);
+        }
+    });
 }

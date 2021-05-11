@@ -9,6 +9,7 @@ pub struct KeyboardState {
     pub camera_back: bool,
     pub camera_right: bool,
     pub center_camera: Tapped,
+    pub fire: bool,
 }
 
 #[derive(Default)]
@@ -32,6 +33,7 @@ impl KeyboardState {
             VirtualKeyCode::S => self.camera_back = pressed,
             VirtualKeyCode::D => self.camera_right = pressed,
             VirtualKeyCode::C => self.center_camera.handle(pressed),
+            VirtualKeyCode::F => self.fire = pressed,
             _ => {}
         }
     }
