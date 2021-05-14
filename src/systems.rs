@@ -63,6 +63,7 @@ pub fn upload_ship_instances(
     position: &Position,
     rotation_matrix: &RotationMatrix,
     model_id: &ModelId,
+    scale: Option<&Scale>,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
@@ -79,6 +80,7 @@ pub fn upload_ship_instances(
             translation: position.0,
             rotation: rotation_matrix.matrix,
             colour,
+            scale: scale.map(|scale| scale.0).unwrap_or(1.0),
         },
         *model_id as usize,
     );

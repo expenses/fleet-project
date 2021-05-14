@@ -18,3 +18,5 @@ pub enum ModelId {
     Carrier = 0,
     Fighter = 1,
 }
+
+pub struct Scale(pub f32);
