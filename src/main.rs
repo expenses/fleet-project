@@ -154,14 +154,20 @@ fn main() -> anyhow::Result<()> {
         "lines",
         wgpu::BufferUsage::VERTEX,
     ));
-    lr.insert(resources::Models {
-        carrier: load_ship_model(
+    lr.insert(resources::Models([
+        load_ship_model(
             include_bytes!("../models/carrier.glb"),
             &device,
             &queue,
             &resources,
         )?,
-    });
+        load_ship_model(
+            include_bytes!("../models/explosion.glb"),
+            &device,
+            &queue,
+            &resources,
+        )?,
+    ]));
     lr.insert(resources::GpuInterface { device, queue });
     lr.insert(resources::MouseState::default());
     lr.insert(resources::Ray::default());

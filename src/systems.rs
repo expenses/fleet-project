@@ -305,12 +305,21 @@ pub fn collide_projectiles(
                     .locate_with_selection_function_with_data(ray)
                     .map(move |(_, t)| (entity, t))
             })
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(entity, _)| *entity);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some(first_hit) = first_hit {
+        if let Some((_, t)) = first_hit {
+            let position = projectile.get_intersection_point(t);
+
             command_buffer.remove(*entity);
-            command_buffer.remove(first_hit);
+            command_buffer.push((
+                Position(position),
+                RotationMatrix {
+                    matrix: ultraviolet::Mat3::identity(),
+                    reversed: ultraviolet::Mat3::identity(),
+                    rotated_model_bounding_box: BoundingBox::default(),
+                },
+                ModelId::Explosion,
+            ));
         }
     });
 }

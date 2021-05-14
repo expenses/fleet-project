@@ -16,7 +16,7 @@ pub struct Selected;
 #[derive(Copy, Clone)]
 pub enum ModelId {
     Carrier = 0,
-    Fighter = 1,
+    Explosion = 1,
 }
 
 pub struct Scale(pub f32);

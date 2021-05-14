@@ -22,18 +22,13 @@ pub struct GpuInterface {
 #[derive(Default)]
 pub struct ShipUnderCursor(pub Option<Entity>);
 
-pub struct Models {
-    pub carrier: crate::Model,
-}
+pub struct Models(pub [crate::Model; Self::COUNT]);
 
 impl Models {
     pub const COUNT: usize = 2;
 
     pub fn get(&self, id: ModelId) -> &crate::Model {
-        match id {
-            ModelId::Carrier => &self.carrier,
-            ModelId::Fighter => todo!(),
-        }
+        &self.0[id as usize]
     }
 }
 

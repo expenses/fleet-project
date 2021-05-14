@@ -74,10 +74,6 @@ pub fn run_render_passes(
     let (instance_buffer, num_instances) = ship_buffer.slice();
 
     render_pass.set_pipeline(&pipelines.ship);
-    render_pass.set_bind_group(0, &models.carrier.bind_group, &[]);
-    render_pass.set_vertex_buffer(0, models.carrier.vertices.slice(..));
-    render_pass.set_vertex_buffer(1, instance_buffer);
-    render_pass.set_index_buffer(models.carrier.indices.slice(..), wgpu::IndexFormat::Uint16);
     render_pass.set_push_constants(
         wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
         0,
@@ -86,7 +82,22 @@ pub fn run_render_passes(
             light_dir: star_system.sun_dir,
         }),
     );
-    render_pass.draw_indexed(0..models.carrier.num_indices, 0, 0..num_instances[0]);
+    render_pass.set_vertex_buffer(1, instance_buffer);
+
+    let mut offset = 0;
+
+    for i in 0 .. resources::Models::COUNT {
+        let num_instances = num_instances[i];
+
+        if num_instances > 0 {
+            render_pass.set_bind_group(0, &models.0[i].bind_group, &[]);
+            render_pass.set_vertex_buffer(0, models.0[i].vertices.slice(..));
+            render_pass.set_index_buffer(models.0[i].indices.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..models.0[i].num_indices, 0, offset..offset+num_instances);
+
+            offset += num_instances;
+        }
+    }
 
     render_pass.set_pipeline(&pipelines.background);
     render_pass.set_vertex_buffer(0, star_system.background_vertices.slice(..));
@@ -218,13 +229,24 @@ pub fn run_render_passes(
     render_pass.draw(0..num_line_vertices, 0..1);
 
     render_pass.set_pipeline(&pipelines.bounding_boxes);
-    render_pass.set_vertex_buffer(0, models.carrier.bounding_box_buffer.slice(..));
     render_pass.set_index_buffer(
         constants.bounding_box_indices.slice(..),
         wgpu::IndexFormat::Uint16,
     );
     render_pass.set_vertex_buffer(1, instance_buffer);
-    render_pass.draw_indexed(0..24, 0, 0..num_instances[0]);
+
+    let mut offset = 0;
+
+    for i in 0 .. resources::Models::COUNT {
+        let num_instances = num_instances[i];
+
+        if num_instances > 0 {
+            render_pass.set_vertex_buffer(0, models.0[i].bounding_box_buffer.slice(..));
+            render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
+
+            offset += num_instances;
+        }
+    }
 
     drop(render_pass);
 }
