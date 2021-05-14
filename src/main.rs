@@ -180,6 +180,7 @@ fn main() -> anyhow::Result<()> {
     lr.insert(dimensions);
     lr.insert(resources::KeyboardState::default());
     lr.insert(resources::Camera::default());
+    lr.insert(resources::DeltaTime(1.0 / 60.0));
 
     let mut schedule = legion::Schedule::builder()
         .add_system(systems::spawn_projectiles_system())

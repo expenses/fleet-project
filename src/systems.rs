@@ -151,10 +151,12 @@ pub fn handle_clicks(
 }
 
 #[system]
-pub fn update_mouse_state(#[resource] mouse_state: &mut MouseState) {
-    let delta_time = 1.0 / 60.0;
-    mouse_state.left_state.update(delta_time, 0.1);
-    mouse_state.right_state.update(delta_time, 0.0);
+pub fn update_mouse_state(
+    #[resource] mouse_state: &mut MouseState,
+    #[resource] delta_time: &DeltaTime,
+) {
+    mouse_state.left_state.update(delta_time.0, 0.1);
+    mouse_state.right_state.update(delta_time.0, 0.0);
 }
 
 #[system]
@@ -268,9 +270,8 @@ pub fn render_projectiles(
 }
 
 #[system(for_each)]
-pub fn update_projectiles(projectile: &mut Projectile) {
-    let delta_time = 1.0 / 60.0;
-    projectile.update(delta_time);
+pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &DeltaTime) {
+    projectile.update(delta_time.0);
 }
 
 #[system]
@@ -279,12 +280,11 @@ pub fn collide_projectiles(
     ships: &mut Query<(Entity, &Position, &RotationMatrix, &ModelId)>,
     world: &legion::world::SubWorld,
     #[resource] models: &Models,
+    #[resource] delta_time: &DeltaTime,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
-    let delta_time = 1.0 / 60.0;
-
     projectiles.for_each(world, |(entity, projectile)| {
-        let bounding_box = projectile.bounding_box(delta_time);
+        let bounding_box = projectile.bounding_box(delta_time.0);
 
         let first_hit = ships
             .iter(world)
@@ -294,7 +294,7 @@ pub fn collide_projectiles(
             })
             .flat_map(|(entity, position, rotation, model_id)| {
                 let ray = projectile
-                    .as_limited_ray(delta_time)
+                    .as_limited_ray(delta_time.0)
                     .centered_around_transform(position.0, rotation.reversed);
 
                 models
