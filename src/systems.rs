@@ -26,6 +26,7 @@ pub fn update_ship_rotation_matrix(
 }
 
 #[system(for_each)]
+#[filter(component::<Moving>())]
 pub fn move_ships(position: &mut Position, rotation: &RotationMatrix) {
     position.0 += rotation.matrix * Vec3::new(0.0, 0.0, 0.01);
 }
@@ -112,6 +113,70 @@ pub fn find_ship_under_cursor(
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(entity, _)| *entity);
 }
+
+
+#[system]
+pub fn debug_find_ship_under_cursor(
+    world: &legion::world::SubWorld,
+    query: &mut Query<(&ModelId, &Position, &RotationMatrix)>,
+    #[resource] ray: &Ray,
+    #[resource] models: &Models,
+    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+) {
+    if let Some((tri, t, position, rotation)) = query
+        .iter(world)
+        .filter(|(_, position, rotation)| {
+            ray.bounding_box_intersection(rotation.rotated_model_bounding_box + position.0)
+                .is_some()
+        })
+        .flat_map(|(model_id, position, rotation)| {
+            let ray = ray.centered_around_transform(position.0, rotation.reversed);
+
+            models
+                .get(*model_id)
+                .acceleration_tree
+                .locate_with_selection_function_with_data(ray)
+                .map(move |(tri, t)| (tri, t, position, rotation))
+        })
+        .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)) {
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * tri.a,
+                    colour: Vec3::unit_x(),
+                },
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                    colour: Vec3::unit_y(),
+                },
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                    colour: Vec3::unit_y(),
+                },
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                    colour: Vec3::unit_z(),
+                },
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                    colour: Vec3::unit_z(),
+                },
+                BackgroundVertex {
+                    position: position.0 + rotation.matrix * tri.a,
+                    colour: Vec3::unit_x(),
+                },
+
+                BackgroundVertex {
+                    position: ray.get_intersection_point(t) - Vec3::broadcast(0.5),
+                    colour: Vec3::unit_x(),
+                },
+                BackgroundVertex {
+                    position: ray.get_intersection_point(t) + Vec3::broadcast(0.5),
+                    colour: Vec3::unit_x(),
+                },
+            ]);
+        }
+}
+
 
 #[system]
 pub fn update_ray(

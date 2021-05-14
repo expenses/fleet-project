@@ -86,30 +86,30 @@ impl Ray {
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
     pub fn triangle_intersection(&self, triangle: &Triangle) -> Option<f32> {
         let h = self.direction.cross(triangle.edge_c_a);
-        let a = triangle.edge_b_a.dot(h);
+        let determinant = triangle.edge_b_a.dot(h);
 
-        if a > -f32::EPSILON && a < f32::EPSILON {
+        if determinant > -f32::EPSILON && determinant < f32::EPSILON {
             return None;
         }
 
         // Note: we compute the reciprocal here so we have 1 div and 3 muls instead of 3 divs.
-        let f = 1.0 / a;
+        let inv_determinant = 1.0 / determinant;
         let s = self.origin - triangle.a;
-        let u = f * s.dot(h);
+        let u = inv_determinant * s.dot(h);
 
         if u < 0.0 || u > 1.0 {
             return None;
         }
 
         let q = s.cross(triangle.edge_b_a);
-        let v = f * self.direction.dot(q);
+        let v = inv_determinant * self.direction.dot(q);
 
         // Note: U + V > 1.0 NOT v > 1.0 !!
-        if v < 0.0 || u + v > 1.0 {
+        if v < 0.0 || (u + v) > 1.0 {
             return None;
         }
 
-        let t = f * triangle.edge_c_a.dot(q);
+        let t = inv_determinant * triangle.edge_c_a.dot(q);
 
         if t > f32::EPSILON {
             Some(t)
@@ -184,6 +184,10 @@ impl Projectile {
             max_t: self.max_t(delta_time),
         }
     }
+
+    pub fn get_intersection_point(&self, t: f32) -> Vec3 {
+        self.flipped_ray.get_intersection_point(t)
+    }
 }
 
 pub struct LimitedRay {
@@ -207,7 +211,7 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
         let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
         self.ray
             .bounding_box_intersection(bounding_box)
-            //.filter(|&t| t <= self.max_t)
+            .filter(|&t| t <= self.max_t)
             .is_some()
     }
 
@@ -234,10 +238,18 @@ impl BoundingBox {
     }
 
     pub fn rotate(self, matrix: Mat3) -> Self {
-        let min_rotated = matrix * self.min;
-        let max_rotated = matrix * self.max;
+        let corners = self.corners();
 
-        Self::new_checked(min_rotated, max_rotated)
+        let mut min = matrix * self.min;
+        let mut max = min;
+
+        for i in 1 .. 8 {
+            let point = matrix * corners[i];
+            min = min.min_by_component(point);
+            max = max.max_by_component(point);
+        }
+
+        Self::new(min, max)
     }
 
     pub fn intersects(self, other: Self) -> bool {
@@ -247,6 +259,19 @@ impl BoundingBox {
             && self.max.x >= other.min.x
             && self.max.y >= other.min.y
             && self.max.z >= other.min.z
+    }
+
+    pub fn corners(self) -> [Vec3; 8] {
+        [
+            Vec3::new(self.min.x, self.min.y, self.min.z),
+            Vec3::new(self.min.x, self.min.y, self.max.z),
+            Vec3::new(self.min.x, self.max.y, self.min.z),
+            Vec3::new(self.min.x, self.max.y, self.max.z),
+            Vec3::new(self.max.x, self.min.y, self.min.z),
+            Vec3::new(self.max.x, self.min.y, self.max.z),
+            Vec3::new(self.max.x, self.max.y, self.min.z),
+            Vec3::new(self.max.x, self.max.y, self.max.z),
+        ]
     }
 }
 

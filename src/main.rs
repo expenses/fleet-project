@@ -144,6 +144,7 @@ fn main() -> anyhow::Result<()> {
             components::Rotation(rotation),
             components::RotationMatrix::default(),
             components::ModelId::Carrier,
+            components::Moving,
         ));
     }
 
@@ -202,6 +203,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::upload_ship_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
+        //.add_system(systems::debug_find_ship_under_cursor_system())
         .add_system(systems::handle_clicks_system())
         .add_system(systems::update_ray_plane_point_system())
         .add_system(systems::render_projectiles_system())
@@ -1050,6 +1052,7 @@ fn load_ship_model(
 
     let min: Vec3 = bounding_box.min.into();
     let max: Vec3 = bounding_box.max.into();
+    let bounding_box = resources::BoundingBox::new(min, max);
 
     Ok(Model {
         vertices,
@@ -1057,20 +1060,11 @@ fn load_ship_model(
         num_indices,
         bind_group,
         acceleration_tree,
-        bounding_box: resources::BoundingBox::new(min, max),
+        bounding_box,
         bounding_box_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             usage: wgpu::BufferUsage::VERTEX,
-            contents: bytemuck::cast_slice(&[
-                Vec3::new(min.x, min.y, min.z),
-                Vec3::new(min.x, min.y, max.z),
-                Vec3::new(min.x, max.y, min.z),
-                Vec3::new(min.x, max.y, max.z),
-                Vec3::new(max.x, min.y, min.z),
-                Vec3::new(max.x, min.y, max.z),
-                Vec3::new(max.x, max.y, min.z),
-                Vec3::new(max.x, max.y, max.z),
-            ]),
+            contents: bytemuck::cast_slice(&bounding_box.corners()),
         }),
     })
 }
