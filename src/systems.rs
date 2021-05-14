@@ -90,18 +90,21 @@ pub fn upload_ship_instances(
 #[system]
 pub fn find_ship_under_cursor(
     world: &legion::world::SubWorld,
-    query: &mut Query<(Entity, &ModelId, &Position, &RotationMatrix)>,
+    query: &mut Query<(
+        Entity,
+        &WorldSpaceBoundingBox,
+        &ModelId,
+        &Position,
+        &RotationMatrix,
+    )>,
     #[resource] ray: &Ray,
     #[resource] models: &Models,
     #[resource] ship_under_cursor: &mut ShipUnderCursor,
 ) {
     ship_under_cursor.0 = query
         .iter(world)
-        .filter(|(.., position, rotation)| {
-            ray.bounding_box_intersection(rotation.rotated_model_bounding_box + position.0)
-                .is_some()
-        })
-        .flat_map(|(entity, model_id, position, rotation)| {
+        .filter(|(_, bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
+        .flat_map(|(entity, _, model_id, position, rotation)| {
             let ray = ray.centered_around_transform(position.0, rotation.reversed);
 
             models
@@ -343,7 +346,7 @@ pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &
 #[system]
 pub fn collide_projectiles(
     projectiles: &mut Query<(Entity, &Projectile)>,
-    ships: &mut Query<(Entity, &Position, &RotationMatrix, &ModelId)>,
+    ships: &mut Query<(&WorldSpaceBoundingBox, &Position, &RotationMatrix, &ModelId)>,
     world: &legion::world::SubWorld,
     #[resource] models: &Models,
     #[resource] delta_time: &DeltaTime,
@@ -355,11 +358,8 @@ pub fn collide_projectiles(
 
         let first_hit = ships
             .iter(world)
-            .filter(|(_, position, rotation, _)| {
-                let ship_bounding_box = rotation.rotated_model_bounding_box + position.0;
-                bounding_box.intersects(ship_bounding_box)
-            })
-            .flat_map(|(entity, position, rotation, model_id)| {
+            .filter(|(ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
+            .flat_map(|(_, position, rotation, model_id)| {
                 let ray = projectile
                     .as_limited_ray(delta_time.0)
                     .centered_around_transform(position.0, rotation.reversed);
@@ -368,21 +368,17 @@ pub fn collide_projectiles(
                     .get(*model_id)
                     .acceleration_tree
                     .locate_with_selection_function_with_data(ray)
-                    .map(move |(_, t)| (entity, t))
+                    .map(move |(_, t)| t)
             })
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some((_, t)) = first_hit {
+        if let Some(t) = first_hit {
             let position = projectile.get_intersection_point(t);
 
             command_buffer.remove(*entity);
             command_buffer.push((
                 Position(position),
-                RotationMatrix {
-                    matrix: ultraviolet::Mat3::identity(),
-                    reversed: ultraviolet::Mat3::identity(),
-                    rotated_model_bounding_box: BoundingBox::default(),
-                },
+                RotationMatrix::default(),
                 ModelId::Explosion,
                 Scale(0.0),
                 AliveUntil(total_time.0 + 5.0),
@@ -414,4 +410,13 @@ pub fn increase_total_time(
     #[resource] delta_time: &DeltaTime,
 ) {
     total_time.0 += delta_time.0;
+}
+
+#[system(for_each)]
+pub fn set_world_space_bounding_box(
+    bounding_box: &mut WorldSpaceBoundingBox,
+    position: &Position,
+    rotation: &RotationMatrix,
+) {
+    bounding_box.0 = rotation.rotated_model_bounding_box + position.0;
 }

@@ -24,3 +24,6 @@ pub struct Scale(pub f32);
 pub struct Moving;
 
 pub struct AliveUntil(pub f32);
+
+#[derive(Default)]
+pub struct WorldSpaceBoundingBox(pub BoundingBox);

@@ -145,6 +145,7 @@ fn main() -> anyhow::Result<()> {
             components::RotationMatrix::default(),
             components::ModelId::Carrier,
             components::Moving,
+            components::WorldSpaceBoundingBox::default(),
         ));
     }
 
@@ -202,6 +203,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_ship_rotation_matrix_system())
         .add_system(systems::move_ships_system())
+        .add_system(systems::set_world_space_bounding_box_system())
         .add_system(systems::move_camera_around_following_system())
         .add_system(systems::upload_ship_instances_system())
         .add_system(systems::update_ray_system())
@@ -902,23 +904,14 @@ pub struct Triangle {
     a: Vec3,
     edge_b_a: Vec3,
     edge_c_a: Vec3,
-    aabb: rstar::AABB<[f32; 3]>,
 }
 
 impl Triangle {
     fn new(a: Vec3, b: Vec3, c: Vec3) -> Self {
-        let edge_b_a = b - a;
-        let edge_c_a = c - a;
-
-        let min = a.min_by_component(b).min_by_component(c);
-        let max = a.max_by_component(b).max_by_component(c);
-        let aabb = rstar::AABB::from_corners(min.into(), max.into());
-
         Self {
             a,
-            edge_b_a,
-            edge_c_a,
-            aabb,
+            edge_b_a: b - a,
+            edge_c_a: c - a,
         }
     }
 }
@@ -926,8 +919,14 @@ impl Triangle {
 impl rstar::RTreeObject for Triangle {
     type Envelope = rstar::AABB<[f32; 3]>;
 
+    // This is only called during construction so there's no need to cache the aabb.
     fn envelope(&self) -> Self::Envelope {
-        self.aabb
+        let b = self.edge_b_a + self.a;
+        let c = self.edge_c_a + self.a;
+
+        let min = self.a.min_by_component(b).min_by_component(c);
+        let max = self.a.max_by_component(b).max_by_component(c);
+        rstar::AABB::from_corners(min.into(), max.into())
     }
 }
 
