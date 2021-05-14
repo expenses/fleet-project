@@ -114,7 +114,6 @@ pub fn find_ship_under_cursor(
         .map(|(entity, _)| *entity);
 }
 
-
 #[system]
 pub fn debug_find_ship_under_cursor(
     world: &legion::world::SubWorld,
@@ -138,45 +137,44 @@ pub fn debug_find_ship_under_cursor(
                 .locate_with_selection_function_with_data(ray)
                 .map(move |(tri, t)| (tri, t, position, rotation))
         })
-        .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)) {
-            lines_buffer.stage(&[
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * tri.a,
-                    colour: Vec3::unit_x(),
-                },
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
-                    colour: Vec3::unit_y(),
-                },
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
-                    colour: Vec3::unit_y(),
-                },
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
-                    colour: Vec3::unit_z(),
-                },
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
-                    colour: Vec3::unit_z(),
-                },
-                BackgroundVertex {
-                    position: position.0 + rotation.matrix * tri.a,
-                    colour: Vec3::unit_x(),
-                },
-
-                BackgroundVertex {
-                    position: ray.get_intersection_point(t) - Vec3::broadcast(0.5),
-                    colour: Vec3::unit_x(),
-                },
-                BackgroundVertex {
-                    position: ray.get_intersection_point(t) + Vec3::broadcast(0.5),
-                    colour: Vec3::unit_x(),
-                },
-            ]);
-        }
+        .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    {
+        lines_buffer.stage(&[
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * tri.a,
+                colour: Vec3::unit_x(),
+            },
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                colour: Vec3::unit_y(),
+            },
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                colour: Vec3::unit_y(),
+            },
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                colour: Vec3::unit_z(),
+            },
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                colour: Vec3::unit_z(),
+            },
+            BackgroundVertex {
+                position: position.0 + rotation.matrix * tri.a,
+                colour: Vec3::unit_x(),
+            },
+            BackgroundVertex {
+                position: ray.get_intersection_point(t) - Vec3::broadcast(0.5),
+                colour: Vec3::unit_x(),
+            },
+            BackgroundVertex {
+                position: ray.get_intersection_point(t) + Vec3::broadcast(0.5),
+                colour: Vec3::unit_x(),
+            },
+        ]);
+    }
 }
-
 
 #[system]
 pub fn update_ray(
@@ -310,10 +308,11 @@ pub fn move_camera_around_following(
 pub fn spawn_projectiles(
     #[resource] ray: &Ray,
     #[resource] keyboard_state: &KeyboardState,
+    #[resource] total_time: &TotalTime,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
     if keyboard_state.fire {
-        command_buffer.push((Projectile::new(ray, 10.0),));
+        command_buffer.push((Projectile::new(ray, 10.0), AliveUntil(total_time.0 + 30.0)));
     }
 }
 
@@ -348,6 +347,7 @@ pub fn collide_projectiles(
     world: &legion::world::SubWorld,
     #[resource] models: &Models,
     #[resource] delta_time: &DeltaTime,
+    #[resource] total_time: &TotalTime,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
     projectiles.for_each(world, |(entity, projectile)| {
@@ -384,7 +384,34 @@ pub fn collide_projectiles(
                     rotated_model_bounding_box: BoundingBox::default(),
                 },
                 ModelId::Explosion,
+                Scale(0.0),
+                AliveUntil(total_time.0 + 5.0),
             ));
         }
     });
+}
+
+#[system(for_each)]
+pub fn scale_explosions(scale: &mut Scale, #[resource] delta_time: &DeltaTime) {
+    scale.0 += delta_time.0;
+}
+
+#[system(for_each)]
+pub fn kill_temporary(
+    entity: &Entity,
+    alive_until: &AliveUntil,
+    #[resource] total_time: &TotalTime,
+    command_buffer: &mut legion::systems::CommandBuffer,
+) {
+    if total_time.0 > alive_until.0 {
+        command_buffer.remove(*entity);
+    }
+}
+
+#[system]
+pub fn increase_total_time(
+    #[resource] total_time: &mut TotalTime,
+    #[resource] delta_time: &DeltaTime,
+) {
+    total_time.0 += delta_time.0;
 }

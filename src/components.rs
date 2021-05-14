@@ -22,3 +22,5 @@ pub enum ModelId {
 pub struct Scale(pub f32);
 
 pub struct Moving;
+
+pub struct AliveUntil(pub f32);

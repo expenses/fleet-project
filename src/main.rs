@@ -188,8 +188,11 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::KeyboardState::default());
     lr.insert(resources::Camera::default());
     lr.insert(resources::DeltaTime(1.0 / 60.0));
+    lr.insert(resources::TotalTime(0.0));
 
     let mut schedule = legion::Schedule::builder()
+        .add_system(systems::kill_temporary_system())
+        .add_system(systems::scale_explosions_system())
         .add_system(systems::spawn_projectiles_system())
         .add_system(systems::update_projectiles_system())
         .add_system(systems::collide_projectiles_system())
@@ -211,6 +214,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
         .add_system(systems::update_mouse_state_system())
         .add_system(systems::update_keyboard_state_system())
+        .add_system(systems::increase_total_time_system())
         .build();
 
     dbg!(&schedule);

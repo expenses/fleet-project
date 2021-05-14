@@ -12,6 +12,8 @@ use crate::components::ModelId;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+pub struct TotalTime(pub f32);
+
 pub struct DeltaTime(pub f32);
 
 pub struct GpuInterface {

@@ -243,7 +243,7 @@ impl BoundingBox {
         let mut min = matrix * self.min;
         let mut max = min;
 
-        for i in 1 .. 8 {
+        for i in 1..8 {
             let point = matrix * corners[i];
             min = min.min_by_component(point);
             max = max.max_by_component(point);
