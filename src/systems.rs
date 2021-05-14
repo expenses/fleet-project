@@ -412,6 +412,8 @@ pub fn increase_total_time(
     total_time.0 += delta_time.0;
 }
 
+// We cache these because it's 6 f32 adds and that adds time to bounding box checks
+// if we do them per ray.
 #[system(for_each)]
 pub fn set_world_space_bounding_box(
     bounding_box: &mut WorldSpaceBoundingBox,

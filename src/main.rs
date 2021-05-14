@@ -219,8 +219,6 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::increase_total_time_system())
         .build();
 
-    dbg!(&schedule);
-
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
