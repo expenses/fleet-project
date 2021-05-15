@@ -84,6 +84,7 @@ impl Ray {
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     // Explained:
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+    #[allow(clippy::many_single_char_names)]
     pub fn triangle_intersection(&self, triangle: &Triangle) -> Option<f32> {
         let h = self.direction.cross(triangle.edge_c_a);
         let determinant = triangle.edge_b_a.dot(h);
@@ -97,6 +98,7 @@ impl Ray {
         let s = self.origin - triangle.a;
         let u = inv_determinant * s.dot(h);
 
+        #[allow(clippy::manual_range_contains)]
         if u < 0.0 || u > 1.0 {
             return None;
         }
@@ -240,9 +242,10 @@ impl BoundingBox {
     pub fn rotate(self, matrix: Mat3) -> Self {
         let corners = self.corners();
 
-        let mut min = matrix * self.min;
+        let mut min = matrix * corners[0];
         let mut max = min;
 
+        #[allow(clippy::needless_range_loop)]
         for i in 1..8 {
             let point = matrix * corners[i];
             min = min.min_by_component(point);

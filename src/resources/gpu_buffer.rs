@@ -99,6 +99,7 @@ impl ShipBuffer {
 
     pub fn slice(&self) -> (wgpu::BufferSlice, [u32; Models::COUNT]) {
         let mut lengths = [0; Models::COUNT];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..Models::COUNT {
             lengths[i] = self.staging[i].len() as u32;
         }

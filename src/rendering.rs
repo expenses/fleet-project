@@ -261,10 +261,9 @@ fn uv_space_light_pos(perspective_view: &resources::PerspectiveView, sun_dir: Ve
 
     let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
 
-    let wgpu_corrected = Vec2::new(
+    // wgpu correction
+    Vec2::new(
         (screen_space_pos.x + 1.0) / 2.0,
         (1.0 - screen_space_pos.y) / 2.0,
-    );
-
-    wgpu_corrected
+    )
 }

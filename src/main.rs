@@ -113,8 +113,8 @@ fn main() -> anyhow::Result<()> {
             0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7,
         ];
         let offset = id * 24;
-        for i in 0..24 {
-            bounding_box_indices[i] += offset;
+        for index in &mut bounding_box_indices {
+            *index += offset;
         }
         bounding_box_indices
     };
@@ -528,6 +528,9 @@ pub struct Pipelines {
 }
 
 impl Pipelines {
+    // We use helper structs and clone them around.
+    // It would be a pain to remove the clone from the last use of the struct.
+    #[allow(clippy::redundant_clone)]
     fn new(
         device: &wgpu::Device,
         resources: &Resources,
@@ -685,7 +688,7 @@ impl Pipelines {
                             ignore_colour_state(EFFECT_BUFFER_FORMAT),
                         ],
                     }),
-                    primitive: backface_culling.clone(),
+                    primitive: backface_culling,
                     depth_stencil: Some(depth_write.clone()),
                     multisample: wgpu::MultisampleState::default(),
                 })
@@ -712,7 +715,7 @@ impl Pipelines {
                             EFFECT_BUFFER_FORMAT.into(),
                         ],
                     }),
-                    primitive: clamp_depth.clone(),
+                    primitive: clamp_depth,
                     depth_stencil: Some(depth_read.clone()),
                     multisample: wgpu::MultisampleState::default(),
                 })
