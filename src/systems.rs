@@ -58,13 +58,13 @@ pub fn upload_ship_buffer(
 }
 
 #[system(for_each)]
+#[filter(!component::<Scale>())]
 pub fn upload_ship_instances(
     entity: &Entity,
     selected: Option<&Selected>,
     position: &Position,
     rotation_matrix: &RotationMatrix,
     model_id: &ModelId,
-    scale: Option<&Scale>,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
@@ -81,7 +81,26 @@ pub fn upload_ship_instances(
             translation: position.0,
             rotation: rotation_matrix.matrix,
             colour,
-            scale: scale.map(|scale| scale.0).unwrap_or(1.0),
+            scale: 1.0,
+        },
+        *model_id as usize,
+    );
+}
+
+#[system(for_each)]
+pub fn upload_scaled_instances(
+    position: &Position,
+    rotation_matrix: &RotationMatrix,
+    model_id: &ModelId,
+    scale: &Scale,
+    #[resource] ship_buffer: &mut ShipBuffer,
+) {
+    ship_buffer.stage(
+        Instance {
+            translation: position.0,
+            rotation: rotation_matrix.matrix,
+            colour: Vec3::zero(),
+            scale: scale.0,
         },
         *model_id as usize,
     );

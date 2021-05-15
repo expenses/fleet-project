@@ -206,6 +206,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::set_world_space_bounding_box_system())
         .add_system(systems::move_camera_around_following_system())
         .add_system(systems::upload_ship_instances_system())
+        .add_system(systems::upload_scaled_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
         //.add_system(systems::debug_find_ship_under_cursor_system())

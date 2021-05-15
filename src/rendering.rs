@@ -1,6 +1,7 @@
 use crate::gpu_structs::{BackgroundVertex, BlurSettings, GodraySettings, PushConstants};
 use crate::resources;
 use crate::{Pipelines, Resizables};
+use crate::components::ModelId;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
 pub struct StarSystem {
@@ -244,7 +245,7 @@ pub fn run_render_passes(
     for i in 0..resources::Models::COUNT {
         let num_instances = num_instances[i];
 
-        if num_instances > 0 {
+        if num_instances > 0 && i != ModelId::Explosion as usize {
             render_pass.set_vertex_buffer(0, models.0[i].bounding_box_buffer.slice(..));
             render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
 
