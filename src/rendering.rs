@@ -1,7 +1,7 @@
+use crate::components::ModelId;
 use crate::gpu_structs::{BackgroundVertex, BlurSettings, GodraySettings, PushConstants};
 use crate::resources;
 use crate::{Pipelines, Resizables};
-use crate::components::ModelId;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
 pub struct StarSystem {

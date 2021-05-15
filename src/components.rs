@@ -18,9 +18,11 @@ pub enum ModelId {
     Carrier = 0,
     Fighter = 1,
     Explosion = 2,
+    Asteroid = 3,
 }
 
 pub struct Scale(pub f32);
+pub struct Expands;
 
 pub struct Moving;
 
@@ -30,3 +32,25 @@ pub struct AliveUntil(pub f32);
 pub struct WorldSpaceBoundingBox(pub BoundingBox);
 
 pub struct MaxSpeed(pub f32);
+
+pub struct Spin {
+    angle: f32,
+    plane: ultraviolet::Bivec3,
+}
+
+impl Spin {
+    pub fn new(axis: Vec3) -> Self {
+        Self {
+            angle: 0.0,
+            plane: ultraviolet::Bivec3::from_normalized_axis(axis),
+        }
+    }
+
+    pub fn update_angle(&mut self, amount: f32) {
+        self.angle += amount;
+    }
+
+    pub fn as_rotor(&self) -> Rotor3 {
+        Rotor3::from_angle_plane(self.angle, self.plane)
+    }
+}

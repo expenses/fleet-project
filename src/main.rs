@@ -145,13 +145,33 @@ fn main() -> anyhow::Result<()> {
         };
 
         world.push((
-            Instance::default(),
             components::Position(position),
             components::Rotation(rotation),
             components::RotationMatrix::default(),
-            model, max_speed,
+            model,
+            max_speed,
             components::Moving,
             components::WorldSpaceBoundingBox::default(),
+        ));
+    }
+
+    for _ in 0..1000 {
+        let position = Vec3::new(
+            rng.gen_range(-400.0..400.0),
+            rng.gen_range(-50.0..=10.0),
+            rng.gen_range(-400.0..400.0),
+        );
+        let facing = background::uniform_sphere_distribution(&mut rng);
+        let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), facing);
+
+        world.push((
+            components::Position(position),
+            components::Rotation(rotation),
+            components::RotationMatrix::default(),
+            components::ModelId::Asteroid,
+            components::WorldSpaceBoundingBox::default(),
+            components::Spin::new(background::uniform_sphere_distribution(&mut rng)),
+            components::Scale(rng.gen_range(1.0..5.0)),
         ));
     }
 
@@ -181,6 +201,12 @@ fn main() -> anyhow::Result<()> {
             &queue,
             &resources,
         )?,
+        load_ship_model(
+            include_bytes!("../models/asteroid.glb"),
+            &device,
+            &queue,
+            &resources,
+        )?,
     ]));
     lr.insert(resources::GpuInterface { device, queue });
     lr.insert(resources::MouseState::default());
@@ -204,8 +230,9 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::TotalTime(0.0));
 
     let mut schedule = legion::Schedule::builder()
+        .add_system(systems::spin_system())
         .add_system(systems::kill_temporary_system())
-        .add_system(systems::scale_explosions_system())
+        .add_system(systems::expand_explosions_system())
         .add_system(systems::spawn_projectiles_system())
         .add_system(systems::update_projectiles_system())
         .add_system(systems::collide_projectiles_system())
@@ -217,8 +244,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::move_ships_system())
         .add_system(systems::set_world_space_bounding_box_system())
         .add_system(systems::move_camera_around_following_system())
-        .add_system(systems::upload_ship_instances_system())
-        .add_system(systems::upload_scaled_instances_system())
+        .add_system(systems::upload_instances_system())
         .add_system(systems::update_ray_system())
         .add_system(systems::find_ship_under_cursor_system())
         //.add_system(systems::debug_find_ship_under_cursor_system())
@@ -828,7 +854,7 @@ impl Pipelines {
                 let instance_buffer_layout = wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Instance>() as u64,
                     step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32x3, 3 => Float32x3, 4 => Float32x3, 5 => Float32x3],
+                    attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32x3, 3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32],
                 };
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

@@ -27,7 +27,7 @@ pub struct ShipUnderCursor(pub Option<Entity>);
 pub struct Models(pub [crate::Model; Self::COUNT]);
 
 impl Models {
-    pub const COUNT: usize = 3;
+    pub const COUNT: usize = 4;
 
     pub fn get(&self, id: ModelId) -> &crate::Model {
         &self.0[id as usize]

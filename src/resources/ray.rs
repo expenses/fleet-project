@@ -40,11 +40,16 @@ impl Ray {
         self.origin + self.direction * t
     }
 
-    pub fn centered_around_transform(&self, position: Vec3, reversed_rotation: Mat3) -> Self {
+    pub fn centered_around_transform(
+        &self,
+        position: Vec3,
+        reversed_rotation: Mat3,
+        scale: f32,
+    ) -> Self {
         let direction = reversed_rotation * self.direction;
 
         Self {
-            origin: reversed_rotation * (self.origin - position),
+            origin: reversed_rotation * (self.origin - position) / scale,
             direction,
             inv_direction: Vec3::one() / direction,
         }
@@ -184,6 +189,7 @@ impl Projectile {
         LimitedRay {
             ray: self.flipped_ray.clone(),
             max_t: self.max_t(delta_time),
+            scale: 1.0,
         }
     }
 
@@ -195,15 +201,22 @@ impl Projectile {
 pub struct LimitedRay {
     ray: Ray,
     max_t: f32,
+    scale: f32,
 }
 
 impl LimitedRay {
-    pub fn centered_around_transform(&self, position: Vec3, reversed_rotation: Mat3) -> Self {
+    pub fn centered_around_transform(
+        &self,
+        position: Vec3,
+        reversed_rotation: Mat3,
+        scale: f32,
+    ) -> Self {
         Self {
             ray: self
                 .ray
-                .centered_around_transform(position, reversed_rotation),
+                .centered_around_transform(position, reversed_rotation, scale),
             max_t: self.max_t,
+            scale: self.scale * scale,
         }
     }
 }
@@ -213,6 +226,7 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
         let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
         self.ray
             .bounding_box_intersection(bounding_box)
+            .map(|t| t * self.scale)
             .filter(|&t| t <= self.max_t)
             .is_some()
     }
@@ -220,6 +234,7 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
     fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
         self.ray
             .triangle_intersection(triangle)
+            .map(|t| t * self.scale)
             .filter(|&t| t <= self.max_t)
     }
 }
@@ -283,5 +298,13 @@ impl std::ops::Add<Vec3> for BoundingBox {
 
     fn add(self, adjustment: Vec3) -> Self {
         Self::new(self.min + adjustment, self.max + adjustment)
+    }
+}
+
+impl std::ops::Mul<f32> for BoundingBox {
+    type Output = Self;
+
+    fn mul(self, scale: f32) -> Self {
+        Self::new(self.min * scale, self.max * scale)
     }
 }

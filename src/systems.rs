@@ -58,13 +58,13 @@ pub fn upload_ship_buffer(
 }
 
 #[system(for_each)]
-#[filter(!component::<Scale>())]
-pub fn upload_ship_instances(
+pub fn upload_instances(
     entity: &Entity,
     selected: Option<&Selected>,
     position: &Position,
     rotation_matrix: &RotationMatrix,
     model_id: &ModelId,
+    scale: Option<&Scale>,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
@@ -81,26 +81,7 @@ pub fn upload_ship_instances(
             translation: position.0,
             rotation: rotation_matrix.matrix,
             colour,
-            scale: 1.0,
-        },
-        *model_id as usize,
-    );
-}
-
-#[system(for_each)]
-pub fn upload_scaled_instances(
-    position: &Position,
-    rotation_matrix: &RotationMatrix,
-    model_id: &ModelId,
-    scale: &Scale,
-    #[resource] ship_buffer: &mut ShipBuffer,
-) {
-    ship_buffer.stage(
-        Instance {
-            translation: position.0,
-            rotation: rotation_matrix.matrix,
-            colour: Vec3::zero(),
-            scale: scale.0,
+            scale: get_scale(scale),
         },
         *model_id as usize,
     );
@@ -115,6 +96,7 @@ pub fn find_ship_under_cursor(
         &ModelId,
         &Position,
         &RotationMatrix,
+        Option<&Scale>,
     )>,
     #[resource] ray: &Ray,
     #[resource] models: &Models,
@@ -123,14 +105,17 @@ pub fn find_ship_under_cursor(
     ship_under_cursor.0 = query
         .iter(world)
         .filter(|(_, bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
-        .flat_map(|(entity, _, model_id, position, rotation)| {
-            let ray = ray.centered_around_transform(position.0, rotation.reversed);
+        .flat_map(|(entity, _, model_id, position, rotation, scale)| {
+            let scale = get_scale(scale);
+
+            let ray = ray.centered_around_transform(position.0, rotation.reversed, scale);
 
             models
                 .get(*model_id)
                 .acceleration_tree
                 .locate_with_selection_function_with_data(ray)
-                .map(move |(_, t)| (entity, t))
+                // We need to multiply t by scale here as the time of impact is calculated on an unscaled model
+                .map(move |(_, t)| (entity, t * scale))
         })
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(entity, _)| *entity);
@@ -139,53 +124,59 @@ pub fn find_ship_under_cursor(
 #[system]
 pub fn debug_find_ship_under_cursor(
     world: &legion::world::SubWorld,
-    query: &mut Query<(&ModelId, &Position, &RotationMatrix)>,
+    query: &mut Query<(
+        &WorldSpaceBoundingBox,
+        &ModelId,
+        &Position,
+        &RotationMatrix,
+        Option<&Scale>,
+    )>,
     #[resource] ray: &Ray,
     #[resource] models: &Models,
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
 ) {
-    if let Some((tri, t, position, rotation)) = query
+    if let Some((tri, _, position, rotation, scale)) = query
         .iter(world)
-        .filter(|(_, position, rotation)| {
-            ray.bounding_box_intersection(rotation.rotated_model_bounding_box + position.0)
-                .is_some()
-        })
-        .flat_map(|(model_id, position, rotation)| {
-            let ray = ray.centered_around_transform(position.0, rotation.reversed);
+        .filter(|(bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
+        .flat_map(|(_, model_id, position, rotation, scale)| {
+            let scale = get_scale(scale);
+
+            let ray = ray.centered_around_transform(position.0, rotation.reversed, scale);
 
             models
                 .get(*model_id)
                 .acceleration_tree
                 .locate_with_selection_function_with_data(ray)
-                .map(move |(tri, t)| (tri, t, position, rotation))
+                .map(move |(tri, t)| (tri, t * scale, position, rotation, scale))
         })
         .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
     {
         lines_buffer.stage(&[
             BackgroundVertex {
-                position: position.0 + rotation.matrix * tri.a,
+                position: position.0 + rotation.matrix * tri.a * scale,
                 colour: Vec3::unit_x(),
             },
             BackgroundVertex {
-                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a) * scale,
                 colour: Vec3::unit_y(),
             },
             BackgroundVertex {
-                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a),
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a) * scale,
                 colour: Vec3::unit_y(),
             },
             BackgroundVertex {
-                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a) * scale,
                 colour: Vec3::unit_z(),
             },
             BackgroundVertex {
-                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a),
+                position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a) * scale,
                 colour: Vec3::unit_z(),
             },
             BackgroundVertex {
-                position: position.0 + rotation.matrix * tri.a,
+                position: position.0 + rotation.matrix * tri.a * scale,
                 colour: Vec3::unit_x(),
             },
+            /*
             BackgroundVertex {
                 position: ray.get_intersection_point(t) - Vec3::broadcast(0.5),
                 colour: Vec3::unit_x(),
@@ -194,6 +185,7 @@ pub fn debug_find_ship_under_cursor(
                 position: ray.get_intersection_point(t) + Vec3::broadcast(0.5),
                 colour: Vec3::unit_x(),
             },
+            */
         ]);
     }
 }
@@ -365,7 +357,13 @@ pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &
 #[system]
 pub fn collide_projectiles(
     projectiles: &mut Query<(Entity, &Projectile)>,
-    ships: &mut Query<(&WorldSpaceBoundingBox, &Position, &RotationMatrix, &ModelId)>,
+    ships: &mut Query<(
+        &WorldSpaceBoundingBox,
+        &Position,
+        &RotationMatrix,
+        &ModelId,
+        Option<&Scale>,
+    )>,
     world: &legion::world::SubWorld,
     #[resource] models: &Models,
     #[resource] delta_time: &DeltaTime,
@@ -378,16 +376,18 @@ pub fn collide_projectiles(
         let first_hit = ships
             .iter(world)
             .filter(|(ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
-            .flat_map(|(_, position, rotation, model_id)| {
+            .flat_map(|(_, position, rotation, model_id, scale)| {
+                let scale = get_scale(scale);
+
                 let ray = projectile
                     .as_limited_ray(delta_time.0)
-                    .centered_around_transform(position.0, rotation.reversed);
+                    .centered_around_transform(position.0, rotation.reversed, scale);
 
                 models
                     .get(*model_id)
                     .acceleration_tree
                     .locate_with_selection_function_with_data(ray)
-                    .map(move |(_, t)| t)
+                    .map(move |(_, scaled_t)| scaled_t)
             })
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -401,13 +401,15 @@ pub fn collide_projectiles(
                 ModelId::Explosion,
                 Scale(0.0),
                 AliveUntil(total_time.0 + 5.0),
+                Expands,
             ));
         }
     });
 }
 
 #[system(for_each)]
-pub fn scale_explosions(scale: &mut Scale, #[resource] delta_time: &DeltaTime) {
+#[filter(component::<Expands>())]
+pub fn expand_explosions(scale: &mut Scale, #[resource] delta_time: &DeltaTime) {
     scale.0 += delta_time.0;
 }
 
@@ -434,10 +436,24 @@ pub fn increase_total_time(
 // We cache these because it's 6 f32 adds and that adds time to bounding box checks
 // if we do them per ray.
 #[system(for_each)]
+#[filter(
+    maybe_changed::<Position>() | maybe_changed::<RotationMatrix>() | maybe_changed::<Scale>()
+)]
 pub fn set_world_space_bounding_box(
     bounding_box: &mut WorldSpaceBoundingBox,
     position: &Position,
     rotation: &RotationMatrix,
+    scale: Option<&Scale>,
 ) {
-    bounding_box.0 = rotation.rotated_model_bounding_box + position.0;
+    bounding_box.0 = (rotation.rotated_model_bounding_box * get_scale(scale)) + position.0;
+}
+
+#[system(for_each)]
+pub fn spin(spin: &mut Spin, rotation: &mut Rotation, #[resource] delta_time: &DeltaTime) {
+    spin.update_angle(delta_time.0);
+    rotation.0 = spin.as_rotor();
+}
+
+fn get_scale(scale: Option<&Scale>) -> f32 {
+    scale.map(|scale| scale.0).unwrap_or(1.0)
 }
