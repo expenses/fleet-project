@@ -138,12 +138,18 @@ fn main() -> anyhow::Result<()> {
         );
         let rotation = Rotor3::from_rotation_xz(rng.gen_range(0.0..=360.0_f32).to_radians());
 
+        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.9 {
+            (components::ModelId::Fighter, components::MaxSpeed(10.0))
+        } else {
+            (components::ModelId::Carrier, components::MaxSpeed(1.0))
+        };
+
         world.push((
             Instance::default(),
             components::Position(position),
             components::Rotation(rotation),
             components::RotationMatrix::default(),
-            components::ModelId::Carrier,
+            model, max_speed,
             components::Moving,
             components::WorldSpaceBoundingBox::default(),
         ));
@@ -159,6 +165,12 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::Models([
         load_ship_model(
             include_bytes!("../models/carrier.glb"),
+            &device,
+            &queue,
+            &resources,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/fighter.glb"),
             &device,
             &queue,
             &resources,

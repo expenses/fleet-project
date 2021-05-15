@@ -27,8 +27,8 @@ pub fn update_ship_rotation_matrix(
 
 #[system(for_each)]
 #[filter(component::<Moving>())]
-pub fn move_ships(position: &mut Position, rotation: &RotationMatrix) {
-    position.0 += rotation.matrix * Vec3::new(0.0, 0.0, 0.01);
+pub fn move_ships(position: &mut Position, rotation: &RotationMatrix, max_speed: &MaxSpeed) {
+    position.0 += rotation.matrix * (Vec3::new(0.0, 0.0, 0.01) * max_speed.0);
 }
 
 #[system]

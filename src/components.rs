@@ -16,7 +16,8 @@ pub struct Selected;
 #[derive(Copy, Clone)]
 pub enum ModelId {
     Carrier = 0,
-    Explosion = 1,
+    Fighter = 1,
+    Explosion = 2,
 }
 
 pub struct Scale(pub f32);
@@ -27,3 +28,5 @@ pub struct AliveUntil(pub f32);
 
 #[derive(Default)]
 pub struct WorldSpaceBoundingBox(pub BoundingBox);
+
+pub struct MaxSpeed(pub f32);
