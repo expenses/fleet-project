@@ -11,6 +11,7 @@ pub struct KeyboardState {
     pub center_camera: Tapped,
     pub fire: bool,
     pub shift: bool,
+    pub stop: Tapped,
 }
 
 #[derive(Default)]
@@ -29,19 +30,21 @@ impl Tapped {
 impl KeyboardState {
     pub fn handle(&mut self, key: VirtualKeyCode, pressed: bool) {
         match key {
-            VirtualKeyCode::W => self.camera_forwards = pressed,
-            VirtualKeyCode::A => self.camera_left = pressed,
-            VirtualKeyCode::S => self.camera_back = pressed,
-            VirtualKeyCode::D => self.camera_right = pressed,
+            VirtualKeyCode::Up => self.camera_forwards = pressed,
+            VirtualKeyCode::Left => self.camera_left = pressed,
+            VirtualKeyCode::Down => self.camera_back = pressed,
+            VirtualKeyCode::Right => self.camera_right = pressed,
             VirtualKeyCode::C => self.center_camera.handle(pressed),
             VirtualKeyCode::F => self.fire = pressed,
             VirtualKeyCode::LShift => self.shift = pressed,
+            VirtualKeyCode::S => self.stop.handle(pressed),
             _ => {}
         }
     }
 
     pub fn update(&mut self) {
         self.center_camera.reset();
+        self.stop.reset();
     }
 
     pub fn move_camera(&self, camera: &mut Camera, orbit: &Orbit) -> bool {

@@ -262,6 +262,7 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::update_projectiles_system())
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
+        .add_system(systems::handle_keys_system())
         // Need to update what the camera is following.
         .flush()
         // Buffer clears

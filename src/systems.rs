@@ -335,6 +335,20 @@ pub fn move_camera(
 }
 
 #[system]
+pub fn handle_keys(
+    selected_moving: &mut Query<Entity, HasComponent<Selected>>,
+    world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
+    #[resource] keyboard_state: &KeyboardState,
+) {
+    if keyboard_state.stop.0 {
+        selected_moving.for_each(world, |entity| {
+            command_buffer.remove_component::<MovingTo>(*entity);
+        });
+    }
+}
+
+#[system]
 pub fn update_keyboard_state(#[resource] keyboard_state: &mut KeyboardState) {
     keyboard_state.update();
 }
