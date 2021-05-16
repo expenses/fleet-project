@@ -165,7 +165,6 @@ fn main() -> anyhow::Result<()> {
             components::RotationMatrix::default(),
             model,
             max_speed,
-            components::Moving,
             components::WorldSpaceBoundingBox::default(),
         ));
     }
@@ -253,32 +252,49 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::MouseMode::Normal);
 
     let mut schedule = legion::Schedule::builder()
+        // No dependencies.
+        .add_system(systems::move_ships_system())
         .add_system(systems::spin_system())
         .add_system(systems::kill_temporary_system())
         .add_system(systems::expand_explosions_system())
         .add_system(systems::spawn_projectiles_system())
         .add_system(systems::update_projectiles_system())
-        .add_system(systems::collide_projectiles_system())
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
         // Buffer clears
         .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
         .add_system(systems::clear_buffer_system::<CircleInstance>())
-        .add_system(systems::update_ship_rotation_matrix_system())
-        //
-        .add_system(systems::move_ships_system())
+        // Dependent on ship positions (`move_ships_system`).
         .add_system(systems::calculate_average_selected_position_system())
+        //  Dependent on average ship position (`calculate_average_selected_position_system`).
+        .add_system(systems::handle_right_clicks_system())
+        // Flush the command buffer adding `MovingTo`s to ships.
+        .flush()
+        // Dependent on `handle_right_clicks_system`.
+        .add_system(systems::set_rotation_from_moving_to_system())
+        .add_system(systems::move_ships_system())
+        // Dependent on updated rotations.
+        .add_system(systems::update_ship_rotation_matrix_system())
+        // Dependent on updated rotation matrices.
         .add_system(systems::set_world_space_bounding_box_system())
+        // Dependent on model movement.
         .add_system(systems::move_camera_around_following_system())
-        .add_system(systems::upload_instances_system())
+        // Dependent on model movement and updated matrices
+        .add_system(systems::collide_projectiles_system())
+        // Dependent on camera movement.
         .add_system(systems::update_ray_system())
-        .add_system(systems::find_ship_under_cursor_system())
-        //.add_system(systems::debug_find_ship_under_cursor_system())
-        .add_system(systems::handle_clicks_system())
+        // Dependent on an updated ray
         .add_system(systems::update_ray_plane_point_system())
+        // Dependent on an updated ray, positions and matrices.
+        .add_system(systems::find_ship_under_cursor_system())
+        // .add_system(systems::debug_find_ship_under_cursor_system())
+        // Dependent on `find_ship_under_cursor_system`.
+        .add_system(systems::handle_left_click_system())
+        // Staging
         .add_system(systems::render_projectiles_system())
         .add_system(systems::render_movement_circle_system())
+        .add_system(systems::upload_instances_system()) // rm
         // Buffer uploads
         .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())

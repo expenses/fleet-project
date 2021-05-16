@@ -24,8 +24,6 @@ pub enum ModelId {
 pub struct Scale(pub f32);
 pub struct Expands;
 
-pub struct Moving;
-
 pub struct AliveUntil(pub f32);
 
 #[derive(Default)]
@@ -54,3 +52,5 @@ impl Spin {
         Rotor3::from_angle_plane(self.angle, self.plane)
     }
 }
+
+pub struct MovingTo(pub Vec3);

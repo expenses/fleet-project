@@ -25,12 +25,6 @@ pub fn update_ship_rotation_matrix(
     };
 }
 
-#[system(for_each)]
-#[filter(component::<Moving>())]
-pub fn move_ships(position: &mut Position, rotation: &RotationMatrix, max_speed: &MaxSpeed) {
-    position.0 += rotation.matrix * (Vec3::new(0.0, 0.0, 0.01) * max_speed.0);
-}
-
 #[system]
 pub fn clear_buffer<T: 'static + Copy + bytemuck::Pod>(#[resource] buffer: &mut GpuBuffer<T>) {
     buffer.clear();
@@ -211,13 +205,12 @@ pub fn update_ray(
 type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
 
 #[system]
-pub fn handle_clicks(
+pub fn handle_left_click(
     world: &legion::world::SubWorld,
     command_buffer: &mut legion::systems::CommandBuffer,
     selected: &mut Query<Entity, HasComponent<Selected>>,
     #[resource] mouse_button: &MouseState,
     #[resource] ship_under_cursor: &ShipUnderCursor,
-    #[resource] average_selected_position: &AverageSelectedPosition,
     #[resource] mouse_mode: &mut MouseMode,
     #[resource] keyboard_state: &KeyboardState,
 ) {
@@ -234,7 +227,18 @@ pub fn handle_clicks(
             command_buffer.add_component(entity, Selected);
         }
     }
+}
 
+#[system]
+pub fn handle_right_clicks(
+    world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
+    selected: &mut Query<Entity, HasComponent<Selected>>,
+    #[resource] mouse_button: &MouseState,
+    #[resource] average_selected_position: &AverageSelectedPosition,
+    #[resource] mouse_mode: &mut MouseMode,
+    #[resource] ray_plane_point: &RayPlanePoint,
+) {
     if mouse_button.right_state.was_clicked() {
         *mouse_mode = match mouse_mode {
             MouseMode::Normal => {
@@ -244,9 +248,52 @@ pub fn handle_clicks(
                     MouseMode::Normal
                 }
             }
-            MouseMode::Movement { .. } => MouseMode::Normal,
+            MouseMode::Movement { .. } => {
+                if let Some(point) = ray_plane_point.0 {
+                    selected.for_each(world, |entity| {
+                        command_buffer.add_component(*entity, MovingTo(point));
+                    });
+                }
+
+                MouseMode::Normal
+            }
         };
     }
+}
+
+#[system(for_each)]
+pub fn move_ships(
+    entity: &Entity,
+    position: &mut Position,
+    moving_to: &MovingTo,
+    max_speed: &MaxSpeed,
+    command_buffer: &mut legion::systems::CommandBuffer,
+    #[resource] delta_time: &DeltaTime,
+) {
+    let delta = moving_to.0 - position.0;
+    let distance = delta.mag();
+    let speed = max_speed.0 * delta_time.0;
+
+    if distance < speed {
+        position.0 = moving_to.0;
+        command_buffer.remove_component::<MovingTo>(*entity);
+    } else {
+        position.0 += delta / distance * speed;
+    }
+}
+
+#[system(for_each)]
+#[filter(maybe_changed::<MovingTo>())]
+pub fn set_rotation_from_moving_to(
+    position: &Position,
+    moving_to: &MovingTo,
+    rotation: &mut Rotation,
+) {
+    let delta = moving_to.0 - position.0;
+    let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
+
+    rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
+        * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
 }
 
 #[system]
@@ -255,7 +302,7 @@ pub fn update_mouse_state(
     #[resource] delta_time: &DeltaTime,
 ) {
     mouse_state.left_state.update(delta_time.0, 0.1);
-    mouse_state.right_state.update(delta_time.0, 0.05);
+    mouse_state.right_state.update(delta_time.0, 0.075);
 }
 
 #[system]
@@ -276,11 +323,9 @@ pub fn update_ray_plane_point(
 pub fn move_camera(
     #[resource] keyboard_state: &KeyboardState,
     #[resource] orbit: &Orbit,
-    #[resource] perspective_view: &mut PerspectiveView,
     #[resource] camera: &mut Camera,
 ) {
     keyboard_state.move_camera(camera, orbit);
-    perspective_view.set_view(orbit.as_vector(), camera.center);
 }
 
 #[system]
@@ -309,6 +354,8 @@ pub fn set_camera_following(
 #[system]
 pub fn move_camera_around_following(
     #[resource] camera: &mut Camera,
+    #[resource] perspective_view: &mut PerspectiveView,
+    #[resource] orbit: &Orbit,
     positions: &mut Query<&Position>,
     world: &legion::world::SubWorld,
 ) {
@@ -318,6 +365,8 @@ pub fn move_camera_around_following(
             Err(_) => camera.following = None,
         }
     }
+
+    perspective_view.set_view(orbit.as_vector(), camera.center);
 }
 
 #[system]
