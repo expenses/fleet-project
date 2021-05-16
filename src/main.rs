@@ -250,6 +250,7 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::TotalTime(0.0));
     lr.insert(resources::RayPlanePoint::default());
     lr.insert(resources::AverageSelectedPosition::default());
+    lr.insert(resources::AverageSelectedEndPosition::default());
     lr.insert(resources::MouseMode::Normal);
 
     let mut schedule = legion::Schedule::builder()
@@ -274,7 +275,7 @@ fn main() -> anyhow::Result<()> {
         .flush()
         // Dependent on `handle_right_clicks_system`.
         .add_system(systems::set_rotation_from_moving_to_system())
-        .add_system(systems::move_ships_system())
+        .add_system(systems::calculate_average_selected_end_position_system())
         // Dependent on updated rotations.
         .add_system(systems::update_ship_rotation_matrix_system())
         // Dependent on updated rotation matrices.

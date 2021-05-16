@@ -19,6 +19,9 @@ pub enum MouseMode {
 }
 
 #[derive(Default)]
+pub struct AverageSelectedEndPosition(pub Option<Vec3>);
+
+#[derive(Default)]
 pub struct AverageSelectedPosition(pub Option<Vec3>);
 
 #[derive(Default)]

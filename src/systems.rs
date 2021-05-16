@@ -233,24 +233,37 @@ pub fn handle_left_click(
 
 #[system]
 pub fn handle_right_clicks(
-    world: &legion::world::SubWorld,
+    world: &mut legion::world::SubWorld,
     command_buffer: &mut legion::systems::CommandBuffer,
-    selected: &mut Query<Entity, SelectedFilter>,
+    selected: &mut Query<(Entity, Option<&mut MovingTo>), SelectedFilter>,
     #[resource] mouse_button: &MouseState,
     #[resource] average_selected_position: &AverageSelectedPosition,
+    #[resource] average_selected_end_position: &AverageSelectedEndPosition,
     #[resource] mouse_mode: &mut MouseMode,
     #[resource] ray_plane_point: &RayPlanePoint,
+    #[resource] keyboard_state: &KeyboardState,
 ) {
     if mouse_button.right_state.was_clicked() {
+        let avg_position_to_use = if keyboard_state.shift {
+            average_selected_end_position.0
+        } else {
+            average_selected_position.0
+        };
+
         *mouse_mode = match mouse_mode {
-            MouseMode::Normal => match average_selected_position.0 {
+            MouseMode::Normal => match avg_position_to_use {
                 Some(avg) => MouseMode::Movement { plane_y: avg.y },
                 _ => MouseMode::Normal,
             },
             MouseMode::Movement { .. } => {
                 if let Some(point) = ray_plane_point.0 {
-                    selected.for_each(world, |entity| {
-                        command_buffer.add_component(*entity, MovingTo(point));
+                    selected.for_each_mut(world, |(entity, moving_to)| {
+                        match (moving_to, keyboard_state.shift) {
+                            (Some(moving_to), true) => {
+                                moving_to.0.push(point);
+                            },
+                            _ => command_buffer.add_component(*entity, MovingTo(vec![point]))
+                        }
                     });
                 }
 
@@ -264,20 +277,24 @@ pub fn handle_right_clicks(
 pub fn move_ships(
     entity: &Entity,
     position: &mut Position,
-    moving_to: &MovingTo,
+    moving_to: &mut MovingTo,
     max_speed: &MaxSpeed,
     command_buffer: &mut legion::systems::CommandBuffer,
     #[resource] delta_time: &DeltaTime,
 ) {
-    let delta = moving_to.0 - position.0;
-    let distance = delta.mag();
-    let speed = max_speed.0 * delta_time.0;
+    if let Some(point) = moving_to.0.first().cloned() {
+        let delta = point - position.0;
+        let distance = delta.mag();
+        let speed = max_speed.0 * delta_time.0;
 
-    if distance < speed {
-        position.0 = moving_to.0;
-        command_buffer.remove_component::<MovingTo>(*entity);
+        if distance < speed {
+            position.0 = point;
+            moving_to.0.remove(0);
+        } else {
+            position.0 += delta / distance * speed;
+        }
     } else {
-        position.0 += delta / distance * speed;
+        command_buffer.remove_component::<MovingTo>(*entity);
     }
 }
 
@@ -288,11 +305,13 @@ pub fn set_rotation_from_moving_to(
     moving_to: &MovingTo,
     rotation: &mut Rotation,
 ) {
-    let delta = moving_to.0 - position.0;
-    let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
+    if let Some(point) = moving_to.0.first().cloned() {
+        let delta = point - position.0;
+        let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
 
-    rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
-        * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+        rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
+            * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+    }
 }
 
 #[system]
@@ -514,8 +533,16 @@ pub fn render_movement_circle(
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
     #[resource] ray_plane_point: &RayPlanePoint,
     #[resource] average_selected_position: &AverageSelectedPosition,
+    #[resource] average_selected_end_position: &AverageSelectedEndPosition,
+    #[resource] keyboard_state: &KeyboardState,
 ) {
-    if let (Some(avg), Some(point)) = (average_selected_position.0, ray_plane_point.0) {
+    let avg_position_to_use = if keyboard_state.shift {
+        average_selected_end_position.0
+    } else {
+        average_selected_position.0
+    };
+
+    if let (Some(avg), Some(point)) = (avg_position_to_use, ray_plane_point.0) {
         let mut circle_center = avg;
         circle_center.y = point.y;
 
@@ -574,6 +601,31 @@ pub fn calculate_average_selected_position(
     });
 
     average_selected_position.0 = if count != 0 {
+        Some(sum / count as f32)
+    } else {
+        None
+    };
+}
+
+#[system]
+pub fn calculate_average_selected_end_position(
+    #[resource] average_selected_end_position: &mut AverageSelectedEndPosition,
+    selected_positions: &mut Query<(&Position, Option<&MovingTo>), SelectedFilter>,
+    world: &legion::world::SubWorld,
+) {
+    let mut count = 0;
+    let mut sum = Vec3::zero();
+
+    selected_positions.iter(world)
+        .map(|(position, moving_to)| {
+            moving_to.and_then(|moving_to| moving_to.0.last().cloned()).unwrap_or(position.0)
+        })
+        .for_each(|position| {
+            count += 1;
+            sum += position;
+        });
+
+        average_selected_end_position.0 = if count != 0 {
         Some(sum / count as f32)
     } else {
         None

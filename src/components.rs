@@ -53,6 +53,6 @@ impl Spin {
     }
 }
 
-pub struct MovingTo(pub Vec3);
+pub struct MovingTo(pub Vec<Vec3>);
 
 pub struct FollowsCommands;
