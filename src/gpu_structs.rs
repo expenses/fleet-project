@@ -1,4 +1,4 @@
-use ultraviolet::{Mat3, Mat4, Vec2, Vec3};
+use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -47,4 +47,12 @@ pub struct GodraySettings {
     pub weight: f32,
     pub num_samples: u32,
     pub uv_space_light_pos: Vec2,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CircleInstance {
+    pub translation: Vec3,
+    pub scale: f32,
+    pub colour: Vec4,
 }

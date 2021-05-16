@@ -125,6 +125,21 @@ fn main() -> anyhow::Result<()> {
             contents: bytemuck::cast_slice(&bounding_box_indices_for_model_id(0)),
             usage: wgpu::BufferUsage::INDEX,
         }),
+        circle_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("circle vertices"),
+            contents: bytemuck::cast_slice(&circle_vertices::<64>()),
+            usage: wgpu::BufferUsage::VERTEX,
+        }),
+        circle_line_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("circle line indices"),
+            contents: bytemuck::cast_slice(&circle_line_indices::<64, { 64 * 2 }>()),
+            usage: wgpu::BufferUsage::INDEX,
+        }),
+        circle_filled_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("circle filled indices"),
+            contents: bytemuck::cast_slice(&circle_filled_indices::<64, { (64 - 2) * 3 }>()),
+            usage: wgpu::BufferUsage::INDEX,
+        }),
     };
 
     // ecs
@@ -182,6 +197,11 @@ fn main() -> anyhow::Result<()> {
         "lines",
         wgpu::BufferUsage::VERTEX,
     ));
+    lr.insert(resources::GpuBuffer::<CircleInstance>::new(
+        &device,
+        "circle instances",
+        wgpu::BufferUsage::VERTEX,
+    ));
     lr.insert(resources::Models([
         load_ship_model(
             include_bytes!("../models/carrier.glb"),
@@ -228,6 +248,9 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::Camera::default());
     lr.insert(resources::DeltaTime(1.0 / 60.0));
     lr.insert(resources::TotalTime(0.0));
+    lr.insert(resources::RayPlanePoint::default());
+    lr.insert(resources::AverageSelectedPosition::default());
+    lr.insert(resources::MouseMode::Normal);
 
     let mut schedule = legion::Schedule::builder()
         .add_system(systems::spin_system())
@@ -238,10 +261,14 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::collide_projectiles_system())
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
+        // Buffer clears
         .add_system(systems::clear_ship_buffer_system())
         .add_system(systems::clear_buffer_system::<BackgroundVertex>())
+        .add_system(systems::clear_buffer_system::<CircleInstance>())
         .add_system(systems::update_ship_rotation_matrix_system())
+        //
         .add_system(systems::move_ships_system())
+        .add_system(systems::calculate_average_selected_position_system())
         .add_system(systems::set_world_space_bounding_box_system())
         .add_system(systems::move_camera_around_following_system())
         .add_system(systems::upload_instances_system())
@@ -251,8 +278,12 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::handle_clicks_system())
         .add_system(systems::update_ray_plane_point_system())
         .add_system(systems::render_projectiles_system())
+        .add_system(systems::render_movement_circle_system())
+        // Buffer uploads
         .add_system(systems::upload_ship_buffer_system())
         .add_system(systems::upload_buffer_system::<BackgroundVertex>())
+        .add_system(systems::upload_buffer_system::<CircleInstance>())
+        // Cleanup
         .add_system(systems::update_mouse_state_system())
         .add_system(systems::update_keyboard_state_system())
         .add_system(systems::increase_total_time_system())
@@ -318,14 +349,19 @@ fn main() -> anyhow::Result<()> {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
+                let keyboard_state = lr.get::<resources::KeyboardState>().unwrap();
+                let mut mouse_mode = lr.get_mut::<resources::MouseMode>().unwrap();
 
                 let position = Vec2::new(position.x as f32, position.y as f32);
+                let delta = position - mouse_state.position;
 
                 if mouse_state.right_state.is_being_dragged().is_some() {
                     let mut orbit = lr.get_mut::<resources::Orbit>().unwrap();
-
-                    let delta = position - mouse_state.position;
                     orbit.rotate(delta);
+                } else if keyboard_state.shift {
+                    if let resources::MouseMode::Movement { plane_y } = &mut *mouse_mode {
+                        *plane_y -= delta.y / 10.0;
+                    }
                 }
 
                 mouse_state.position = position;
@@ -564,6 +600,8 @@ pub struct Pipelines {
     lines: wgpu::RenderPipeline,
     bounding_boxes: wgpu::RenderPipeline,
     tonemapper: wgpu::RenderPipeline,
+    circle: wgpu::RenderPipeline,
+    circle_outline: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -696,6 +734,33 @@ impl Pipelines {
 
         let fs_blur =
             device.create_shader_module(&wgpu::include_spirv!("../shaders/compiled/blur.frag.spv"));
+
+        let vec3_vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vec3>() as u64,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3],
+        };
+
+        let vec2_vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vec2>() as u64,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x2],
+        };
+
+        let circle_instance_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<CircleInstance>() as u64,
+            step_mode: wgpu::InputStepMode::Instance,
+            attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32, 3 => Float32x4],
+        };
+
+        let alpha_blend = |target| wgpu::ColorTargetState {
+            format: target,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrite::ALL,
+        };
+
+        let vs_circle = device
+            .create_shader_module(&wgpu::include_spirv!("../shaders/compiled/circle.vert.spv"));
 
         Self {
             ship: {
@@ -845,12 +910,6 @@ impl Pipelines {
                     "../shaders/compiled/bounding_box.vert.spv"
                 ));
 
-                let line_vertex_buffer_layout = wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vec3>() as u64,
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x3],
-                };
-
                 let instance_buffer_layout = wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Instance>() as u64,
                     step_mode: wgpu::InputStepMode::Instance,
@@ -864,7 +923,7 @@ impl Pipelines {
                         module: &vs_bounding_box,
                         entry_point: "main",
                         buffers: &[
-                            line_vertex_buffer_layout.clone(),
+                            vec3_vertex_buffer_layout.clone(),
                             instance_buffer_layout.clone(),
                         ],
                     },
@@ -907,6 +966,56 @@ impl Pipelines {
                     }),
                     primitive: wgpu::PrimitiveState::default(),
                     depth_stencil: Some(depth_ignore),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            circle: {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("circle pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_circle,
+                        entry_point: "main",
+                        buffers: &[
+                            vec2_vertex_buffer_layout.clone(),
+                            circle_instance_buffer_layout.clone(),
+                        ],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[alpha_blend(display_format)],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_read.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            circle_outline: {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("circle outline pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_circle,
+                        entry_point: "main",
+                        buffers: &[
+                            vec2_vertex_buffer_layout.clone(),
+                            circle_instance_buffer_layout.clone(),
+                        ],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[display_format.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
@@ -1153,4 +1262,38 @@ fn load_image(
             &*image,
         )
         .create_view(&wgpu::TextureViewDescriptor::default()))
+}
+
+fn circle_vertices<const VERTICES: usize>() -> [Vec2; VERTICES] {
+    let mut verts = [Default::default(); VERTICES];
+
+    for i in 0..VERTICES {
+        let rad = (i as f32) / VERTICES as f32 * std::f32::consts::TAU;
+        verts[i] = Vec2::new(rad.sin(), rad.cos());
+    }
+
+    verts
+}
+
+fn circle_line_indices<const VERTICES: usize, const INDICES: usize>() -> [u16; INDICES] {
+    let mut indices = [Default::default(); INDICES];
+
+    for i in 0..VERTICES {
+        indices[i * 2] = i as u16;
+        indices[i * 2 + 1] = ((i + 1) % VERTICES) as u16;
+    }
+
+    indices
+}
+
+fn circle_filled_indices<const VERTICES: usize, const INDICES: usize>() -> [u16; INDICES] {
+    let mut indices = [Default::default(); INDICES];
+
+    for i in 0..VERTICES - 2 {
+        indices[i * 3] = 0;
+        indices[i * 3 + 1] = (i + 1) as u16;
+        indices[i * 3 + 2] = (i + 2) as u16;
+    }
+
+    indices
 }

@@ -1,5 +1,5 @@
 use crate::components::*;
-use crate::gpu_structs::{BackgroundVertex, Instance};
+use crate::gpu_structs::{BackgroundVertex, CircleInstance, Instance};
 use crate::resources::*;
 use ultraviolet::Vec3;
 
@@ -217,15 +217,35 @@ pub fn handle_clicks(
     selected: &mut Query<Entity, HasComponent<Selected>>,
     #[resource] mouse_button: &MouseState,
     #[resource] ship_under_cursor: &ShipUnderCursor,
+    #[resource] average_selected_position: &AverageSelectedPosition,
+    #[resource] mouse_mode: &mut MouseMode,
+    #[resource] keyboard_state: &KeyboardState,
 ) {
     if mouse_button.left_state.was_clicked() {
-        selected.for_each(world, |entity| {
-            command_buffer.remove_component::<Selected>(*entity);
-        });
+        if !keyboard_state.shift {
+            selected.for_each(world, |entity| {
+                command_buffer.remove_component::<Selected>(*entity);
+            });
+        }
+
+        *mouse_mode = MouseMode::Normal;
 
         if let Some(entity) = ship_under_cursor.0 {
             command_buffer.add_component(entity, Selected);
         }
+    }
+
+    if mouse_button.right_state.was_clicked() {
+        *mouse_mode = match mouse_mode {
+            MouseMode::Normal => {
+                if let Some(avg) = average_selected_position.0 {
+                    MouseMode::Movement { plane_y: avg.y }
+                } else {
+                    MouseMode::Normal
+                }
+            }
+            MouseMode::Movement { .. } => MouseMode::Normal,
+        };
     }
 }
 
@@ -235,39 +255,21 @@ pub fn update_mouse_state(
     #[resource] delta_time: &DeltaTime,
 ) {
     mouse_state.left_state.update(delta_time.0, 0.1);
-    mouse_state.right_state.update(delta_time.0, 0.0);
+    mouse_state.right_state.update(delta_time.0, 0.05);
 }
 
 #[system]
 pub fn update_ray_plane_point(
     #[resource] ray: &Ray,
-    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+    #[resource] mouse_mode: &MouseMode,
+    #[resource] ray_plane_point: &mut RayPlanePoint,
 ) {
-    if let Some(intersection_point) = ray
-        .plane_intersection(0.0)
-        .map(|t| ray.get_intersection_point(t))
-    {
-        lines_buffer.stage(&[
-            BackgroundVertex {
-                position: intersection_point + Vec3::unit_y(),
-                colour: Vec3::unit_x(),
-            },
-            BackgroundVertex {
-                position: intersection_point,
-                colour: Vec3::unit_y(),
-            },
-            /*
-            BackgroundVertex {
-                position: ray.origin,
-                colour: Vec3::unit_x(),
-            },
-            BackgroundVertex {
-                position: ray.origin + ray.direction * 20.0,
-                colour: Vec3::unit_y(),
-            },
-            */
-        ]);
-    }
+    ray_plane_point.0 = match *mouse_mode {
+        MouseMode::Movement { plane_y } => ray
+            .plane_intersection(plane_y)
+            .map(|t| ray.get_intersection_point(t)),
+        MouseMode::Normal => None,
+    };
 }
 
 #[system]
@@ -456,4 +458,76 @@ pub fn spin(spin: &mut Spin, rotation: &mut Rotation, #[resource] delta_time: &D
 
 fn get_scale(scale: Option<&Scale>) -> f32 {
     scale.map(|scale| scale.0).unwrap_or(1.0)
+}
+
+#[system]
+pub fn render_movement_circle(
+    #[resource] circle_instances: &mut GpuBuffer<CircleInstance>,
+    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+    #[resource] ray_plane_point: &RayPlanePoint,
+    #[resource] average_selected_position: &AverageSelectedPosition,
+) {
+    if let (Some(avg), Some(point)) = (average_selected_position.0, ray_plane_point.0) {
+        let mut circle_center = avg;
+        circle_center.y = point.y;
+
+        let scale = (point - circle_center).mag();
+
+        let green = Vec3::unit_y();
+        let green_alpha = ultraviolet::Vec4::new(0.0, 1.0, 0.0, 0.15);
+
+        circle_instances.stage(&[CircleInstance {
+            translation: circle_center,
+            scale,
+            colour: green_alpha,
+        }]);
+
+        lines_buffer.stage(&[
+            BackgroundVertex {
+                position: avg,
+                colour: green,
+            },
+            BackgroundVertex {
+                position: point,
+                colour: green,
+            },
+            BackgroundVertex {
+                position: point,
+                colour: green,
+            },
+            BackgroundVertex {
+                position: circle_center,
+                colour: green,
+            },
+            BackgroundVertex {
+                position: circle_center,
+                colour: green,
+            },
+            BackgroundVertex {
+                position: avg,
+                colour: green,
+            },
+        ])
+    }
+}
+
+#[system]
+pub fn calculate_average_selected_position(
+    #[resource] average_selected_position: &mut AverageSelectedPosition,
+    selected_positions: &mut Query<&Position, HasComponent<Selected>>,
+    world: &legion::world::SubWorld,
+) {
+    let mut count = 0;
+    let mut sum = Vec3::zero();
+
+    selected_positions.for_each(world, |position| {
+        count += 1;
+        sum += position.0;
+    });
+
+    average_selected_position.0 = if count != 0 {
+        Some(sum / count as f32)
+    } else {
+        None
+    };
 }

@@ -1,5 +1,7 @@
 use crate::components::ModelId;
-use crate::gpu_structs::{BackgroundVertex, BlurSettings, GodraySettings, PushConstants};
+use crate::gpu_structs::{
+    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants,
+};
 use crate::resources;
 use crate::{Pipelines, Resizables};
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -14,6 +16,9 @@ pub struct StarSystem {
 
 pub struct Constants {
     pub bounding_box_indices: wgpu::Buffer,
+    pub circle_vertices: wgpu::Buffer,
+    pub circle_line_indices: wgpu::Buffer,
+    pub circle_filled_indices: wgpu::Buffer,
 }
 
 pub fn run_render_passes(
@@ -193,6 +198,10 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
+    let circle_instances_buffer = resources
+        .get::<resources::GpuBuffer<CircleInstance>>()
+        .unwrap();
+
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("tonemap and ui render pass"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -252,6 +261,24 @@ pub fn run_render_passes(
             offset += num_instances;
         }
     }
+
+    let (circle_instances_buffer, num_circle_instances) = circle_instances_buffer.slice();
+
+    render_pass.set_pipeline(&pipelines.circle);
+    render_pass.set_vertex_buffer(0, constants.circle_vertices.slice(..));
+    render_pass.set_index_buffer(
+        constants.circle_filled_indices.slice(..),
+        wgpu::IndexFormat::Uint16,
+    );
+    render_pass.set_vertex_buffer(1, circle_instances_buffer);
+    render_pass.draw_indexed(0..((64 - 2) * 3), 0, 0..num_circle_instances);
+
+    render_pass.set_pipeline(&pipelines.circle_outline);
+    render_pass.set_index_buffer(
+        constants.circle_line_indices.slice(..),
+        wgpu::IndexFormat::Uint16,
+    );
+    render_pass.draw_indexed(0..(64 * 2), 0, 0..num_circle_instances);
 
     drop(render_pass);
 }

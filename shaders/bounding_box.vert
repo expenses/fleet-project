@@ -14,7 +14,7 @@ layout(push_constant) uniform PushConstants {
     vec3 light_dir;
 };
 
-layout(location = 0) out vec3 out_colour;
+layout(location = 0) out vec4 out_colour;
 
 void main() {
     mat3 rotation = mat3(rotation_1, rotation_2, rotation_3);
@@ -26,5 +26,5 @@ void main() {
         gl_Position = vec4(0.0);
     }
 
-    out_colour = colour;
+    out_colour = vec4(colour, 1.0);
 }

@@ -12,6 +12,18 @@ use crate::components::ModelId;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+#[derive(Clone, Copy)]
+pub enum MouseMode {
+    Normal,
+    Movement { plane_y: f32 },
+}
+
+#[derive(Default)]
+pub struct AverageSelectedPosition(pub Option<Vec3>);
+
+#[derive(Default)]
+pub struct RayPlanePoint(pub Option<Vec3>);
+
 pub struct TotalTime(pub f32);
 
 pub struct DeltaTime(pub f32);
