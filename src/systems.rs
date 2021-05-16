@@ -323,8 +323,15 @@ pub fn move_camera(
     #[resource] keyboard_state: &KeyboardState,
     #[resource] orbit: &Orbit,
     #[resource] camera: &mut Camera,
+    currently_following: &mut Query<Entity, HasComponent<CameraFollowing>>,
+    world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
 ) {
-    keyboard_state.move_camera(camera, orbit);
+    if keyboard_state.move_camera(camera, orbit) {
+        currently_following.for_each(world, |entity| {
+            command_buffer.remove_component::<CameraFollowing>(*entity)
+        });
+    }
 }
 
 #[system]
@@ -335,18 +342,23 @@ pub fn update_keyboard_state(#[resource] keyboard_state: &mut KeyboardState) {
 #[system]
 pub fn set_camera_following(
     #[resource] keyboard_state: &KeyboardState,
-    #[resource] camera: &mut Camera,
     selected: &mut Query<Entity, HasComponent<Selected>>,
+    currently_following: &mut Query<Entity, HasComponent<CameraFollowing>>,
     world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
 ) {
     if keyboard_state.center_camera.0 {
-        camera.following = selected
-            .iter(world)
-            .next()
-            .cloned()
-            // If we deselect everything and press 'center camera while following
-            // something, it makes the most sense to keep following that thing.
-            .or(camera.following);
+        // If we deselect everything and press 'center camera while following
+        // something, it makes the most sense to keep following that thing.
+        if selected.iter(world).next().is_some() {
+            currently_following.for_each(world, |entity| {
+                command_buffer.remove_component::<CameraFollowing>(*entity)
+            });
+
+            selected.for_each(world, |entity| {
+                command_buffer.add_component(*entity, CameraFollowing);
+            });
+        }
     }
 }
 
@@ -355,14 +367,11 @@ pub fn move_camera_around_following(
     #[resource] camera: &mut Camera,
     #[resource] perspective_view: &mut PerspectiveView,
     #[resource] orbit: &Orbit,
-    positions: &mut Query<&Position>,
     world: &legion::world::SubWorld,
+    following: &mut Query<&Position, HasComponent<CameraFollowing>>,
 ) {
-    if let Some(following) = camera.following {
-        match positions.get(world, following) {
-            Ok(position) => camera.center = position.0,
-            Err(_) => camera.following = None,
-        }
+    if let Some(avg) = average(following.iter(world).map(|pos| pos.0)) {
+        camera.center = avg;
     }
 
     perspective_view.set_view(orbit.as_vector(), camera.center);
@@ -565,17 +574,21 @@ pub fn calculate_average_selected_position(
     selected_positions: &mut Query<&Position, SelectedFilter>,
     world: &legion::world::SubWorld,
 ) {
+    average_selected_position.0 = average(selected_positions.iter(world).map(|pos| pos.0));
+}
+
+fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {
     let mut count = 0;
     let mut sum = Vec3::zero();
 
-    selected_positions.for_each(world, |position| {
+    for position in positions {
         count += 1;
-        sum += position.0;
-    });
+        sum += position;
+    }
 
-    average_selected_position.0 = if count != 0 {
+    if count != 0 {
         Some(sum / count as f32)
     } else {
         None
-    };
+    }
 }

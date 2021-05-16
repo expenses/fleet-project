@@ -49,7 +49,6 @@ impl Models {
 #[derive(Default)]
 pub struct Camera {
     pub center: Vec3,
-    pub following: Option<Entity>,
 }
 
 pub struct Dimensions {

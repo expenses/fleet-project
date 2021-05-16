@@ -44,7 +44,7 @@ impl KeyboardState {
         self.center_camera.reset();
     }
 
-    pub fn move_camera(&self, camera: &mut Camera, orbit: &Orbit) {
+    pub fn move_camera(&self, camera: &mut Camera, orbit: &Orbit) -> bool {
         let forwards = self.camera_forwards as i8 - self.camera_back as i8;
         let right = self.camera_right as i8 - self.camera_left as i8;
 
@@ -58,7 +58,9 @@ impl KeyboardState {
                 forwards * orbit.latitude.cos() + right * orbit.latitude.sin(),
             );
 
-            camera.following = None;
+            true
+        } else {
+            false
         }
     }
 }
