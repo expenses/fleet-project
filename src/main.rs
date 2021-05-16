@@ -166,6 +166,7 @@ fn main() -> anyhow::Result<()> {
             model,
             max_speed,
             components::WorldSpaceBoundingBox::default(),
+            components::FollowsCommands,
         ));
     }
 
@@ -1283,9 +1284,9 @@ fn load_image(
 fn circle_vertices<const VERTICES: usize>() -> [Vec2; VERTICES] {
     let mut verts = [Default::default(); VERTICES];
 
-    for i in 0..VERTICES {
+    for (i, vert) in verts.iter_mut().enumerate() {
         let rad = (i as f32) / VERTICES as f32 * std::f32::consts::TAU;
-        verts[i] = Vec2::new(rad.sin(), rad.cos());
+        *vert = Vec2::new(rad.sin(), rad.cos());
     }
 
     verts

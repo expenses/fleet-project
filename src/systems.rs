@@ -203,6 +203,8 @@ pub fn update_ray(
 }
 
 type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
+type HasComponents<T> = EntityFilterTuple<And<T>, Passthrough>;
+type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<FollowsCommands>)>;
 
 #[system]
 pub fn handle_left_click(
@@ -233,7 +235,7 @@ pub fn handle_left_click(
 pub fn handle_right_clicks(
     world: &legion::world::SubWorld,
     command_buffer: &mut legion::systems::CommandBuffer,
-    selected: &mut Query<Entity, HasComponent<Selected>>,
+    selected: &mut Query<Entity, SelectedFilter>,
     #[resource] mouse_button: &MouseState,
     #[resource] average_selected_position: &AverageSelectedPosition,
     #[resource] mouse_mode: &mut MouseMode,
@@ -241,13 +243,10 @@ pub fn handle_right_clicks(
 ) {
     if mouse_button.right_state.was_clicked() {
         *mouse_mode = match mouse_mode {
-            MouseMode::Normal => {
-                if let Some(avg) = average_selected_position.0 {
-                    MouseMode::Movement { plane_y: avg.y }
-                } else {
-                    MouseMode::Normal
-                }
-            }
+            MouseMode::Normal => match average_selected_position.0 {
+                Some(avg) => MouseMode::Movement { plane_y: avg.y },
+                _ => MouseMode::Normal,
+            },
             MouseMode::Movement { .. } => {
                 if let Some(point) = ray_plane_point.0 {
                     selected.for_each(world, |entity| {
@@ -563,7 +562,7 @@ pub fn render_movement_circle(
 #[system]
 pub fn calculate_average_selected_position(
     #[resource] average_selected_position: &mut AverageSelectedPosition,
-    selected_positions: &mut Query<&Position, HasComponent<Selected>>,
+    selected_positions: &mut Query<&Position, SelectedFilter>,
     world: &legion::world::SubWorld,
 ) {
     let mut count = 0;

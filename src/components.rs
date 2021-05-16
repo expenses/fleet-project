@@ -54,3 +54,5 @@ impl Spin {
 }
 
 pub struct MovingTo(pub Vec3);
+
+pub struct FollowsCommands;
