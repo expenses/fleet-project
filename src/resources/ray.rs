@@ -29,6 +29,10 @@ impl Ray {
             .truncated()
             .normalized();
 
+        Self::new(origin, direction)
+    }
+
+    pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
             origin,
             direction,
@@ -46,13 +50,10 @@ impl Ray {
         reversed_rotation: Mat3,
         scale: f32,
     ) -> Self {
-        let direction = reversed_rotation * self.direction;
-
-        Self {
-            origin: reversed_rotation * (self.origin - position) / scale,
-            direction,
-            inv_direction: Vec3::one() / direction,
-        }
+        Self::new(
+            reversed_rotation * (self.origin - position) / scale,
+            reversed_rotation * self.direction,
+        )
     }
 
     pub fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
