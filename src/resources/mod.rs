@@ -12,6 +12,8 @@ use crate::components::ModelId;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+pub struct Paused(pub bool);
+
 #[derive(Clone, Copy)]
 pub enum MouseMode {
     Normal,

@@ -55,7 +55,6 @@ fn main() -> anyhow::Result<()> {
     let resources = Resources::new(&device);
     let pipelines = Pipelines::new(&device, &resources, display_format);
 
-    let mut paused = false;
     let draw_godrays = false;
 
     let tonemapper = colstodian::LottesTonemapper::new(colstodian::LottesTonemaperParams {
@@ -251,6 +250,7 @@ fn main() -> anyhow::Result<()> {
     lr.insert(resources::RayPlanePoint::default());
     lr.insert(resources::AverageSelectedPosition::default());
     lr.insert(resources::MouseMode::Normal);
+    lr.insert(resources::Paused(false));
 
     let mut schedule = legion::Schedule::builder()
         // No dependencies.
@@ -347,13 +347,8 @@ fn main() -> anyhow::Result<()> {
                 ..
             } => {
                 let pressed = *state == ElementState::Pressed;
-                match key {
-                    VirtualKeyCode::P if pressed => paused = !paused,
-                    _ => {
-                        let mut keyboard_state = lr.get_mut::<resources::KeyboardState>().unwrap();
-                        keyboard_state.handle(*key, pressed);
-                    }
-                }
+                let mut keyboard_state = lr.get_mut::<resources::KeyboardState>().unwrap();
+                keyboard_state.handle(*key, pressed);
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
@@ -389,9 +384,7 @@ fn main() -> anyhow::Result<()> {
             _ => {}
         },
         Event::MainEventsCleared => {
-            if !paused {
-                schedule.execute(&mut world, &mut lr);
-            }
+            schedule.execute(&mut world, &mut lr);
 
             window.request_redraw();
         }

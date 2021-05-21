@@ -340,11 +340,16 @@ pub fn handle_keys(
     world: &legion::world::SubWorld,
     command_buffer: &mut legion::systems::CommandBuffer,
     #[resource] keyboard_state: &KeyboardState,
+    #[resource] paused: &mut Paused,
 ) {
     if keyboard_state.stop.0 {
         selected_moving.for_each(world, |entity| {
             command_buffer.remove_component::<MovingTo>(*entity);
         });
+    }
+
+    if keyboard_state.pause.0 {
+        paused.0 = !paused.0;
     }
 }
 
