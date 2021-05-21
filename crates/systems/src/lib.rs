@@ -199,7 +199,8 @@ pub fn update_ray(
         dimensions.width,
         dimensions.height,
         orbit.as_vector() + camera.center,
-        perspective_view,
+        perspective_view.perspective.inversed(),
+        perspective_view.view.inversed(),
     );
 }
 

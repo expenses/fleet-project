@@ -30,14 +30,17 @@ rendering = { path = "crates/rendering" }
 default = ["parallel"]
 parallel = ["legion/parallel"]
 
-# Compile all dependencies in release mode
-[profile.dev.package."*"]
-opt-level = 3
-
 [workspace]
 members = [
     ".",
     "crates/components-and-resources",
     "crates/systems",
     "crates/rendering",
+    "crates/ray-collisions",
 ]
+
+[profile.dev.package."systems"]
+opt-level = 3
+
+[profile.dev.package."ray-collisions"]
+opt-level = 3

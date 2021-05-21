@@ -10,6 +10,7 @@ bytemuck = { version = "1.5.1", features = ["derive"] }
 gltf = "0.16.0"
 image = { version = "0.23.14", features = ["png"], default-features = false }
 legion = "0.4.0"
+ray-collisions = { path = "../ray-collisions/" }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
 ultraviolet = { version = "0.8.1", features = ["bytemuck"] }
 wgpu = "0.8.1"

@@ -1,38 +1,7 @@
 use ultraviolet::Vec3;
 use wgpu::util::DeviceExt;
-use crate::resources::BoundingBox;
+use ray_collisions::{BoundingBox, Triangle};
 use crate::gpu_structs::ModelVertex;
-
-#[derive(Debug)]
-pub struct Triangle {
-    pub a: Vec3,
-    pub edge_b_a: Vec3,
-    pub edge_c_a: Vec3,
-}
-
-impl Triangle {
-    fn new(a: Vec3, b: Vec3, c: Vec3) -> Self {
-        Self {
-            a,
-            edge_b_a: b - a,
-            edge_c_a: c - a,
-        }
-    }
-}
-
-impl rstar::RTreeObject for Triangle {
-    type Envelope = rstar::AABB<[f32; 3]>;
-
-    // This is only called during construction so there's no need to cache the aabb.
-    fn envelope(&self) -> Self::Envelope {
-        let b = self.edge_b_a + self.a;
-        let c = self.edge_c_a + self.a;
-
-        let min = self.a.min_by_component(b).min_by_component(c);
-        let max = self.a.max_by_component(b).max_by_component(c);
-        rstar::AABB::from_corners(min.into(), max.into())
-    }
-}
 
 pub struct Model {
     pub vertices: wgpu::Buffer,

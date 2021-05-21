@@ -1,6 +1,4 @@
-use crate::resources::PerspectiveView;
-use crate::model::Triangle;
-use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat4, Mat3, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Default, Clone)]
 pub struct Ray {
@@ -16,16 +14,17 @@ impl Ray {
         width: u32,
         height: u32,
         origin: Vec3,
-        perspective_view: &PerspectiveView,
+        inv_perspective: Mat4,
+        inv_view: Mat4,
     ) -> Self {
         let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
         let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
 
         let clip = Vec4::new(x, y, -1.0, 1.0);
-        let eye = perspective_view.perspective.inversed() * clip;
+        let eye = inv_perspective * clip;
         let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
 
-        let direction = (perspective_view.view.inversed() * eye)
+        let direction = (inv_view * eye)
             .truncated()
             .normalized();
 
@@ -308,5 +307,36 @@ impl std::ops::Mul<f32> for BoundingBox {
 
     fn mul(self, scale: f32) -> Self {
         Self::new(self.min * scale, self.max * scale)
+    }
+}
+
+#[derive(Debug)]
+pub struct Triangle {
+    pub a: Vec3,
+    pub edge_b_a: Vec3,
+    pub edge_c_a: Vec3,
+}
+
+impl Triangle {
+    pub fn new(a: Vec3, b: Vec3, c: Vec3) -> Self {
+        Self {
+            a,
+            edge_b_a: b - a,
+            edge_c_a: c - a,
+        }
+    }
+}
+
+impl rstar::RTreeObject for Triangle {
+    type Envelope = rstar::AABB<[f32; 3]>;
+
+    // This is only called during construction so there's no need to cache the aabb.
+    fn envelope(&self) -> Self::Envelope {
+        let b = self.edge_b_a + self.a;
+        let c = self.edge_c_a + self.a;
+
+        let min = self.a.min_by_component(b).min_by_component(c);
+        let max = self.a.max_by_component(b).max_by_component(c);
+        rstar::AABB::from_corners(min.into(), max.into())
     }
 }
