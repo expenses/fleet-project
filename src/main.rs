@@ -9,6 +9,7 @@ mod components;
 mod gpu_structs;
 mod rendering;
 mod resources;
+mod steering;
 mod systems;
 
 use gpu_structs::*;
@@ -144,32 +145,91 @@ fn main() -> anyhow::Result<()> {
     // ecs
     let mut world = legion::world::World::default();
 
-    for _ in 0..10000 {
+    /*for _ in 0..100 {
         let position = Vec3::new(
-            rng.gen_range(-400.0..400.0),
-            rng.gen_range(-50.0..=10.0),
-            rng.gen_range(-400.0..400.0),
+            rng.gen_range(-40.0..40.0),
+            rng.gen_range(-5.0..=1.0),
+            rng.gen_range(-40.0..40.0),
         );
         let rotation = Rotor3::from_rotation_xz(rng.gen_range(0.0..=360.0_f32).to_radians());
 
-        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.9 {
+        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.5 {
             (components::ModelId::Fighter, components::MaxSpeed(10.0))
         } else {
             (components::ModelId::Carrier, components::MaxSpeed(1.0))
         };
 
-        world.push((
-            components::Position(position),
-            components::Rotation(rotation),
-            components::RotationMatrix::default(),
-            model,
-            max_speed,
-            components::WorldSpaceBoundingBox::default(),
-            components::FollowsCommands,
-        ));
-    }
+        if rng.gen() {
+            world.push((
+                components::Position(position),
+                components::Rotation(rotation),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Friendly,
+                components::Velocity(Vec3::zero()),
+            ));
+        } else {
+            world.push((
+                components::Position(position),
+                components::Rotation(rotation),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::Enemy,
+                components::Velocity(Vec3::zero()),
+            ));
+        }
+    }*/
 
     for _ in 0..1000 {
+        let side = rng.gen_range(0.0..1.0) > 1.0 / 3.0;
+
+        let position = Vec3::new(
+            rng.gen_range(-50.0..50.0) + side as u8 as f32 * 150.0,
+            rng.gen_range(-50.0..50.0),
+            rng.gen_range(-50.0..50.0),
+        );
+
+        let (model, max_speed) = if true {
+            (components::ModelId::Fighter, components::MaxSpeed(10.0))
+        } else {
+            (components::ModelId::Carrier, components::MaxSpeed(1.0))
+        };
+
+        if side {
+            world.push((
+                components::Position(position),
+                components::Rotation(Default::default()),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Friendly,
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+            ));
+        } else {
+            world.push((
+                components::Position(position),
+                components::Rotation(Default::default()),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Enemy,
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+            ));
+        }
+    }
+
+    for _ in 0..10 {
         let position = Vec3::new(
             rng.gen_range(-400.0..400.0),
             rng.gen_range(-50.0..=10.0),
@@ -263,6 +323,9 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
         .add_system(systems::handle_keys_system())
+        .add_system(systems::apply_staging_velocity_system())
+        .add_system(systems::apply_velocity_system())
+        .add_system(systems::spawn_projectile_from_ships_system())
         // Need to update what the camera is following.
         .flush()
         // Buffer clears
@@ -284,6 +347,10 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::set_world_space_bounding_box_system())
         // Dependent on model movement.
         .add_system(systems::move_camera_around_following_system())
+        .add_system(systems::choose_enemy_target_system())
+        .flush()
+        .add_system(systems::run_steering_system())
+        .add_system(systems::debug_draw_targets_system())
         // Dependent on model movement and updated matrices
         .add_system(systems::collide_projectiles_system())
         // Dependent on camera movement.

@@ -20,7 +20,7 @@ tint = "1.0.1"
 noise = "0.7.0"
 rand = "0.8.3"
 env_logger = "0.8.3"
-legion = { version = "0.4.0", default-features = false, features = ["codegen"] }
+legion = { path = "legion", default-features = false, features = ["codegen", "extended-tuple-impls"] }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
 colstodian = { git = "https://github.com/expenses/colstodian", branch = "bytemuck", features = ["bytemuck"] }
 
@@ -31,3 +31,6 @@ parallel = ["legion/parallel"]
 # Compile all dependencies in release mode
 [profile.dev.package."*"]
 opt-level = 3
+
+[profile.release]
+debug = true

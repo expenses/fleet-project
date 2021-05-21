@@ -1,4 +1,5 @@
 use crate::resources::BoundingBox;
+use legion::Entity;
 use ultraviolet::{Mat3, Rotor3, Vec3};
 
 pub struct Position(pub Vec3);
@@ -58,3 +59,15 @@ pub struct MovingTo(pub Vec3);
 pub struct FollowsCommands;
 
 pub struct CameraFollowing;
+
+pub struct Friendly;
+pub struct Enemy;
+
+pub struct Targetting(pub Entity);
+pub struct Evading(pub Entity);
+
+pub struct Velocity(pub Vec3);
+pub struct StagingVelocity(pub Vec3);
+pub struct RayCooldown(pub f32);
+
+pub struct ProjectileIgnores(pub Entity);

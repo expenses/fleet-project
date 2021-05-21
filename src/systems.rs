@@ -1,6 +1,7 @@
 use crate::components::*;
 use crate::gpu_structs::{BackgroundVertex, CircleInstance, Instance};
 use crate::resources::*;
+use crate::steering;
 use ultraviolet::Vec3;
 
 use legion::query::*;
@@ -59,13 +60,23 @@ pub fn upload_instances(
     rotation_matrix: &RotationMatrix,
     model_id: &ModelId,
     scale: Option<&Scale>,
+    friendly: Option<&Friendly>,
+    enemy: Option<&Enemy>,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
-    let colour = if ship_under_cursor.0 == Some(*entity) {
-        Vec3::one()
-    } else if selected.is_some() {
+    let base_colour = if friendly.is_some() {
         Vec3::unit_y()
+    } else if enemy.is_some() {
+        Vec3::unit_x()
+    } else {
+        Vec3::unit_z()
+    };
+
+    let colour = if ship_under_cursor.0 == Some(*entity) {
+        base_colour
+    } else if selected.is_some() {
+        base_colour * 0.5
     } else {
         Vec3::zero()
     };
@@ -204,7 +215,7 @@ pub fn update_ray(
 
 type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
 type HasComponents<T> = EntityFilterTuple<And<T>, Passthrough>;
-type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<FollowsCommands>)>;
+type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<Friendly>)>;
 
 #[system]
 pub fn handle_left_click(
@@ -282,17 +293,19 @@ pub fn move_ships(
 }
 
 #[system(for_each)]
-#[filter(maybe_changed::<MovingTo>())]
+#[filter(maybe_changed::<Velocity>())]
 pub fn set_rotation_from_moving_to(
     position: &Position,
-    moving_to: &MovingTo,
+    velocity: &Velocity,
     rotation: &mut Rotation,
 ) {
-    let delta = moving_to.0 - position.0;
-    let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
+    if velocity.0 != Vec3::zero() {
+        let delta = velocity.0;
+        let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
 
-    rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
-        * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+        rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
+            * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+    }
 }
 
 #[system]
@@ -413,16 +426,16 @@ pub fn render_projectiles(
     projectile: &Projectile,
     #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
 ) {
-    let (start, end) = projectile.line_points(5.0);
+    let (start, end) = projectile.line_points(-0.1);
 
     lines_buffer.stage(&[
         BackgroundVertex {
             position: start,
-            colour: Vec3::unit_x(),
+            colour: Vec3::new(0.75, 0.0, 1.0),
         },
         BackgroundVertex {
             position: end,
-            colour: Vec3::unit_y(),
+            colour: Vec3::new(0.75, 0.0, 1.0),
         },
     ]);
 }
@@ -434,8 +447,9 @@ pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &
 
 #[system]
 pub fn collide_projectiles(
-    projectiles: &mut Query<(Entity, &Projectile)>,
+    projectiles: &mut Query<(Entity, &Projectile, Option<&ProjectileIgnores>)>,
     ships: &mut Query<(
+        Entity,
         &WorldSpaceBoundingBox,
         &Position,
         &RotationMatrix,
@@ -448,13 +462,14 @@ pub fn collide_projectiles(
     #[resource] total_time: &TotalTime,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
-    projectiles.for_each(world, |(entity, projectile)| {
+    projectiles.for_each(world, |(entity, projectile, ignores)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
         let first_hit = ships
             .iter(world)
-            .filter(|(ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
-            .flat_map(|(_, position, rotation, model_id, scale)| {
+            .filter(|(entity, ..)| Some(**entity) != ignores.map(|ignores| ignores.0))
+            .filter(|(_, ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
+            .flat_map(|(ship_entity, _, position, rotation, model_id, scale)| {
                 let scale = get_scale(scale);
 
                 let ray = projectile
@@ -465,14 +480,15 @@ pub fn collide_projectiles(
                     .get(*model_id)
                     .acceleration_tree
                     .locate_with_selection_function_with_data(ray)
-                    .map(move |(_, scaled_t)| scaled_t)
+                    .map(move |(_, scaled_t)| (ship_entity, scaled_t))
             })
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some(t) = first_hit {
+        if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
 
             command_buffer.remove(*entity);
+            command_buffer.remove(*ship_entity);
             command_buffer.push((
                 Position(position),
                 RotationMatrix::default(),
@@ -609,5 +625,248 @@ fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {
         Some(sum / count as f32)
     } else {
         None
+    }
+}
+
+type TargettingFilter<T> = HasComponents<(Not<ComponentFilter<Targetting>>, ComponentFilter<T>)>;
+
+#[system]
+pub fn choose_enemy_target(
+    friendlies: &mut Query<(Entity, &Position), TargettingFilter<Friendly>>,
+    enemies: &mut Query<(Entity, &Position), TargettingFilter<Enemy>>,
+    world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
+) {
+    friendlies.for_each(world, |(entity, pos)| {
+        let target = enemies
+            .iter(world)
+            .map(|(target_entity, target_pos)| (target_entity, (target_pos.0 - pos.0).mag_sq()))
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((target_entity, _)) = target {
+            command_buffer.add_component(*entity, Targetting(*target_entity));
+            command_buffer.add_component(*target_entity, Evading(*entity));
+        }
+    });
+
+    enemies.for_each(world, |(entity, pos)| {
+        let target = friendlies
+            .iter(world)
+            .map(|(target_entity, target_pos)| (target_entity, (target_pos.0 - pos.0).mag_sq()))
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((target_entity, _)) = target {
+            command_buffer.add_component(*entity, Targetting(*target_entity));
+            command_buffer.add_component(*target_entity, Evading(*entity));
+        }
+    });
+}
+
+#[system]
+pub fn run_steering(
+    entities: &mut Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&Targetting>,
+        Option<&Evading>,
+    )>,
+    boids: &mut Query<(&Position, &Velocity, &MaxSpeed)>,
+    world: &legion::world::SubWorld,
+    command_buffer: &mut legion::systems::CommandBuffer,
+    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+) {
+    entities.for_each(
+        world,
+        |(entity, pos, vel, max_speed, targetting, evading)| {
+            let mut steering = Vec3::zero();
+            let boid = to_boid((pos, vel, max_speed));
+
+            if let Some(&Targetting(target_entity)) = targetting {
+                if let Ok(target_boid) = boids.get(world, target_entity) {
+                    let target_boid = to_boid(target_boid);
+                    // Because ships are constantly turning, the predicted
+                    // point of contact for a ship far away varies a lot, resulting
+                    // in an annoying visual wobble. So we disable leading here.
+                    // We should fix this someother how though.
+                    let lead_factor = 0.0;
+
+                    let force = boid.persue(target_boid, lead_factor);
+
+                    lines_buffer.stage(&[
+                        BackgroundVertex {
+                            position: pos.0,
+                            colour: Vec3::unit_x(),
+                        },
+                        BackgroundVertex {
+                            position: pos.0 + force,
+                            colour: Vec3::unit_x(),
+                        },
+                    ]);
+
+                    steering += force;
+                } else {
+                    command_buffer.remove_component::<Targetting>(*entity);
+                }
+            }
+
+            if let Some(&Evading(evading_entity)) = evading {
+                if let Ok(evading_boid) = boids.get(world, evading_entity) {
+                    let evading_boid = to_boid(evading_boid);
+
+                    let force = boid.evade(evading_boid);
+
+                    lines_buffer.stage(&[
+                        BackgroundVertex {
+                            position: pos.0,
+                            colour: Vec3::unit_y(),
+                        },
+                        BackgroundVertex {
+                            position: pos.0 + force,
+                            colour: Vec3::unit_y(),
+                        },
+                    ]);
+
+                    steering += force;
+                } else {
+                    command_buffer.remove_component::<Evading>(*entity);
+                }
+            }
+
+            /*
+            {
+                let force = boid.avoidance(boids.iter(world).map(to_boid)) * 0.5;
+
+                steering += force;
+
+                lines_buffer.stage(&[
+                    BackgroundVertex {
+                        position: pos.0,
+                        colour: Vec3::new(1.0, 0.5, 0.0)
+                    },
+                    BackgroundVertex {
+                        position: pos.0 + force,
+                        colour: Vec3::new(1.0, 0.5, 0.0)
+                    }
+                ]);
+            }
+            */
+
+            if steering == Vec3::zero() {
+                steering -= boid.vel;
+            }
+
+            let max_force = max_speed.0 / 10.0;
+            let steering = truncate(steering, max_force);
+
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: pos.0,
+                    colour: Vec3::unit_z(),
+                },
+                BackgroundVertex {
+                    position: pos.0 + steering,
+                    colour: Vec3::unit_z(),
+                },
+            ]);
+
+            command_buffer.add_component(
+                *entity,
+                StagingVelocity(truncate(vel.0 + steering, max_speed.0)),
+            );
+        },
+    )
+}
+
+fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> steering::Boid {
+    steering::Boid {
+        pos: pos.0,
+        vel: vel.0,
+        max_vel: max_speed.0,
+        radius_sq: 4.0_f32.powi(2),
+    }
+}
+
+fn truncate(vec: Vec3, max: f32) -> Vec3 {
+    let mag = vec.mag();
+    let new_mag = mag.min(max);
+    if new_mag == 0.0 {
+        Vec3::zero()
+    } else {
+        vec / mag * new_mag
+    }
+}
+
+#[system(for_each)]
+pub fn apply_staging_velocity(
+    velocity: &mut Velocity,
+    staging_velocity: &StagingVelocity,
+    #[resource] paused: &Paused,
+) {
+    if paused.0 {
+        return;
+    }
+    velocity.0 = staging_velocity.0;
+}
+
+#[system(for_each)]
+pub fn apply_velocity(
+    position: &mut Position,
+    velocity: &Velocity,
+    #[resource] delta_time: &DeltaTime,
+    #[resource] paused: &Paused,
+) {
+    if paused.0 {
+        return;
+    }
+    position.0 += velocity.0 * delta_time.0;
+}
+
+#[system]
+pub fn debug_draw_targets(
+    entity_query: &mut Query<(&Position, &Targetting), HasComponent<Selected>>,
+    position_query: &mut Query<&Position>,
+    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+    world: &legion::world::SubWorld,
+) {
+    for (position, targetting) in entity_query.iter(world) {
+        if let Ok(target_pos) = position_query.get(world, targetting.0) {
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: position.0,
+                    colour: Vec3::zero(),
+                },
+                BackgroundVertex {
+                    position: target_pos.0,
+                    colour: Vec3::one(),
+                },
+            ]);
+        }
+    }
+}
+
+#[system(for_each)]
+#[filter(component::<Targetting>())]
+pub fn spawn_projectile_from_ships(
+    entity: &Entity,
+    position: &Position,
+    velocity: &Velocity,
+    ray_cooldown: &mut RayCooldown,
+    #[resource] delta_time: &DeltaTime,
+    #[resource] total_time: &TotalTime,
+    command_buffer: &mut legion::systems::CommandBuffer,
+) {
+    ray_cooldown.0 -= delta_time.0;
+
+    if ray_cooldown.0 < 0.0 {
+        ray_cooldown.0 += 1.0;
+
+        let ray = Ray::new(position.0, velocity.0.normalized());
+        command_buffer.push((
+            Projectile::new(&ray, 100.0),
+            AliveUntil(total_time.0 + 10.0),
+            ProjectileIgnores(*entity),
+        ));
     }
 }
