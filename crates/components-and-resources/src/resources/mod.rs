@@ -11,6 +11,7 @@ pub use ray::{BoundingBox, Projectile, Ray};
 use crate::components::ModelId;
 use legion::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
+use crate::model::Model;
 
 pub struct Paused(pub bool);
 
@@ -38,12 +39,12 @@ pub struct GpuInterface {
 #[derive(Default)]
 pub struct ShipUnderCursor(pub Option<Entity>);
 
-pub struct Models(pub [crate::Model; Self::COUNT]);
+pub struct Models(pub [Model; Self::COUNT]);
 
 impl Models {
     pub const COUNT: usize = 4;
 
-    pub fn get(&self, id: ModelId) -> &crate::Model {
+    pub fn get(&self, id: ModelId) -> &Model {
         &self.0[id as usize]
     }
 }

@@ -1,0 +1,11 @@
+[package]
+name = "systems"
+version = "0.1.0"
+authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bytemuck = "1.5.1"
+components-and-resources = { path = "../components-and-resources/" }
+legion = "0.4.0"
+ultraviolet = "0.8.1"

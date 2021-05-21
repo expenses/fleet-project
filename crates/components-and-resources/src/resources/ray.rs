@@ -1,5 +1,5 @@
 use crate::resources::PerspectiveView;
-use crate::Triangle;
+use crate::model::Triangle;
 use ultraviolet::{Mat3, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Default, Clone)]
@@ -31,6 +31,7 @@ impl Ray {
 
         Self::new(origin, direction)
     }
+
 
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {

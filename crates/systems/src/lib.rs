@@ -1,6 +1,6 @@
-use crate::components::*;
-use crate::gpu_structs::{BackgroundVertex, CircleInstance, Instance};
-use crate::resources::*;
+use components_and_resources::components::*;
+use components_and_resources::gpu_structs::{BackgroundVertex, CircleInstance, Instance};
+use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
 use legion::query::*;
@@ -28,6 +28,7 @@ pub fn update_ship_rotation_matrix(
 #[system]
 pub fn clear_buffer<T: 'static + Copy + bytemuck::Pod>(#[resource] buffer: &mut GpuBuffer<T>) {
     buffer.clear();
+
 }
 
 #[system]

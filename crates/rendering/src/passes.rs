@@ -1,8 +1,8 @@
-use crate::components::ModelId;
-use crate::gpu_structs::{
+use components_and_resources::components::ModelId;
+use components_and_resources::gpu_structs::{
     BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants,
 };
-use crate::resources;
+use components_and_resources::resources;
 use crate::{Pipelines, Resizables};
 use ultraviolet::{Vec2, Vec3, Vec4};
 

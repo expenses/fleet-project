@@ -1,4 +1,4 @@
-use crate::gpu_structs::BackgroundVertex;
+use components_and_resources::gpu_structs::BackgroundVertex;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use spade::delaunay::FloatDelaunayTriangulation;

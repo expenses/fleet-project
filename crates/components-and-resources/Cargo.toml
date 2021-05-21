@@ -1,0 +1,16 @@
+[package]
+name = "components-and-resources"
+version = "0.1.0"
+authors = ["Ashley Ruglys <ashley.ruglys@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.40"
+bytemuck = { version = "1.5.1", features = ["derive"] }
+gltf = "0.16.0"
+image = { version = "0.23.14", features = ["png"], default-features = false }
+legion = "0.4.0"
+rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
+ultraviolet = { version = "0.8.1", features = ["bytemuck"] }
+wgpu = "0.8.1"
+winit = "0.25"
