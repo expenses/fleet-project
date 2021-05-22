@@ -320,6 +320,9 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::move_camera_system())
         .add_system(systems::set_camera_following_system())
         .add_system(systems::handle_keys_system())
+        .add_system(systems::apply_staging_velocity_system())
+        .add_system(systems::apply_velocity_system())
+        .add_system(systems::spawn_projectile_from_ships_system())
         // Need to update what the camera is following.
         .flush()
         // Buffer clears
@@ -341,6 +344,10 @@ fn main() -> anyhow::Result<()> {
         .add_system(systems::set_world_space_bounding_box_system())
         // Dependent on model movement.
         .add_system(systems::move_camera_around_following_system())
+        //.add_system(systems::choose_enemy_target_system())
+        .flush()
+        .add_system(systems::run_steering_system())
+        .add_system(systems::debug_draw_targets_system())
         // Dependent on model movement and updated matrices
         .add_system(systems::collide_projectiles_system::<components::Friendly, components::Enemy>())
         .add_system(systems::collide_projectiles_system::<components::Enemy, components::Friendly>())
