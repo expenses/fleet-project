@@ -138,32 +138,91 @@ fn main() -> anyhow::Result<()> {
     // ecs
     let mut world = legion::world::World::default();
 
-    for _ in 0..10000 {
+    /*for _ in 0..100 {
         let position = Vec3::new(
-            rng.gen_range(-400.0..400.0),
-            rng.gen_range(-50.0..=10.0),
-            rng.gen_range(-400.0..400.0),
+            rng.gen_range(-40.0..40.0),
+            rng.gen_range(-5.0..=1.0),
+            rng.gen_range(-40.0..40.0),
         );
         let rotation = Rotor3::from_rotation_xz(rng.gen_range(0.0..=360.0_f32).to_radians());
 
-        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.9 {
+        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.5 {
             (components::ModelId::Fighter, components::MaxSpeed(10.0))
         } else {
             (components::ModelId::Carrier, components::MaxSpeed(1.0))
         };
 
-        world.push((
-            components::Position(position),
-            components::Rotation(rotation),
-            components::RotationMatrix::default(),
-            model,
-            max_speed,
-            components::WorldSpaceBoundingBox::default(),
-            components::FollowsCommands,
-        ));
-    }
+        if rng.gen() {
+            world.push((
+                components::Position(position),
+                components::Rotation(rotation),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Friendly,
+                components::Velocity(Vec3::zero()),
+            ));
+        } else {
+            world.push((
+                components::Position(position),
+                components::Rotation(rotation),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::Enemy,
+                components::Velocity(Vec3::zero()),
+            ));
+        }
+    }*/
 
     for _ in 0..1000 {
+        let side = rng.gen_range(0.0..1.0) > 1.0 / 3.0;
+
+        let position = Vec3::new(
+            rng.gen_range(-50.0..50.0) + side as u8 as f32 * 150.0,
+            rng.gen_range(-50.0..50.0),
+            rng.gen_range(-50.0..50.0),
+        );
+
+        let (model, max_speed) = if true {
+            (components::ModelId::Fighter, components::MaxSpeed(10.0))
+        } else {
+            (components::ModelId::Carrier, components::MaxSpeed(1.0))
+        };
+
+        if side {
+            world.push((
+                components::Position(position),
+                components::Rotation(Default::default()),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Friendly,
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+            ));
+        } else {
+            world.push((
+                components::Position(position),
+                components::Rotation(Default::default()),
+                components::RotationMatrix::default(),
+                model,
+                max_speed,
+                components::WorldSpaceBoundingBox::default(),
+                components::FollowsCommands,
+                components::Enemy,
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+            ));
+        }
+    }
+
+    for _ in 0..10 {
         let position = Vec3::new(
             rng.gen_range(-400.0..400.0),
             rng.gen_range(-50.0..=10.0),
@@ -283,7 +342,8 @@ fn main() -> anyhow::Result<()> {
         // Dependent on model movement.
         .add_system(systems::move_camera_around_following_system())
         // Dependent on model movement and updated matrices
-        .add_system(systems::collide_projectiles_system())
+        .add_system(systems::collide_projectiles_system::<components::Friendly, components::Enemy>())
+        .add_system(systems::collide_projectiles_system::<components::Enemy, components::Friendly>())
         // Dependent on camera movement.
         .add_system(systems::update_ray_system())
         // Dependent on an updated ray
