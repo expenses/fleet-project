@@ -60,13 +60,23 @@ pub fn upload_instances(
     rotation_matrix: &RotationMatrix,
     model_id: &ModelId,
     scale: Option<&Scale>,
+    friendly: Option<&Friendly>,
+    enemy: Option<&Enemy>,
     #[resource] ship_under_cursor: &ShipUnderCursor,
     #[resource] ship_buffer: &mut ShipBuffer,
 ) {
-    let colour = if ship_under_cursor.0 == Some(*entity) {
-        Vec3::one()
-    } else if selected.is_some() {
+    let base_colour = if friendly.is_some() {
         Vec3::unit_y()
+    } else if enemy.is_some() {
+        Vec3::unit_x()
+    } else {
+        Vec3::unit_z()
+    };
+
+    let colour = if ship_under_cursor.0 == Some(*entity) {
+        base_colour
+    } else if selected.is_some() {
+        base_colour * 0.5
     } else {
         Vec3::zero()
     };
@@ -206,7 +216,7 @@ pub fn update_ray(
 
 type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
 type HasComponents<T> = EntityFilterTuple<And<T>, Passthrough>;
-type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<FollowsCommands>)>;
+type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<Friendly>)>;
 
 #[system]
 pub fn handle_left_click(
@@ -406,7 +416,7 @@ pub fn spawn_projectiles(
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
     if keyboard_state.fire {
-        command_buffer.push((Projectile::new(ray, 10.0), AliveUntil(total_time.0 + 30.0)));
+        command_buffer.push((Projectile::new(ray, 10.0), AliveUntil(total_time.0 + 30.0), Friendly));
     }
 }
 
@@ -435,28 +445,33 @@ pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &
 }
 
 #[system]
-pub fn collide_projectiles(
-    projectiles: &mut Query<(Entity, &Projectile)>,
+pub fn collide_projectiles<SideA, SideB>(
+    projectiles: &mut Query<(Entity, &Projectile), HasComponent<SideA>>,
     ships: &mut Query<(
+        Entity,
         &WorldSpaceBoundingBox,
         &Position,
         &RotationMatrix,
         &ModelId,
         Option<&Scale>,
-    )>,
+    ), HasComponent<SideB>>,
     world: &legion::world::SubWorld,
     #[resource] models: &Models,
     #[resource] delta_time: &DeltaTime,
     #[resource] total_time: &TotalTime,
     command_buffer: &mut legion::systems::CommandBuffer,
-) {
+)
+    where
+        SideA: Send + Sync + legion::storage::Component,
+        SideB: Send + Sync + legion::storage::Component
+{
     projectiles.for_each(world, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
         let first_hit = ships
             .iter(world)
-            .filter(|(ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
-            .flat_map(|(_, position, rotation, model_id, scale)| {
+            .filter(|(_, ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
+            .flat_map(|(ship_entity, _, position, rotation, model_id, scale)| {
                 let scale = get_scale(scale);
 
                 let ray = projectile
@@ -467,14 +482,15 @@ pub fn collide_projectiles(
                     .get(*model_id)
                     .acceleration_tree
                     .locate_with_selection_function_with_data(ray)
-                    .map(move |(_, scaled_t)| scaled_t)
+                    .map(move |(_, scaled_t)| (ship_entity, scaled_t))
             })
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some(t) = first_hit {
+        if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
 
             command_buffer.remove(*entity);
+            command_buffer.remove(*ship_entity);
             command_buffer.push((
                 Position(position),
                 RotationMatrix::default(),
