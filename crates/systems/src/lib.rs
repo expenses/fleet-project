@@ -3,99 +3,91 @@ use components_and_resources::gpu_structs::{BackgroundVertex, CircleInstance, In
 use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
-use legion::query::*;
-use legion::*;
+use bevy_ecs::prelude::*;
 
-#[system(for_each)]
-#[filter(maybe_changed::<Rotation>())]
 pub fn update_ship_rotation_matrix(
-    rotation: &Rotation,
-    rotation_matrix: &mut RotationMatrix,
-    model_id: &ModelId,
-    #[resource] models: &Models,
+    query: Query<(&Rotation, &mut RotationMatrix, &ModelId), Changed<Rotation>>,
+    models: Res<Models>,
 ) {
-    let matrix = rotation.0.into_matrix();
+    query.for_each_mut(|(rotation, mut rotation_matrix, model_id)| {
+        let matrix = rotation.0.into_matrix();
 
-    let model = models.get(*model_id);
+        let model = models.get(*model_id);
 
-    *rotation_matrix = RotationMatrix {
-        matrix,
-        reversed: rotation.0.reversed().into_matrix(),
-        rotated_model_bounding_box: model.bounding_box.rotate(matrix),
-    };
+        *rotation_matrix = RotationMatrix {
+            matrix,
+            reversed: rotation.0.reversed().into_matrix(),
+            rotated_model_bounding_box: model.bounding_box.rotate(matrix),
+        };
+    });
 }
 
-#[system]
-pub fn clear_buffer<T: 'static + Copy + bytemuck::Pod>(#[resource] buffer: &mut GpuBuffer<T>) {
+pub fn clear_buffer<T: bytemuck::Pod + Send + Sync + 'static>(mut buffer: ResMut<GpuBuffer<T>>) {
     buffer.clear();
-
 }
 
-#[system]
-pub fn upload_buffer<T: 'static + Copy + bytemuck::Pod>(
-    #[resource] buffer: &mut GpuBuffer<T>,
-    #[resource] gpu_interface: &GpuInterface,
+pub fn upload_buffer<T: bytemuck::Pod + Send + Sync + 'static>(
+    mut buffer: ResMut<GpuBuffer<T>>,
+    gpu_interface: Res<GpuInterface>,
 ) {
     buffer.upload(&gpu_interface.device, &gpu_interface.queue);
 }
 
-#[system]
-pub fn clear_ship_buffer(#[resource] buffer: &mut ShipBuffer) {
+pub fn clear_ship_buffer(mut buffer: ResMut<ShipBuffer>) {
     buffer.clear();
 }
 
-#[system]
-pub fn upload_ship_buffer(
-    #[resource] buffer: &mut ShipBuffer,
-    #[resource] gpu_interface: &GpuInterface,
-) {
+pub fn upload_ship_buffer(mut buffer: ResMut<ShipBuffer>, gpu_interface: Res<GpuInterface>) {
     buffer.upload(&gpu_interface.device, &gpu_interface.queue);
 }
 
-#[system(for_each)]
 pub fn upload_instances(
-    entity: &Entity,
-    selected: Option<&Selected>,
-    position: &Position,
-    rotation_matrix: &RotationMatrix,
-    model_id: &ModelId,
-    scale: Option<&Scale>,
-    friendly: Option<&Friendly>,
-    enemy: Option<&Enemy>,
-    #[resource] ship_under_cursor: &ShipUnderCursor,
-    #[resource] ship_buffer: &mut ShipBuffer,
+    query: Query<(
+        Entity,
+        Option<&Selected>,
+        &Position,
+        &RotationMatrix,
+        &ModelId,
+        Option<&Scale>,
+        Option<&Friendly>,
+        Option<&Enemy>,
+    )>,
+    ship_under_cursor: Res<ShipUnderCursor>,
+    mut ship_buffer: ResMut<ShipBuffer>,
 ) {
-    let base_colour = if friendly.is_some() {
-        Vec3::unit_y()
-    } else if enemy.is_some() {
-        Vec3::unit_x()
-    } else {
-        Vec3::unit_z()
-    };
+    query.for_each(
+        |(entity, selected, position, rotation_matrix, model_id, scale, friendly, enemy)| {
+            let base_colour = if friendly.is_some() {
+                Vec3::unit_y()
+            } else if enemy.is_some() {
+                Vec3::unit_x()
+            } else {
+                Vec3::unit_z()
+            };
 
-    let colour = if ship_under_cursor.0 == Some(*entity) {
-        base_colour
-    } else if selected.is_some() {
-        base_colour * 0.5
-    } else {
-        Vec3::zero()
-    };
+            let colour = if ship_under_cursor.0 == Some(entity) {
+                base_colour
+            } else if selected.is_some() {
+                base_colour * 0.5
+            } else {
+                Vec3::zero()
+            };
 
-    ship_buffer.stage(
-        Instance {
-            translation: position.0,
-            rotation: rotation_matrix.matrix,
-            colour,
-            scale: get_scale(scale),
+            ship_buffer.stage(
+                Instance {
+                    translation: position.0,
+                    rotation: rotation_matrix.matrix,
+                    colour,
+                    scale: get_scale(scale),
+                },
+                *model_id as usize,
+            );
         },
-        *model_id as usize,
     );
 }
 
-#[system]
 pub fn find_ship_under_cursor(
-    world: &legion::world::SubWorld,
-    query: &mut Query<(
+    query: Query<(
         Entity,
         &WorldSpaceBoundingBox,
         &ModelId,
@@ -103,12 +95,12 @@ pub fn find_ship_under_cursor(
         &RotationMatrix,
         Option<&Scale>,
     )>,
-    #[resource] ray: &Ray,
-    #[resource] models: &Models,
-    #[resource] ship_under_cursor: &mut ShipUnderCursor,
+    ray: Res<Ray>,
+    models: Res<Models>,
+    mut ship_under_cursor: ResMut<ShipUnderCursor>,
 ) {
     ship_under_cursor.0 = query
-        .iter(world)
+        .iter()
         .filter(|(_, bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
         .flat_map(|(entity, _, model_id, position, rotation, scale)| {
             let scale = get_scale(scale);
@@ -123,25 +115,23 @@ pub fn find_ship_under_cursor(
                 .map(move |(_, t)| (entity, t * scale))
         })
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(entity, _)| *entity);
+        .map(|(entity, _)| entity);
 }
 
-#[system]
 pub fn debug_find_ship_under_cursor(
-    world: &legion::world::SubWorld,
-    query: &mut Query<(
+    query: Query<(
         &WorldSpaceBoundingBox,
         &ModelId,
         &Position,
         &RotationMatrix,
         Option<&Scale>,
     )>,
-    #[resource] ray: &Ray,
-    #[resource] models: &Models,
-    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+    ray: Res<Ray>,
+    models: Res<Models>,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     if let Some((tri, _, position, rotation, scale)) = query
-        .iter(world)
+        .iter()
         .filter(|(bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
         .flat_map(|(_, model_id, position, rotation, scale)| {
             let scale = get_scale(scale);
@@ -195,14 +185,13 @@ pub fn debug_find_ship_under_cursor(
     }
 }
 
-#[system]
 pub fn update_ray(
-    #[resource] dimensions: &Dimensions,
-    #[resource] orbit: &Orbit,
-    #[resource] perspective_view: &PerspectiveView,
-    #[resource] mouse_state: &MouseState,
-    #[resource] ray: &mut Ray,
-    #[resource] camera: &Camera,
+    dimensions: Res<Dimensions>,
+    orbit: Res<Orbit>,
+    perspective_view: Res<PerspectiveView>,
+    mouse_state: Res<MouseState>,
+    mut ray: ResMut<Ray>,
+    camera: Res<Camera>,
 ) {
     *ray = Ray::new_from_screen(
         mouse_state.position,
@@ -214,55 +203,50 @@ pub fn update_ray(
     );
 }
 
-type HasComponent<T> = EntityFilterTuple<ComponentFilter<T>, Passthrough>;
-type HasComponents<T> = EntityFilterTuple<And<T>, Passthrough>;
-type SelectedFilter = HasComponents<(ComponentFilter<Selected>, ComponentFilter<Friendly>)>;
+type SelectedFilter = (With<Selected>, With<Friendly>);
 
-#[system]
 pub fn handle_left_click(
-    world: &legion::world::SubWorld,
-    command_buffer: &mut legion::systems::CommandBuffer,
-    selected: &mut Query<Entity, HasComponent<Selected>>,
-    #[resource] mouse_button: &MouseState,
-    #[resource] ship_under_cursor: &ShipUnderCursor,
-    #[resource] mouse_mode: &mut MouseMode,
-    #[resource] keyboard_state: &KeyboardState,
+    mut commands: Commands,
+    selected: Query<Entity, With<Selected>>,
+    mouse_button: Res<MouseState>,
+    ship_under_cursor: Res<ShipUnderCursor>,
+    mut mouse_mode: ResMut<MouseMode>,
+    keyboard_state: Res<KeyboardState>,
 ) {
     if mouse_button.left_state.was_clicked() {
         if !keyboard_state.shift {
-            selected.for_each(world, |entity| {
-                command_buffer.remove_component::<Selected>(*entity);
+            selected.for_each(|entity| {
+                commands.entity(entity).remove::<Selected>();
             });
         }
 
         *mouse_mode = MouseMode::Normal;
 
         if let Some(entity) = ship_under_cursor.0 {
-            command_buffer.add_component(entity, Selected);
+            println!("Selecting {:?}", entity);
+            commands.entity(entity).insert(Selected);
         }
     }
 }
 
-#[system]
 pub fn handle_right_clicks(
-    world: &legion::world::SubWorld,
-    command_buffer: &mut legion::systems::CommandBuffer,
-    selected: &mut Query<Entity, SelectedFilter>,
-    #[resource] mouse_button: &MouseState,
-    #[resource] average_selected_position: &AverageSelectedPosition,
-    #[resource] mouse_mode: &mut MouseMode,
-    #[resource] ray_plane_point: &RayPlanePoint,
+    mut commands: Commands,
+    selected: Query<Entity, SelectedFilter>,
+    mouse_button: Res<MouseState>,
+    average_selected_position: Res<AverageSelectedPosition>,
+    mut mouse_mode: ResMut<MouseMode>,
+    ray_plane_point: Res<RayPlanePoint>,
 ) {
     if mouse_button.right_state.was_clicked() {
-        *mouse_mode = match mouse_mode {
+        *mouse_mode = match *mouse_mode {
             MouseMode::Normal => match average_selected_position.0 {
                 Some(avg) => MouseMode::Movement { plane_y: avg.y },
                 _ => MouseMode::Normal,
             },
             MouseMode::Movement { .. } => {
                 if let Some(point) = ray_plane_point.0 {
-                    selected.for_each(world, |entity| {
-                        command_buffer.add_component(*entity, MovingTo(point));
+                    selected.for_each(|entity| {
+                        commands.entity(entity).insert(MovingTo(point));
                     });
                 }
 
@@ -272,55 +256,46 @@ pub fn handle_right_clicks(
     }
 }
 
-#[system(for_each)]
 pub fn move_ships(
-    entity: &Entity,
-    position: &mut Position,
-    moving_to: &MovingTo,
-    max_speed: &MaxSpeed,
-    command_buffer: &mut legion::systems::CommandBuffer,
-    #[resource] delta_time: &DeltaTime,
+    query: Query<(Entity, &mut Position, &MovingTo, &MaxSpeed)>,
+    mut commands: Commands,
+    delta_time: Res<DeltaTime>,
 ) {
-    let delta = moving_to.0 - position.0;
-    let distance = delta.mag();
-    let speed = max_speed.0 * delta_time.0;
+    query.for_each_mut(|(entity, mut position, moving_to, max_speed)| {
+        let delta = moving_to.0 - position.0;
+        let distance = delta.mag();
+        let speed = max_speed.0 * delta_time.0;
 
-    if distance < speed {
-        position.0 = moving_to.0;
-        command_buffer.remove_component::<MovingTo>(*entity);
-    } else {
-        position.0 += delta / distance * speed;
-    }
+        if distance < speed {
+            position.0 = moving_to.0;
+            commands.entity(entity).remove::<MovingTo>();
+        } else {
+            position.0 += delta / distance * speed;
+        }
+    })
 }
 
-#[system(for_each)]
-#[filter(maybe_changed::<MovingTo>())]
 pub fn set_rotation_from_moving_to(
-    position: &Position,
-    moving_to: &MovingTo,
-    rotation: &mut Rotation,
+    query: Query<(&Position, &MovingTo, &mut Rotation), Changed<MovingTo>>,
 ) {
-    let delta = moving_to.0 - position.0;
-    let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
+    query.for_each_mut(|(position, moving_to, mut rotation)| {
+        let delta = moving_to.0 - position.0;
+        let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
 
-    rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
-        * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+        rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
+            * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+    })
 }
 
-#[system]
-pub fn update_mouse_state(
-    #[resource] mouse_state: &mut MouseState,
-    #[resource] delta_time: &DeltaTime,
-) {
+pub fn update_mouse_state(mut mouse_state: ResMut<MouseState>, delta_time: Res<DeltaTime>) {
     mouse_state.left_state.update(delta_time.0, 0.1);
     mouse_state.right_state.update(delta_time.0, 0.075);
 }
 
-#[system]
 pub fn update_ray_plane_point(
-    #[resource] ray: &Ray,
-    #[resource] mouse_mode: &MouseMode,
-    #[resource] ray_plane_point: &mut RayPlanePoint,
+    ray: Res<Ray>,
+    mouse_mode: Res<MouseMode>,
+    mut ray_plane_point: ResMut<RayPlanePoint>,
 ) {
     ray_plane_point.0 = match *mouse_mode {
         MouseMode::Movement { plane_y } => ray
@@ -330,33 +305,29 @@ pub fn update_ray_plane_point(
     };
 }
 
-#[system]
 pub fn move_camera(
-    #[resource] keyboard_state: &KeyboardState,
-    #[resource] orbit: &Orbit,
-    #[resource] camera: &mut Camera,
-    currently_following: &mut Query<Entity, HasComponent<CameraFollowing>>,
-    world: &legion::world::SubWorld,
-    command_buffer: &mut legion::systems::CommandBuffer,
+    keyboard_state: Res<KeyboardState>,
+    orbit: Res<Orbit>,
+    mut camera: ResMut<Camera>,
+    currently_following: Query<Entity, With<CameraFollowing>>,
+    mut commands: Commands,
 ) {
-    if keyboard_state.move_camera(camera, orbit) {
-        currently_following.for_each(world, |entity| {
-            command_buffer.remove_component::<CameraFollowing>(*entity)
+    if keyboard_state.move_camera(&mut camera, &orbit) {
+        currently_following.for_each(|entity| {
+            commands.entity(entity).remove::<CameraFollowing>();
         });
     }
 }
 
-#[system]
 pub fn handle_keys(
-    selected_moving: &mut Query<Entity, HasComponent<Selected>>,
-    world: &legion::world::SubWorld,
-    command_buffer: &mut legion::systems::CommandBuffer,
-    #[resource] keyboard_state: &KeyboardState,
-    #[resource] paused: &mut Paused,
+    selected_moving: Query<Entity, With<Selected>>,
+    mut commands: Commands,
+    keyboard_state: Res<KeyboardState>,
+    mut paused: ResMut<Paused>,
 ) {
     if keyboard_state.stop.0 {
-        selected_moving.for_each(world, |entity| {
-            command_buffer.remove_component::<MovingTo>(*entity);
+        selected_moving.for_each(|entity| {
+            commands.entity(entity).remove::<MovingTo>();
         });
     }
 
@@ -365,111 +336,110 @@ pub fn handle_keys(
     }
 }
 
-#[system]
-pub fn update_keyboard_state(#[resource] keyboard_state: &mut KeyboardState) {
+pub fn update_keyboard_state(mut keyboard_state: ResMut<KeyboardState>) {
     keyboard_state.update();
 }
 
-#[system]
 pub fn set_camera_following(
-    #[resource] keyboard_state: &KeyboardState,
-    selected: &mut Query<Entity, HasComponent<Selected>>,
-    currently_following: &mut Query<Entity, HasComponent<CameraFollowing>>,
-    world: &legion::world::SubWorld,
-    command_buffer: &mut legion::systems::CommandBuffer,
+    keyboard_state: Res<KeyboardState>,
+    selected: Query<Entity, With<Selected>>,
+    currently_following: Query<Entity, With<CameraFollowing>>,
+    mut commands: Commands,
 ) {
     if keyboard_state.center_camera.0 {
         // If we deselect everything and press 'center camera while following
         // something, it makes the most sense to keep following that thing.
-        if selected.iter(world).next().is_some() {
-            currently_following.for_each(world, |entity| {
-                command_buffer.remove_component::<CameraFollowing>(*entity)
+        if selected.iter().next().is_some() {
+            currently_following.for_each(|entity| {
+                commands.entity(entity).remove::<CameraFollowing>();
             });
 
-            selected.for_each(world, |entity| {
-                command_buffer.add_component(*entity, CameraFollowing);
+            selected.for_each(|entity| {
+                commands.entity(entity).insert(CameraFollowing);
             });
         }
     }
 }
 
-#[system]
 pub fn move_camera_around_following(
-    #[resource] camera: &mut Camera,
-    #[resource] perspective_view: &mut PerspectiveView,
-    #[resource] orbit: &Orbit,
-    world: &legion::world::SubWorld,
-    following: &mut Query<&Position, HasComponent<CameraFollowing>>,
+    mut camera: ResMut<Camera>,
+    mut perspective_view: ResMut<PerspectiveView>,
+    orbit: Res<Orbit>,
+    following: Query<&Position, With<CameraFollowing>>,
 ) {
-    if let Some(avg) = average(following.iter(world).map(|pos| pos.0)) {
+    if let Some(avg) = average(following.iter().map(|pos| pos.0)) {
         camera.center = avg;
     }
 
     perspective_view.set_view(orbit.as_vector(), camera.center);
 }
 
-#[system]
 pub fn spawn_projectiles(
-    #[resource] ray: &Ray,
-    #[resource] keyboard_state: &KeyboardState,
-    #[resource] total_time: &TotalTime,
-    command_buffer: &mut legion::systems::CommandBuffer,
+    ray: Res<Ray>,
+    keyboard_state: Res<KeyboardState>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
 ) {
     if keyboard_state.fire {
-        command_buffer.push((Projectile::new(ray, 10.0), AliveUntil(total_time.0 + 30.0), Friendly));
+        commands.spawn_bundle((
+            Projectile::new(&ray, 10.0),
+            AliveUntil(total_time.0 + 30.0),
+            Friendly,
+        ));
     }
 }
 
-#[system(for_each)]
 pub fn render_projectiles(
-    projectile: &Projectile,
-    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
+    query: Query<&Projectile>,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
-    let (start, end) = projectile.line_points(5.0);
+    query.for_each(|projectile| {
+        let (start, end) = projectile.line_points(5.0);
 
-    lines_buffer.stage(&[
-        BackgroundVertex {
-            position: start,
-            colour: Vec3::unit_x(),
-        },
-        BackgroundVertex {
-            position: end,
-            colour: Vec3::unit_y(),
-        },
-    ]);
+        lines_buffer.stage(&[
+            BackgroundVertex {
+                position: start,
+                colour: Vec3::unit_x(),
+            },
+            BackgroundVertex {
+                position: end,
+                colour: Vec3::unit_y(),
+            },
+        ]);
+    })
 }
 
-#[system(for_each)]
-pub fn update_projectiles(projectile: &mut Projectile, #[resource] delta_time: &DeltaTime) {
-    projectile.update(delta_time.0);
+pub fn update_projectiles(query: Query<&mut Projectile>, delta_time: Res<DeltaTime>) {
+    query.for_each_mut(|mut projectile| {
+        projectile.update(delta_time.0);
+    })
 }
 
-#[system]
-pub fn collide_projectiles<SideA, SideB>(
-    projectiles: &mut Query<(Entity, &Projectile), HasComponent<SideA>>,
-    ships: &mut Query<(
-        Entity,
-        &WorldSpaceBoundingBox,
-        &Position,
-        &RotationMatrix,
-        &ModelId,
-        Option<&Scale>,
-    ), HasComponent<SideB>>,
-    world: &legion::world::SubWorld,
-    #[resource] models: &Models,
-    #[resource] delta_time: &DeltaTime,
-    #[resource] total_time: &TotalTime,
-    command_buffer: &mut legion::systems::CommandBuffer,
-)
-    where
-        SideA: Send + Sync + legion::storage::Component,
-        SideB: Send + Sync + legion::storage::Component
+pub fn collide_projectiles<Side>(
+    projectiles: Query<(Entity, &Projectile), With<Side>>,
+    ships: Query<
+        (
+            Entity,
+            &WorldSpaceBoundingBox,
+            &Position,
+            &RotationMatrix,
+            &ModelId,
+            Option<&Scale>,
+        ),
+        Without<Side>,
+    >,
+    models: Res<Models>,
+    delta_time: Res<DeltaTime>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
+) where
+    Side: Send + Sync + 'static,
 {
-    projectiles.for_each(world, |(entity, projectile)| {
+    projectiles.for_each(|(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
         let first_hit = ships
-            .iter(world)
+            .iter()
             .filter(|(_, ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
             .flat_map(|(ship_entity, _, position, rotation, model_id, scale)| {
                 let scale = get_scale(scale);
@@ -489,9 +459,9 @@ pub fn collide_projectiles<SideA, SideB>(
         if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
 
-            command_buffer.remove(*entity);
-            command_buffer.remove(*ship_entity);
-            command_buffer.push((
+            commands.entity(entity).despawn();
+            commands.entity(ship_entity).despawn();
+            commands.spawn_bundle((
                 Position(position),
                 RotationMatrix::default(),
                 ModelId::Explosion,
@@ -503,63 +473,64 @@ pub fn collide_projectiles<SideA, SideB>(
     });
 }
 
-#[system(for_each)]
-#[filter(component::<Expands>())]
-pub fn expand_explosions(scale: &mut Scale, #[resource] delta_time: &DeltaTime) {
-    scale.0 += delta_time.0;
+pub fn expand_explosions(query: Query<&mut Scale, With<Expands>>, delta_time: Res<DeltaTime>) {
+    query.for_each_mut(|mut scale| {
+        scale.0 += delta_time.0;
+    });
 }
 
-#[system(for_each)]
 pub fn kill_temporary(
-    entity: &Entity,
-    alive_until: &AliveUntil,
-    #[resource] total_time: &TotalTime,
-    command_buffer: &mut legion::systems::CommandBuffer,
+    query: Query<(Entity, &AliveUntil)>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
 ) {
-    if total_time.0 > alive_until.0 {
-        command_buffer.remove(*entity);
-    }
+    query.for_each(|(entity, alive_until)| {
+        if total_time.0 > alive_until.0 {
+            commands.entity(entity).despawn();
+        }
+    })
 }
 
-#[system]
-pub fn increase_total_time(
-    #[resource] total_time: &mut TotalTime,
-    #[resource] delta_time: &DeltaTime,
-) {
+pub fn increase_total_time(mut total_time: ResMut<TotalTime>, delta_time: Res<DeltaTime>) {
     total_time.0 += delta_time.0;
 }
 
 // We cache these because it's 6 f32 adds and that adds time to bounding box checks
 // if we do them per ray.
-#[system(for_each)]
-#[filter(
-    maybe_changed::<Position>() | maybe_changed::<RotationMatrix>() | maybe_changed::<Scale>()
-)]
+type SetWorldBBoxFilter = Or<(Changed<Position>, Changed<RotationMatrix>, Changed<Scale>)>;
+
 pub fn set_world_space_bounding_box(
-    bounding_box: &mut WorldSpaceBoundingBox,
-    position: &Position,
-    rotation: &RotationMatrix,
-    scale: Option<&Scale>,
+    query: Query<
+        (
+            &mut WorldSpaceBoundingBox,
+            &Position,
+            &RotationMatrix,
+            Option<&Scale>,
+        ),
+        SetWorldBBoxFilter,
+    >,
 ) {
-    bounding_box.0 = (rotation.rotated_model_bounding_box * get_scale(scale)) + position.0;
+    query.for_each_mut(|(mut bounding_box, position, rotation, scale)| {
+        bounding_box.0 = (rotation.rotated_model_bounding_box * get_scale(scale)) + position.0;
+    });
 }
 
-#[system(for_each)]
-pub fn spin(spin: &mut Spin, rotation: &mut Rotation, #[resource] delta_time: &DeltaTime) {
-    spin.update_angle(delta_time.0);
-    rotation.0 = spin.as_rotor();
+pub fn spin(query: Query<(&mut Spin, &mut Rotation)>, delta_time: Res<DeltaTime>) {
+    query.for_each_mut(|(mut spin, mut rotation)| {
+        spin.update_angle(delta_time.0);
+        rotation.0 = spin.as_rotor();
+    });
 }
 
 fn get_scale(scale: Option<&Scale>) -> f32 {
     scale.map(|scale| scale.0).unwrap_or(1.0)
 }
 
-#[system]
 pub fn render_movement_circle(
-    #[resource] circle_instances: &mut GpuBuffer<CircleInstance>,
-    #[resource] lines_buffer: &mut GpuBuffer<BackgroundVertex>,
-    #[resource] ray_plane_point: &RayPlanePoint,
-    #[resource] average_selected_position: &AverageSelectedPosition,
+    mut circle_instances: ResMut<GpuBuffer<CircleInstance>>,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    ray_plane_point: Res<RayPlanePoint>,
+    average_selected_position: Res<AverageSelectedPosition>,
 ) {
     if let (Some(avg), Some(point)) = (average_selected_position.0, ray_plane_point.0) {
         let mut circle_center = avg;
@@ -605,13 +576,11 @@ pub fn render_movement_circle(
     }
 }
 
-#[system]
 pub fn calculate_average_selected_position(
-    #[resource] average_selected_position: &mut AverageSelectedPosition,
-    selected_positions: &mut Query<&Position, SelectedFilter>,
-    world: &legion::world::SubWorld,
+    mut average_selected_position: ResMut<AverageSelectedPosition>,
+    selected_positions: Query<&Position, SelectedFilter>,
 ) {
-    average_selected_position.0 = average(selected_positions.iter(world).map(|pos| pos.0));
+    average_selected_position.0 = average(selected_positions.iter().map(|pos| pos.0));
 }
 
 fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {

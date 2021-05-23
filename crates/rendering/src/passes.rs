@@ -1,9 +1,9 @@
+use crate::{Pipelines, Resizables};
 use components_and_resources::components::ModelId;
 use components_and_resources::gpu_structs::{
     BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants,
 };
 use components_and_resources::resources;
-use crate::{Pipelines, Resizables};
 use ultraviolet::{Vec2, Vec3, Vec4};
 
 pub struct StarSystem {
@@ -26,18 +26,18 @@ pub fn run_render_passes(
     encoder: &mut wgpu::CommandEncoder,
     resizables: &Resizables,
     pipelines: &Pipelines,
-    resources: &legion::Resources,
+    world: &bevy_ecs::world::World,
     star_system: &StarSystem,
     tonemapper: &colstodian::LottesTonemapper,
     constants: &Constants,
     draw_godrays: bool,
 ) {
-    let ship_buffer = resources.get::<resources::ShipBuffer>().unwrap();
-    let models = resources.get::<resources::Models>().unwrap();
-    let line_buffer = resources
-        .get::<resources::GpuBuffer<BackgroundVertex>>()
+    let ship_buffer = world.get_resource::<resources::ShipBuffer>().unwrap();
+    let models = world.get_resource::<resources::Models>().unwrap();
+    let line_buffer = world
+        .get_resource::<resources::GpuBuffer<BackgroundVertex>>()
         .unwrap();
-    let perspective_view = resources.get::<resources::PerspectiveView>().unwrap();
+    let perspective_view = world.get_resource::<resources::PerspectiveView>().unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("main render pass"),
@@ -198,8 +198,8 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
-    let circle_instances_buffer = resources
-        .get::<resources::GpuBuffer<CircleInstance>>()
+    let circle_instances_buffer = world
+        .get_resource::<resources::GpuBuffer<CircleInstance>>()
         .unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

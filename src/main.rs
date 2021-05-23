@@ -6,9 +6,10 @@ use winit::event_loop::*;
 
 mod background;
 
+use bevy_ecs::prelude::{IntoSystem, Stage, ParallelSystemDescriptorCoercion};
 use components_and_resources::gpu_structs::*;
-use components_and_resources::{resources, components};
 use components_and_resources::model::load_ship_model;
+use components_and_resources::{components, resources};
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -84,7 +85,6 @@ fn main() -> anyhow::Result<()> {
         ))
         .collect::<Vec<_>>();
 
-
     let star_system = rendering::passes::StarSystem {
         sun_dir,
         num_background_vertices: background.len() as u32,
@@ -136,7 +136,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     // ecs
-    let mut world = legion::world::World::default();
+    let mut world = bevy_ecs::world::World::default();
 
     /*for _ in 0..100 {
         let position = Vec3::new(
@@ -153,7 +153,7 @@ fn main() -> anyhow::Result<()> {
         };
 
         if rng.gen() {
-            world.push((
+            world.spawn().insert_bundle((
                 components::Position(position),
                 components::Rotation(rotation),
                 components::RotationMatrix::default(),
@@ -165,7 +165,7 @@ fn main() -> anyhow::Result<()> {
                 components::Velocity(Vec3::zero()),
             ));
         } else {
-            world.push((
+            world.spawn().insert_bundle((
                 components::Position(position),
                 components::Rotation(rotation),
                 components::RotationMatrix::default(),
@@ -194,7 +194,7 @@ fn main() -> anyhow::Result<()> {
         };
 
         if side {
-            world.push((
+            world.spawn().insert_bundle((
                 components::Position(position),
                 components::Rotation(Default::default()),
                 components::RotationMatrix::default(),
@@ -207,7 +207,7 @@ fn main() -> anyhow::Result<()> {
                 //components::RayCooldown(rng.gen_range(0.0..1.0)),
             ));
         } else {
-            world.push((
+            world.spawn().insert_bundle((
                 components::Position(position),
                 components::Rotation(Default::default()),
                 components::RotationMatrix::default(),
@@ -231,7 +231,7 @@ fn main() -> anyhow::Result<()> {
         let facing = background::uniform_sphere_distribution(&mut rng);
         let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), facing);
 
-        world.push((
+        world.spawn().insert_bundle((
             components::Position(position),
             components::Rotation(rotation),
             components::RotationMatrix::default(),
@@ -242,19 +242,18 @@ fn main() -> anyhow::Result<()> {
         ));
     }
 
-    let mut lr = legion::Resources::default();
-    lr.insert(resources::ShipBuffer::new(&device));
-    lr.insert(resources::GpuBuffer::<BackgroundVertex>::new(
+    world.insert_resource(resources::ShipBuffer::new(&device));
+    world.insert_resource(resources::GpuBuffer::<BackgroundVertex>::new(
         &device,
         "lines",
         wgpu::BufferUsage::VERTEX,
     ));
-    lr.insert(resources::GpuBuffer::<CircleInstance>::new(
+    world.insert_resource(resources::GpuBuffer::<CircleInstance>::new(
         &device,
         "circle instances",
         wgpu::BufferUsage::VERTEX,
     ));
-    lr.insert(resources::Models([
+    world.insert_resource(resources::Models([
         load_ship_model(
             include_bytes!("../models/carrier.glb"),
             &device,
@@ -284,12 +283,12 @@ fn main() -> anyhow::Result<()> {
             &resources.nearest_sampler,
         )?,
     ]));
-    lr.insert(resources::GpuInterface { device, queue });
-    lr.insert(resources::MouseState::default());
-    lr.insert(resources::Ray::default());
-    lr.insert(resources::ShipUnderCursor::default());
+    world.insert_resource(resources::GpuInterface { device, queue });
+    world.insert_resource(resources::MouseState::default());
+    world.insert_resource(resources::Ray::default());
+    world.insert_resource(resources::ShipUnderCursor::default());
     let orbit = resources::Orbit::new();
-    lr.insert(resources::PerspectiveView::new(
+    world.insert_resource(resources::PerspectiveView::new(
         ultraviolet::projection::perspective_infinite_z_wgpu_dx(
             59.0_f32.to_radians(),
             dimensions.width as f32 / dimensions.height as f32,
@@ -298,99 +297,113 @@ fn main() -> anyhow::Result<()> {
         orbit.as_vector(),
         Vec3::zero(),
     ));
-    lr.insert(orbit);
-    lr.insert(dimensions);
-    lr.insert(resources::KeyboardState::default());
-    lr.insert(resources::Camera::default());
-    lr.insert(resources::DeltaTime(1.0 / 60.0));
-    lr.insert(resources::TotalTime(0.0));
-    lr.insert(resources::RayPlanePoint::default());
-    lr.insert(resources::AverageSelectedPosition::default());
-    lr.insert(resources::MouseMode::Normal);
-    lr.insert(resources::Paused(false));
+    world.insert_resource(orbit);
+    world.insert_resource(dimensions);
+    world.insert_resource(resources::KeyboardState::default());
+    world.insert_resource(resources::Camera::default());
+    world.insert_resource(resources::DeltaTime(1.0 / 60.0));
+    world.insert_resource(resources::TotalTime(0.0));
+    world.insert_resource(resources::RayPlanePoint::default());
+    world.insert_resource(resources::AverageSelectedPosition::default());
+    world.insert_resource(resources::MouseMode::Normal);
+    world.insert_resource(resources::Paused(false));
 
-    let mut schedule = legion::Schedule::builder()
+    let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
-        .add_system(systems::move_ships_system())
-        .add_system(systems::spin_system())
-        .add_system(systems::kill_temporary_system())
-        .add_system(systems::expand_explosions_system())
-        .add_system(systems::spawn_projectiles_system())
-        .add_system(systems::update_projectiles_system())
-        .add_system(systems::move_camera_system())
-        .add_system(systems::set_camera_following_system())
-        .add_system(systems::handle_keys_system())
-        // Need to update what the camera is following.
-        .flush()
+        .with_system(systems::move_ships.system())
+        .with_system(systems::spin.system())
+        .with_system(systems::kill_temporary.system())
+        .with_system(systems::expand_explosions.system())
+        .with_system(systems::spawn_projectiles.system())
+        .with_system(systems::update_projectiles.system())
+        .with_system(systems::move_camera.system())
+        .with_system(systems::set_camera_following.system())
+        .with_system(systems::handle_keys.system())
         // Buffer clears
-        .add_system(systems::clear_ship_buffer_system())
-        .add_system(systems::clear_buffer_system::<BackgroundVertex>())
-        .add_system(systems::clear_buffer_system::<CircleInstance>())
+        .with_system(systems::clear_ship_buffer.system())
+        .with_system(systems::clear_buffer::<BackgroundVertex>.system())
+        .with_system(systems::clear_buffer::<CircleInstance>.system());
+
+    // Need to update what the camera is following.
+    let stage_2 = bevy_ecs::schedule::SystemStage::parallel()
+        // Dependent on updated projectiles
+        .with_system(systems::render_projectiles.system())
         // Dependent on ship positions (`move_ships_system`).
-        .add_system(systems::calculate_average_selected_position_system())
+        .with_system(systems::calculate_average_selected_position.system())
         //  Dependent on average ship position (`calculate_average_selected_position_system`).
-        .add_system(systems::handle_right_clicks_system())
-        // Flush the command buffer adding `MovingTo`s to ships.
-        .flush()
+        .with_system(systems::handle_right_clicks.system());
+
+    // Flush the command buffer adding `MovingTo`s to ships.
+    let stage_3 = bevy_ecs::schedule::SystemStage::parallel()
         // Dependent on `handle_right_clicks_system`.
-        .add_system(systems::set_rotation_from_moving_to_system())
-        .add_system(systems::move_ships_system())
+        .with_system(systems::set_rotation_from_moving_to.system().label("rot"))
+        .with_system(systems::move_ships.system().label("pos"))
         // Dependent on updated rotations.
-        .add_system(systems::update_ship_rotation_matrix_system())
+        .with_system(systems::update_ship_rotation_matrix.system().label("rot_mat").after("rot"))
         // Dependent on updated rotation matrices.
-        .add_system(systems::set_world_space_bounding_box_system())
+        .with_system(systems::set_world_space_bounding_box.system().label("bbox").after("pos").after("rot_mat"))
         // Dependent on model movement.
-        .add_system(systems::move_camera_around_following_system())
+        .with_system(systems::move_camera_around_following.system().label("cam").after("pos"))
         // Dependent on model movement and updated matrices
-        .add_system(systems::collide_projectiles_system::<components::Friendly, components::Enemy>())
-        .add_system(systems::collide_projectiles_system::<components::Enemy, components::Friendly>())
+        .with_system(systems::collide_projectiles::<components::Friendly>.system().after("bbox"))
+        .with_system(systems::collide_projectiles::<components::Enemy>.system().after("bbox"))
         // Dependent on camera movement.
-        .add_system(systems::update_ray_system())
+        .with_system(systems::update_ray.system().label("ray").after("cam"))
         // Dependent on an updated ray
-        .add_system(systems::update_ray_plane_point_system())
+        .with_system(systems::update_ray_plane_point.system().label("ray_plane").after("ray"))
         // Dependent on an updated ray, positions and matrices.
-        .add_system(systems::find_ship_under_cursor_system())
-        // .add_system(systems::debug_find_ship_under_cursor_system())
+        .with_system(systems::find_ship_under_cursor.system().label("under").after("bbox"))
+        // .with_system(systems::debug_find_ship_under_cursor.system())
         // Dependent on `find_ship_under_cursor_system`.
-        .add_system(systems::handle_left_click_system())
+        .with_system(systems::handle_left_click.system().after("under"))
         // Staging
-        .add_system(systems::render_projectiles_system())
-        .add_system(systems::render_movement_circle_system())
-        .add_system(systems::upload_instances_system()) // rm
-        // Buffer uploads
-        .add_system(systems::upload_ship_buffer_system())
-        .add_system(systems::upload_buffer_system::<BackgroundVertex>())
-        .add_system(systems::upload_buffer_system::<CircleInstance>())
-        // Cleanup
-        .add_system(systems::update_mouse_state_system())
-        .add_system(systems::update_keyboard_state_system())
-        .add_system(systems::increase_total_time_system())
-        .build();
+        .with_system(systems::render_movement_circle.system().after("ray_plane"))
+        .with_system(systems::upload_instances.system().after("under"));
+
+    let final_stage = bevy_ecs::schedule::SystemStage::parallel()
+        .with_system(systems::update_mouse_state.system())
+        .with_system(systems::update_keyboard_state.system())
+        .with_system(systems::increase_total_time.system())
+        .with_system(systems::upload_ship_buffer.system())
+        .with_system(systems::upload_buffer::<BackgroundVertex>.system())
+        .with_system(systems::upload_buffer::<CircleInstance>.system());
+
+    let mut schedule = bevy_ecs::schedule::Schedule::default()
+        .with_stage("stage 1", stage_1)
+        .with_stage_after("stage 1", "stage 2", stage_2)
+        .with_stage_after("stage 2", "stage 3", stage_3)
+        .with_stage_after("stage 3", "final stage", final_stage);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::Resized(size) => {
-                let mut dimensions = lr.get_mut::<resources::Dimensions>().unwrap();
-                let mut perspective_view = lr.get_mut::<resources::PerspectiveView>().unwrap();
-                let gpu_interface = lr.get::<resources::GpuInterface>().unwrap();
+                let mut dimensions = world.get_resource_mut::<resources::Dimensions>().unwrap();
 
-                dimensions.width = size.width as u32;
-                dimensions.height = size.height as u32;
+                let (width, height) = (size.width as u32, size.height as u32);
+
+                dimensions.width = width as u32;
+                dimensions.height = height as u32;
+
+                let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
 
                 resizables = rendering::Resizables::new(
-                    dimensions.width,
-                    dimensions.height,
+                    width,
+                    height,
                     display_format,
                     &gpu_interface.device,
                     &surface,
                     &resources,
                 );
 
+                let mut perspective_view = world
+                    .get_resource_mut::<resources::PerspectiveView>()
+                    .unwrap();
+
                 perspective_view.set_perspective(
                     ultraviolet::projection::perspective_infinite_z_wgpu_dx(
                         59.0_f32.to_radians(),
-                        dimensions.width as f32 / dimensions.height as f32,
+                        size.width as f32 / size.height as f32,
                         0.1,
                     ),
                 )
@@ -405,11 +418,13 @@ fn main() -> anyhow::Result<()> {
                 ..
             } => {
                 let pressed = *state == ElementState::Pressed;
-                let mut keyboard_state = lr.get_mut::<resources::KeyboardState>().unwrap();
+                let mut keyboard_state = world
+                    .get_resource_mut::<resources::KeyboardState>()
+                    .unwrap();
                 keyboard_state.handle(*key, pressed);
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
+                let mut mouse_state = world.get_resource_mut::<resources::MouseState>().unwrap();
 
                 let pressed = *state == ElementState::Pressed;
                 let position = mouse_state.position;
@@ -421,34 +436,39 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let mut mouse_state = lr.get_mut::<resources::MouseState>().unwrap();
-                let keyboard_state = lr.get::<resources::KeyboardState>().unwrap();
-                let mut mouse_mode = lr.get_mut::<resources::MouseMode>().unwrap();
+                let keyboard_state = world.get_resource::<resources::KeyboardState>().unwrap();
+                let mouse_state = world.get_resource::<resources::MouseState>().unwrap();
 
                 let position = Vec2::new(position.x as f32, position.y as f32);
                 let delta = position - mouse_state.position;
 
                 if mouse_state.right_state.is_being_dragged().is_some() {
-                    let mut orbit = lr.get_mut::<resources::Orbit>().unwrap();
+                    let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
                     orbit.rotate(delta);
                 } else if keyboard_state.shift {
+                    let mut mouse_mode = world.get_resource_mut::<resources::MouseMode>().unwrap();
+
                     if let resources::MouseMode::Movement { plane_y } = &mut *mouse_mode {
                         *plane_y -= delta.y / 10.0;
                     }
                 }
 
-                mouse_state.position = position;
+                {
+                    let mut mouse_state =
+                        world.get_resource_mut::<resources::MouseState>().unwrap();
+                    mouse_state.position = position;
+                }
             }
             _ => {}
         },
         Event::MainEventsCleared => {
-            schedule.execute(&mut world, &mut lr);
+            schedule.run(&mut world);
 
             window.request_redraw();
         }
         Event::RedrawRequested(_) => {
             if let Ok(frame) = resizables.swapchain.get_current_frame() {
-                let gpu_interface = lr.get::<resources::GpuInterface>().unwrap();
+                let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
 
                 let mut encoder =
                     gpu_interface
@@ -462,7 +482,7 @@ fn main() -> anyhow::Result<()> {
                     &mut encoder,
                     &resizables,
                     &pipelines,
-                    &lr,
+                    &world,
                     &star_system,
                     &tonemapper,
                     &constants,

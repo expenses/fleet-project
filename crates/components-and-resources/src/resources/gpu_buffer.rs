@@ -137,9 +137,11 @@ impl ShipBuffer {
         let mut offset = 0;
 
         for buffer in &self.staging {
-            let bytes = bytemuck::cast_slice(buffer);
-            queue.write_buffer(&self.buffer, offset, bytes);
-            offset += bytes.len() as u64;
+            if !buffer.is_empty() {
+                let bytes = bytemuck::cast_slice(buffer);
+                queue.write_buffer(&self.buffer, offset, bytes);
+                offset += bytes.len() as u64;
+            }
         }
     }
 }

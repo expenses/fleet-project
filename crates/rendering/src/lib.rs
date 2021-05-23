@@ -1,7 +1,7 @@
 pub mod passes;
 
 use components_and_resources::gpu_structs::*;
-use ultraviolet::{Vec2, Vec3, Mat4};
+use ultraviolet::{Mat4, Vec2, Vec3};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const HDR_FRAMEBUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;

@@ -1,7 +1,7 @@
+use crate::gpu_structs::ModelVertex;
+use ray_collisions::{BoundingBox, Triangle};
 use ultraviolet::Vec3;
 use wgpu::util::DeviceExt;
-use ray_collisions::{BoundingBox, Triangle};
-use crate::gpu_structs::ModelVertex;
 
 pub struct Model {
     pub vertices: wgpu::Buffer,

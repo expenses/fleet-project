@@ -8,9 +8,9 @@ pub use mouse::{MouseButtonState, MouseState};
 pub use ray_collisions::{BoundingBox, Projectile, Ray};
 
 use crate::components::ModelId;
-use legion::Entity;
-use ultraviolet::{Mat4, Vec2, Vec3};
 use crate::model::Model;
+use bevy_ecs::prelude::Entity;
+use ultraviolet::{Mat4, Vec2, Vec3};
 
 pub struct Paused(pub bool);
 

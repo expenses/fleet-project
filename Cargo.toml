@@ -12,23 +12,20 @@ ultraviolet = "0.8.0"
 wgpu = { version = "0.8.0", features = ["cross"] }
 winit = "0.25"
 web-sys = { version = "0.3.50", optional = true }
+rand = "0.8.3"
+bevy_ecs = "0.5.0"
+env_logger = "0.8.3"
+
 # Background
 spade = "1.8.2"
 tint = "1.0.1"
 noise = "0.7.0"
-rand = "0.8.3"
 
-env_logger = "0.8.3"
-legion = { version = "0.4.0", default-features = false }
 colstodian = { git = "https://github.com/expenses/colstodian", branch = "bytemuck", features = ["bytemuck"] }
 
 systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
-
-[features]
-default = ["parallel"]
-parallel = ["legion/parallel"]
 
 [workspace]
 members = [

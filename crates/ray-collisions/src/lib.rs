@@ -1,4 +1,4 @@
-use ultraviolet::{Mat4, Mat3, Vec2, Vec3, Vec4};
+use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Default, Clone)]
 pub struct Ray {
@@ -24,13 +24,10 @@ impl Ray {
         let eye = inv_perspective * clip;
         let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
 
-        let direction = (inv_view * eye)
-            .truncated()
-            .normalized();
+        let direction = (inv_view * eye).truncated().normalized();
 
         Self::new(origin, direction)
     }
-
 
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
