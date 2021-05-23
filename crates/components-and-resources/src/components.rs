@@ -61,3 +61,5 @@ pub struct CameraFollowing;
 
 pub struct Friendly;
 pub struct Enemy;
+
+pub struct Indestructible;

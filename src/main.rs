@@ -239,6 +239,7 @@ fn main() -> anyhow::Result<()> {
             components::WorldSpaceBoundingBox::default(),
             components::Spin::new(background::uniform_sphere_distribution(&mut rng)),
             components::Scale(rng.gen_range(1.0..5.0)),
+            components::Indestructible,
         ));
     }
 

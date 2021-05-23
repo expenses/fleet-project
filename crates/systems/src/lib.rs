@@ -432,6 +432,7 @@ pub fn collide_projectiles<Side>(
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
+    indestructible: Query<&Indestructible>,
 ) where
     Side: Send + Sync + 'static,
 {
@@ -460,7 +461,9 @@ pub fn collide_projectiles<Side>(
             let position = projectile.get_intersection_point(t);
 
             commands.entity(entity).despawn();
-            commands.entity(ship_entity).despawn();
+            if indestructible.get(ship_entity).is_err() {
+                commands.entity(ship_entity).despawn();
+            }
             commands.spawn_bundle((
                 Position(position),
                 RotationMatrix::default(),
