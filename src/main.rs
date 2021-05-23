@@ -178,13 +178,13 @@ fn main() -> anyhow::Result<()> {
         }
     }*/
 
-    for _ in 0..1000 {
-        let side = rng.gen_range(0.0..1.0) > 1.0 / 3.0;
+    for _ in 0..500 {
+        let side = rng.gen_range(0.0..1.0) > 0.5;
 
         let position = Vec3::new(
-            rng.gen_range(-50.0..50.0) + side as u8 as f32 * 150.0,
-            rng.gen_range(-50.0..50.0),
-            rng.gen_range(-50.0..50.0),
+            rng.gen_range(-100.0..100.0) + side as u8 as f32 * 250.0,
+            rng.gen_range(-100.0..100.0),
+            rng.gen_range(-100.0..100.0),
         );
 
         let (model, max_speed) = if true {
@@ -203,8 +203,9 @@ fn main() -> anyhow::Result<()> {
                 components::WorldSpaceBoundingBox::default(),
                 components::FollowsCommands,
                 components::Friendly,
-                //components::Velocity(Vec3::zero()),
-                //components::RayCooldown(rng.gen_range(0.0..1.0)),
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+                components::StagingVelocity(Vec3::zero())
             ));
         } else {
             world.spawn().insert_bundle((
@@ -216,8 +217,9 @@ fn main() -> anyhow::Result<()> {
                 components::WorldSpaceBoundingBox::default(),
                 components::FollowsCommands,
                 components::Enemy,
-                //components::Velocity(Vec3::zero()),
-                //components::RayCooldown(rng.gen_range(0.0..1.0)),
+                components::Velocity(Vec3::zero()),
+                components::RayCooldown(rng.gen_range(0.0..1.0)),
+                components::StagingVelocity(Vec3::zero())
             ));
         }
     }
@@ -308,6 +310,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::AverageSelectedPosition::default());
     world.insert_resource(resources::MouseMode::Normal);
     world.insert_resource(resources::Paused(false));
+    world.insert_resource(bevy_tasks::TaskPool::new());
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
@@ -320,6 +323,10 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::move_camera.system())
         .with_system(systems::set_camera_following.system())
         .with_system(systems::handle_keys.system())
+        .with_system(systems::apply_staging_velocity.system())
+        .with_system(systems::apply_velocity.system())
+        .with_system(systems::spawn_projectile_from_ships::<components::Friendly>.system())
+        .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<BackgroundVertex>.system())
@@ -345,6 +352,11 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::set_world_space_bounding_box.system().label("bbox").after("pos").after("rot_mat"))
         // Dependent on model movement.
         .with_system(systems::move_camera_around_following.system().label("cam").after("pos"))
+        .with_system(systems::choose_enemy_target::<components::Friendly, components::Enemy>.system().after("pos"))
+        .with_system(systems::choose_enemy_target::<components::Enemy, components::Friendly>.system().after("pos"))
+        //.flush()
+        .with_system(systems::run_steering.system().after("pos"))
+        .with_system(systems::debug_draw_targets.system().after("pos"))
         // Dependent on model movement and updated matrices
         .with_system(systems::collide_projectiles::<components::Friendly>.system().after("bbox"))
         .with_system(systems::collide_projectiles::<components::Enemy>.system().after("bbox"))

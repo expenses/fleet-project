@@ -3,10 +3,12 @@ use components_and_resources::gpu_structs::{BackgroundVertex, CircleInstance, In
 use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
+mod steering;
+
 use bevy_ecs::prelude::*;
 
 pub fn update_ship_rotation_matrix(
-    query: Query<(&Rotation, &mut RotationMatrix, &ModelId), Changed<Rotation>>,
+    mut query: Query<(&Rotation, &mut RotationMatrix, &ModelId), Changed<Rotation>>,
     models: Res<Models>,
 ) {
     query.for_each_mut(|(rotation, mut rotation_matrix, model_id)| {
@@ -223,7 +225,6 @@ pub fn handle_left_click(
         *mouse_mode = MouseMode::Normal;
 
         if let Some(entity) = ship_under_cursor.0 {
-            println!("Selecting {:?}", entity);
             commands.entity(entity).insert(Selected);
         }
     }
@@ -257,7 +258,7 @@ pub fn handle_right_clicks(
 }
 
 pub fn move_ships(
-    query: Query<(Entity, &mut Position, &MovingTo, &MaxSpeed)>,
+    mut query: Query<(Entity, &mut Position, &MovingTo, &MaxSpeed)>,
     mut commands: Commands,
     delta_time: Res<DeltaTime>,
 ) {
@@ -276,14 +277,16 @@ pub fn move_ships(
 }
 
 pub fn set_rotation_from_moving_to(
-    query: Query<(&Position, &MovingTo, &mut Rotation), Changed<MovingTo>>,
+    mut query: Query<(&Position, &Velocity, &mut Rotation), Changed<Velocity>>,
 ) {
-    query.for_each_mut(|(position, moving_to, mut rotation)| {
-        let delta = moving_to.0 - position.0;
-        let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
+    query.for_each_mut(|(position, velocity, mut rotation)| {
+        if velocity.0 != Vec3::zero() {
+            let delta = velocity.0;
+            let xz_movement = ultraviolet::Vec2::new(delta.x, delta.z).mag();
 
-        rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
-            * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+            rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-delta.x.atan2(delta.z))
+                * ultraviolet::Rotor3::from_rotation_yz(-delta.y.atan2(xz_movement));
+        }
     })
 }
 
@@ -394,22 +397,22 @@ pub fn render_projectiles(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     query.for_each(|projectile| {
-        let (start, end) = projectile.line_points(5.0);
+        let (start, end) = projectile.line_points(-0.1);
 
         lines_buffer.stage(&[
             BackgroundVertex {
                 position: start,
-                colour: Vec3::unit_x(),
+                colour: Vec3::new(0.75, 0.0, 1.0),
             },
             BackgroundVertex {
                 position: end,
-                colour: Vec3::unit_y(),
+                colour: Vec3::new(0.75, 0.0, 1.0),
             },
         ]);
     })
 }
 
-pub fn update_projectiles(query: Query<&mut Projectile>, delta_time: Res<DeltaTime>) {
+pub fn update_projectiles(mut query: Query<&mut Projectile>, delta_time: Res<DeltaTime>) {
     query.for_each_mut(|mut projectile| {
         projectile.update(delta_time.0);
     })
@@ -431,12 +434,15 @@ pub fn collide_projectiles<Side>(
     models: Res<Models>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
-    mut commands: Commands,
+    commands: Commands,
     indestructible: Query<&Indestructible>,
+    task_pool: Res<bevy_tasks::TaskPool>,
 ) where
     Side: Send + Sync + 'static,
 {
-    projectiles.for_each(|(entity, projectile)| {
+    let commands = parking_lot::Mutex::new(commands);
+
+    projectiles.par_for_each(&task_pool, 16, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
         let first_hit = ships
@@ -460,6 +466,8 @@ pub fn collide_projectiles<Side>(
         if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
 
+            let mut commands = commands.lock();
+
             commands.entity(entity).despawn();
             if indestructible.get(ship_entity).is_err() {
                 commands.entity(ship_entity).despawn();
@@ -469,16 +477,16 @@ pub fn collide_projectiles<Side>(
                 RotationMatrix::default(),
                 ModelId::Explosion,
                 Scale(0.0),
-                AliveUntil(total_time.0 + 5.0),
+                AliveUntil(total_time.0 + 2.5),
                 Expands,
             ));
         }
     });
 }
 
-pub fn expand_explosions(query: Query<&mut Scale, With<Expands>>, delta_time: Res<DeltaTime>) {
+pub fn expand_explosions(mut query: Query<&mut Scale, With<Expands>>, delta_time: Res<DeltaTime>) {
     query.for_each_mut(|mut scale| {
-        scale.0 += delta_time.0;
+        scale.0 += delta_time.0 * 1.5;
     });
 }
 
@@ -503,7 +511,7 @@ pub fn increase_total_time(mut total_time: ResMut<TotalTime>, delta_time: Res<De
 type SetWorldBBoxFilter = Or<(Changed<Position>, Changed<RotationMatrix>, Changed<Scale>)>;
 
 pub fn set_world_space_bounding_box(
-    query: Query<
+    mut query: Query<
         (
             &mut WorldSpaceBoundingBox,
             &Position,
@@ -518,7 +526,7 @@ pub fn set_world_space_bounding_box(
     });
 }
 
-pub fn spin(query: Query<(&mut Spin, &mut Rotation)>, delta_time: Res<DeltaTime>) {
+pub fn spin(mut query: Query<(&mut Spin, &mut Rotation)>, delta_time: Res<DeltaTime>) {
     query.for_each_mut(|(mut spin, mut rotation)| {
         spin.update_angle(delta_time.0);
         rotation.0 = spin.as_rotor();
@@ -600,4 +608,227 @@ fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {
     } else {
         None
     }
+}
+
+pub fn choose_enemy_target<SideA, SideB>(
+    query: Query<(Entity, &Position), (With<SideA>, Without<Targetting>)>,
+    candidates: Query<(Entity, &Position), With<SideB>>,
+    mut commands: Commands,
+)
+    where
+        SideA: Send + Sync + 'static,
+        SideB: Send + Sync + 'static,
+{
+    query.for_each(|(entity, pos)| {
+        let target = candidates
+            .iter()
+            .map(|(target_entity, target_pos)| (target_entity, (target_pos.0 - pos.0).mag_sq()))
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((target_entity, _)) = target {
+            commands.entity(entity).insert(Targetting(target_entity));
+            commands.entity(target_entity).insert(Evading(entity));
+        }
+    });
+}
+
+pub fn run_steering(
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&Targetting>,
+        Option<&Evading>,
+        &mut StagingVelocity,
+    )>,
+    boids: Query<(&Position, &Velocity, &MaxSpeed)>,
+    mut commands: Commands,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+) {
+    query.for_each_mut(
+        |(entity, pos, vel, max_speed, targetting, evading, mut sv)| {
+            let mut steering = Vec3::zero();
+            let boid = to_boid((pos, vel, max_speed));
+
+            if let Some(&Targetting(target_entity)) = targetting {
+                if let Ok(target_boid) = boids.get(target_entity) {
+                    let target_boid = to_boid(target_boid);
+                    // Because ships are constantly turning, the predicted
+                    // point of contact for a ship far away varies a lot, resulting
+                    // in an annoying visual wobble. So we disable leading here.
+                    // We should fix this someother how though.
+                    let lead_factor = 0.0;
+
+                    let force = boid.persue(target_boid, lead_factor);
+
+                    lines_buffer.stage(&[
+                        BackgroundVertex {
+                            position: pos.0,
+                            colour: Vec3::unit_x(),
+                        },
+                        BackgroundVertex {
+                            position: pos.0 + force,
+                            colour: Vec3::unit_x(),
+                        },
+                    ]);
+
+                    steering += force;
+                } else {
+                    commands.entity(entity).remove::<Targetting>();
+                }
+            }
+
+            if let Some(&Evading(evading_entity)) = evading {
+                if let Ok(evading_boid) = boids.get(evading_entity) {
+                    let evading_boid = to_boid(evading_boid);
+
+                    let force = boid.evade(evading_boid);
+
+                    lines_buffer.stage(&[
+                        BackgroundVertex {
+                            position: pos.0,
+                            colour: Vec3::unit_y(),
+                        },
+                        BackgroundVertex {
+                            position: pos.0 + force,
+                            colour: Vec3::unit_y(),
+                        },
+                    ]);
+
+                    steering += force;
+                } else {
+                    commands.entity(entity).remove::<Evading>();
+                }
+            }
+
+            /*
+            {
+                let force = boid.avoidance(boids.iter(world).map(to_boid)) * 0.5;
+
+                steering += force;
+
+                lines_buffer.stage(&[
+                    BackgroundVertex {
+                        position: pos.0,
+                        colour: Vec3::new(1.0, 0.5, 0.0)
+                    },
+                    BackgroundVertex {
+                        position: pos.0 + force,
+                        colour: Vec3::new(1.0, 0.5, 0.0)
+                    }
+                ]);
+            }
+            */
+
+            if steering == Vec3::zero() {
+                steering -= boid.vel;
+            }
+
+            let max_force = max_speed.0 / 10.0;
+
+            let steering = truncate(steering, max_force);
+
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: pos.0,
+                    colour: Vec3::unit_z(),
+                },
+                BackgroundVertex {
+                    position: pos.0 + steering,
+                    colour: Vec3::unit_z(),
+                },
+            ]);
+
+            *sv = StagingVelocity(truncate(vel.0 + steering, max_speed.0));
+        },
+    )
+}
+
+fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> steering::Boid {
+    steering::Boid {
+        pos: pos.0,
+        vel: vel.0,
+        max_vel: max_speed.0,
+        radius_sq: 4.0_f32.powi(2),
+    }
+}
+
+fn truncate(vec: Vec3, max: f32) -> Vec3 {
+    let mag = vec.mag();
+    let new_mag = mag.min(max);
+    if new_mag == 0.0 {
+        Vec3::zero()
+    } else {
+        vec / mag * new_mag
+    }
+}
+
+pub fn apply_staging_velocity(
+    mut query: Query<(&mut Velocity, &StagingVelocity)>,
+    paused: Res<Paused>,
+) {
+    if paused.0 {
+        return;
+    }
+    query.for_each_mut(|(mut velocity, staging_velocity)| {
+        velocity.0 = staging_velocity.0;
+    });
+}
+
+pub fn apply_velocity(
+    mut query: Query<(&mut Position, &Velocity)>,
+    delta_time: Res<DeltaTime>,
+    paused: Res<Paused>,
+) {
+    if paused.0 {
+        return;
+    }
+    query.for_each_mut(|(mut position, velocity)| {
+        position.0 += velocity.0 * delta_time.0;
+    });
+}
+
+pub fn debug_draw_targets(
+    query: Query<(&Position, &Targetting), With<Selected>>,
+    positions: Query<&Position>,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+) {
+    query.for_each(|(position, targetting)| {
+        if let Ok(target_pos) = positions.get(targetting.0) {
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: position.0,
+                    colour: Vec3::zero(),
+                },
+                BackgroundVertex {
+                    position: target_pos.0,
+                    colour: Vec3::one(),
+                },
+            ]);
+        }
+    })
+}
+
+pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
+    mut query: Query<(&Position, &Velocity, &mut RayCooldown), With<Side>>,
+    delta_time: Res<DeltaTime>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
+) {
+    query.for_each_mut(|(pos, vel, mut ray_cooldown)| {
+        ray_cooldown.0 -= delta_time.0;
+
+        if ray_cooldown.0 < 0.0 {
+            ray_cooldown.0 += 1.0;
+
+            let ray = Ray::new(pos.0, vel.0);
+
+            commands.spawn_bundle((
+                Projectile::new(&ray, 100.0),
+                AliveUntil(total_time.0 + 10.0),
+                Side::default(),
+            ));
+        }
+    })
 }

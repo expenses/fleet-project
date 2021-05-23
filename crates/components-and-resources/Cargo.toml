@@ -6,9 +6,9 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.40"
-bevy_ecs = "0.5.0"
+bevy_ecs = { git = "https://github.com/expenses/bevy", branch = "checked-command-inserts" }
 bytemuck = { version = "1.5.1", features = ["derive"] }
-gltf = "0.16.0"
+gltf = { version = "0.16.0", default-features = false, features = ["utils"] }
 image = { version = "0.23.14", features = ["png"], default-features = false }
 ray-collisions = { path = "../ray-collisions/" }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }

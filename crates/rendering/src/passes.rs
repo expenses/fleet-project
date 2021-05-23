@@ -233,52 +233,58 @@ pub fn run_render_passes(
 
     let (line_buffer, num_line_vertices) = line_buffer.slice();
 
-    render_pass.set_pipeline(&pipelines.lines);
-    render_pass.set_vertex_buffer(0, line_buffer);
-    render_pass.set_push_constants(
-        wgpu::ShaderStage::VERTEX,
-        0,
-        bytemuck::bytes_of(&perspective_view.perspective_view),
-    );
-    render_pass.draw(0..num_line_vertices, 0..1);
+    if num_line_vertices > 0 {
+        render_pass.set_pipeline(&pipelines.lines);
+        render_pass.set_vertex_buffer(0, line_buffer);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::VERTEX,
+            0,
+            bytemuck::bytes_of(&perspective_view.perspective_view),
+        );
+        render_pass.draw(0..num_line_vertices, 0..1);
+    }
 
-    render_pass.set_pipeline(&pipelines.bounding_boxes);
-    render_pass.set_index_buffer(
-        constants.bounding_box_indices.slice(..),
-        wgpu::IndexFormat::Uint16,
-    );
-    render_pass.set_vertex_buffer(1, instance_buffer);
+    {
+        render_pass.set_pipeline(&pipelines.bounding_boxes);
+        render_pass.set_index_buffer(
+            constants.bounding_box_indices.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+        render_pass.set_vertex_buffer(1, instance_buffer);
 
-    let mut offset = 0;
+        let mut offset = 0;
 
-    for i in 0..resources::Models::COUNT {
-        let num_instances = num_instances[i];
+        for i in 0..resources::Models::COUNT {
+            let num_instances = num_instances[i];
 
-        if num_instances > 0 && i != ModelId::Explosion as usize {
-            render_pass.set_vertex_buffer(0, models.0[i].bounding_box_buffer.slice(..));
-            render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
+            if num_instances > 0 && i != ModelId::Explosion as usize {
+                render_pass.set_vertex_buffer(0, models.0[i].bounding_box_buffer.slice(..));
+                render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
 
-            offset += num_instances;
+                offset += num_instances;
+            }
         }
     }
 
     let (circle_instances_buffer, num_circle_instances) = circle_instances_buffer.slice();
 
-    render_pass.set_pipeline(&pipelines.circle);
-    render_pass.set_vertex_buffer(0, constants.circle_vertices.slice(..));
-    render_pass.set_index_buffer(
-        constants.circle_filled_indices.slice(..),
-        wgpu::IndexFormat::Uint16,
-    );
-    render_pass.set_vertex_buffer(1, circle_instances_buffer);
-    render_pass.draw_indexed(0..((64 - 2) * 3), 0, 0..num_circle_instances);
+    if num_circle_instances > 0 {
+        render_pass.set_pipeline(&pipelines.circle);
+        render_pass.set_vertex_buffer(0, constants.circle_vertices.slice(..));
+        render_pass.set_index_buffer(
+            constants.circle_filled_indices.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+        render_pass.set_vertex_buffer(1, circle_instances_buffer);
+        render_pass.draw_indexed(0..((64 - 2) * 3), 0, 0..num_circle_instances);
 
-    render_pass.set_pipeline(&pipelines.circle_outline);
-    render_pass.set_index_buffer(
-        constants.circle_line_indices.slice(..),
-        wgpu::IndexFormat::Uint16,
-    );
-    render_pass.draw_indexed(0..(64 * 2), 0, 0..num_circle_instances);
+        render_pass.set_pipeline(&pipelines.circle_outline);
+        render_pass.set_index_buffer(
+            constants.circle_line_indices.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+        render_pass.draw_indexed(0..(64 * 2), 0, 0..num_circle_instances);
+    }
 
     drop(render_pass);
 }
