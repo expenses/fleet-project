@@ -89,7 +89,7 @@ impl Orbit {
     }
 
     pub fn zoom(&mut self, delta: f32) {
-        self.distance = (self.distance + delta * 0.5).max(1.0).min(10.0);
+        self.distance = (self.distance * (1.0 + delta * 0.1)).max(1.0).min(250.0);
     }
 
     pub fn as_vector(&self) -> Vec3 {

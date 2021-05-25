@@ -54,8 +54,6 @@ impl Spin {
     }
 }
 
-pub struct MovingTo(pub Vec3);
-
 pub struct FollowsCommands;
 
 pub struct CameraFollowing;
@@ -67,7 +65,6 @@ pub struct Enemy;
 
 pub struct Indestructible;
 
-pub struct Targetting(pub Entity);
 pub struct Evading(pub Entity);
 
 pub struct Velocity(pub Vec3);
@@ -75,3 +72,8 @@ pub struct StagingVelocity(pub Vec3);
 pub struct RayCooldown(pub f32);
 
 pub struct AgroRange(pub f32);
+
+pub enum Command {
+    Attack(Entity),
+    MoveTo(Vec3)
+}

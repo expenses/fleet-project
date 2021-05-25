@@ -311,7 +311,6 @@ fn main() -> anyhow::Result<()> {
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
-        .with_system(systems::move_ships.system())
         .with_system(systems::spin.system())
         .with_system(systems::kill_temporary.system())
         .with_system(systems::expand_explosions.system())
@@ -344,7 +343,6 @@ fn main() -> anyhow::Result<()> {
     let stage_3 = bevy_ecs::schedule::SystemStage::parallel()
         // Dependent on `handle_right_clicks_system`.
         .with_system(systems::set_rotation_from_moving_to.system().label("rot"))
-        .with_system(systems::move_ships.system().label("pos"))
         // Dependent on updated rotations.
         .with_system(
             systems::update_ship_rotation_matrix
@@ -490,6 +488,18 @@ fn main() -> anyhow::Result<()> {
                     MouseButton::Right => mouse_state.right_state.handle(position, pressed),
                     _ => {}
                 }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let delta = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => -*y,
+                    MouseScrollDelta::PixelDelta(winit::dpi::PhysicalPosition { y, .. }) => {
+                        *y as f32 / -200.0
+                    }
+                };
+
+                let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
+
+                orbit.zoom(delta);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let keyboard_state = world.get_resource::<resources::KeyboardState>().unwrap();

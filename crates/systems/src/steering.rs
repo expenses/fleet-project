@@ -31,7 +31,7 @@ impl Boid {
         self.flee(future_pos)
     }
 
-    fn seek(self, target: Vec3) -> Vec3 {
+    pub fn seek(self, target: Vec3) -> Vec3 {
         // todo: arrival using the braking distance:
         // let arrival_distance = self.vel.mag_sq() / (2.0 / self.max_vel);
 

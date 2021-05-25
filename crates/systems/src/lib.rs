@@ -226,7 +226,11 @@ pub fn handle_left_click(
         *mouse_mode = MouseMode::Normal;
 
         if let Some(entity) = ship_under_cursor.0 {
-            commands.entity(entity).insert(Selected);
+            if keyboard_state.shift && selected.get(entity).is_ok() {
+                commands.entity(entity).remove::<Selected>();
+            } else {
+                commands.entity(entity).insert(Selected);
+            }
         }
     }
 }
@@ -282,7 +286,7 @@ pub fn handle_right_clicks(
             MouseMode::Movement { .. } => {
                 if let Some(point) = ray_plane_point.0 {
                     selected.for_each(|entity| {
-                        commands.entity(entity).insert(MovingTo(point));
+                        commands.entity(entity).insert(Command::MoveTo(point));
                     });
                 }
 
@@ -290,25 +294,6 @@ pub fn handle_right_clicks(
             }
         };
     }
-}
-
-pub fn move_ships(
-    mut query: Query<(Entity, &mut Position, &MovingTo, &MaxSpeed)>,
-    mut commands: Commands,
-    delta_time: Res<DeltaTime>,
-) {
-    query.for_each_mut(|(entity, mut position, moving_to, max_speed)| {
-        let delta = moving_to.0 - position.0;
-        let distance = delta.mag();
-        let speed = max_speed.0 * delta_time.0;
-
-        if distance < speed {
-            position.0 = moving_to.0;
-            commands.entity(entity).remove::<MovingTo>();
-        } else {
-            position.0 += delta / distance * speed;
-        }
-    })
 }
 
 #[profiling::function]
@@ -366,7 +351,7 @@ pub fn handle_keys(
 ) {
     if keyboard_state.stop.0 {
         selected_moving.for_each(|entity| {
-            commands.entity(entity).remove::<MovingTo>();
+            commands.entity(entity).remove::<Command>();
         });
     }
 
@@ -662,9 +647,9 @@ fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {
 pub fn choose_enemy_target<SideA, SideB>(
     query: Query<
         (Entity, &Position, &AgroRange),
-        (With<SideA>, Without<Targetting>, Without<MovingTo>),
+        (With<SideA>, Without<Command>),
     >,
-    candidates: Query<(Entity, &Position), (With<SideB>, Or<(With<Targetting>, With<MovingTo>)>)>,
+    candidates: Query<(Entity, &Position), (With<SideB>, With<Command>)>,
     mut commands: Commands,
 ) where
     SideA: Send + Sync + 'static,
@@ -687,7 +672,7 @@ pub fn choose_enemy_target<SideA, SideB>(
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((target_entity, _)) = target {
-            commands.entity(entity).insert(Targetting(target_entity));
+            commands.entity(entity).insert(Command::Attack(target_entity));
             commands.entity(target_entity).insert(Evading(entity));
         }
     });
@@ -700,7 +685,7 @@ pub fn run_steering(
         &Position,
         &Velocity,
         &MaxSpeed,
-        Option<&Targetting>,
+        Option<&Command>,
         Option<&Evading>,
         &mut StagingVelocity,
     )>,
@@ -709,35 +694,49 @@ pub fn run_steering(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     query.for_each_mut(
-        |(entity, pos, vel, max_speed, targetting, evading, mut sv)| {
+        |(entity, pos, vel, max_speed, command, evading, mut sv)| {
             let mut steering = Vec3::zero();
             let boid = to_boid((pos, vel, max_speed));
+            let max_force = max_speed.0 / 10.0;
 
-            if let Some(&Targetting(target_entity)) = targetting {
-                if let Ok(target_boid) = boids.get(target_entity) {
-                    let target_boid = to_boid(target_boid);
-                    // Because ships are constantly turning, the predicted
-                    // point of contact for a ship far away varies a lot, resulting
-                    // in an annoying visual wobble. So we disable leading here.
-                    // We should fix this someother how though.
-                    let lead_factor = 0.0;
+            if let Some(command) = command {
+                match *command {
+                    Command::Attack(target_entity) => {
+                        if let Ok(target_boid) = boids.get(target_entity) {
+                            let target_boid = to_boid(target_boid);
+                            // Because ships are constantly turning, the predicted
+                            // point of contact for a ship far away varies a lot, resulting
+                            // in an annoying visual wobble. So we disable leading here.
+                            // We should fix this someother how though.
+                            let lead_factor = 0.0;
 
-                    let force = boid.persue(target_boid, lead_factor);
+                            let force = boid.persue(target_boid, lead_factor);
 
-                    /*lines_buffer.stage(&[
-                        BackgroundVertex {
-                            position: pos.0,
-                            colour: Vec3::unit_x(),
-                        },
-                        BackgroundVertex {
-                            position: pos.0 + force,
-                            colour: Vec3::unit_x(),
-                        },
-                    ]);*/
+                            /*lines_buffer.stage(&[
+                                BackgroundVertex {
+                                    position: pos.0,
+                                    colour: Vec3::unit_x(),
+                                },
+                                BackgroundVertex {
+                                    position: pos.0 + force,
+                                    colour: Vec3::unit_x(),
+                                },
+                            ]);*/
 
-                    steering += force;
-                } else {
-                    commands.entity(entity).remove::<Targetting>();
+                            steering += force;
+                        } else {
+                            commands.entity(entity).remove::<Command>();
+                        }
+                    },
+                    Command::MoveTo(point) => {
+                        let force = boid.seek(point);
+
+                        steering += force;
+
+                        if (boid.pos - point).mag_sq() < max_force {
+                            commands.entity(entity).remove::<Command>();
+                        }
+                    }
                 }
             }
 
@@ -784,10 +783,8 @@ pub fn run_steering(
             */
 
             if steering == Vec3::zero() {
-                steering -= boid.vel;
+                steering = -boid.vel;
             }
-
-            let max_force = max_speed.0 / 10.0;
 
             let steering = truncate(steering, max_force);
 
@@ -852,45 +849,49 @@ pub fn apply_velocity(
 }
 
 pub fn debug_draw_targets(
-    query: Query<(&Position, &Targetting), With<Selected>>,
+    query: Query<(&Position, &Command), With<Selected>>,
     positions: Query<&Position>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
-    query.for_each(|(position, targetting)| {
-        if let Ok(target_pos) = positions.get(targetting.0) {
-            lines_buffer.stage(&[
-                BackgroundVertex {
-                    position: position.0,
-                    colour: Vec3::zero(),
-                },
-                BackgroundVertex {
-                    position: target_pos.0,
-                    colour: Vec3::one(),
-                },
-            ]);
+    query.for_each(|(position, command)| {
+        if let &Command::Attack(target) = command {
+            if let Ok(target_pos) = positions.get(target) {
+                lines_buffer.stage(&[
+                    BackgroundVertex {
+                        position: position.0,
+                        colour: Vec3::zero(),
+                    },
+                    BackgroundVertex {
+                        position: target_pos.0,
+                        colour: Vec3::one(),
+                    },
+                ]);
+            }
         }
     })
 }
 
 pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
-    mut query: Query<(&Position, &Velocity, &mut RayCooldown), (With<Side>, With<Targetting>)>,
+    mut query: Query<(&Position, &Velocity, &mut RayCooldown, &Command), With<Side>>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
 ) {
-    query.for_each_mut(|(pos, vel, mut ray_cooldown)| {
-        ray_cooldown.0 -= delta_time.0;
+    query.for_each_mut(|(pos, vel, mut ray_cooldown, command)| {
+        ray_cooldown.0 = (ray_cooldown.0 - delta_time.0).max(0.0);
 
-        if ray_cooldown.0 < 0.0 {
-            ray_cooldown.0 += 1.0;
+        if matches!(command, Command::Attack(_)) {
+            if ray_cooldown.0 == 0.0 {
+                ray_cooldown.0 = 1.0;
 
-            let ray = Ray::new(pos.0, vel.0);
+                let ray = Ray::new(pos.0, vel.0);
 
-            commands.spawn_bundle((
-                Projectile::new(&ray, 100.0),
-                AliveUntil(total_time.0 + 10.0),
-                Side::default(),
-            ));
+                commands.spawn_bundle((
+                    Projectile::new(&ray, 100.0),
+                    AliveUntil(total_time.0 + 10.0),
+                    Side::default(),
+                ));
+            }
         }
     })
 }
