@@ -1,7 +1,7 @@
 use crate::{Pipelines, Resizables};
 use components_and_resources::components::ModelId;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants,
+    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants, RangeInstance,
 };
 use components_and_resources::resources;
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -202,6 +202,10 @@ pub fn run_render_passes(
         .get_resource::<resources::GpuBuffer<CircleInstance>>()
         .unwrap();
 
+    let range_instances_buffer = world
+        .get_resource::<resources::GpuBuffer<RangeInstance>>()
+        .unwrap();
+
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("tonemap and ui render pass"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -284,6 +288,24 @@ pub fn run_render_passes(
             wgpu::IndexFormat::Uint16,
         );
         render_pass.draw_indexed(0..(64 * 2), 0, 0..num_circle_instances);
+    }
+
+    let (range_instances_buffer, num_range_instances) = range_instances_buffer.slice();
+
+    if num_range_instances > 0 {
+        render_pass.set_pipeline(&pipelines.z_facing_circle_outline);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::VERTEX,
+            0,
+            bytemuck::bytes_of(&[perspective_view.perspective, perspective_view.view]),
+        );
+        render_pass.set_vertex_buffer(0, constants.circle_vertices.slice(..));
+        render_pass.set_vertex_buffer(1, range_instances_buffer);
+        render_pass.set_index_buffer(
+            constants.circle_line_indices.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+        render_pass.draw_indexed(0..(64 * 2), 0, 0..num_range_instances);
     }
 
     drop(render_pass);

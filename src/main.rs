@@ -6,7 +6,7 @@ use winit::event_loop::*;
 
 mod background;
 
-use bevy_ecs::prelude::{IntoSystem, Stage, ParallelSystemDescriptorCoercion};
+use bevy_ecs::prelude::{IntoSystem, ParallelSystemDescriptorCoercion, Stage};
 use components_and_resources::gpu_structs::*;
 use components_and_resources::model::load_ship_model;
 use components_and_resources::{components, resources};
@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
             label: Some("device"),
             features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::DEPTH_CLAMPING,
             limits: wgpu::Limits {
-                max_push_constant_size: std::mem::size_of::<PushConstants>() as u32,
+                max_push_constant_size: std::mem::size_of::<[ultraviolet::Mat4; 2]>() as u32,
                 ..Default::default()
             },
         },
@@ -197,7 +197,8 @@ fn main() -> anyhow::Result<()> {
             components::FollowsCommands,
             components::Velocity(Vec3::zero()),
             components::RayCooldown(rng.gen_range(0.0..1.0)),
-            components::StagingVelocity(Vec3::zero())
+            components::StagingVelocity(Vec3::zero()),
+            components::AgroRange(200.0),
         ));
 
         if true {
@@ -206,7 +207,7 @@ fn main() -> anyhow::Result<()> {
             spawner.insert_bundle((components::ModelId::Carrier, components::MaxSpeed(1.0)));
         }
 
-        if side {
+        if !side {
             spawner.insert(components::Friendly);
         } else {
             spawner.insert(components::Enemy);
@@ -243,6 +244,11 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::GpuBuffer::<CircleInstance>::new(
         &device,
         "circle instances",
+        wgpu::BufferUsage::VERTEX,
+    ));
+    world.insert_resource(resources::GpuBuffer::<RangeInstance>::new(
+        &device,
+        "range instances",
         wgpu::BufferUsage::VERTEX,
     ));
     world.insert_resource(resources::Models([
@@ -319,6 +325,7 @@ fn main() -> anyhow::Result<()> {
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<BackgroundVertex>.system())
+        .with_system(systems::clear_buffer::<RangeInstance>.system())
         .with_system(systems::clear_buffer::<CircleInstance>.system());
 
     // Need to update what the camera is following.
@@ -336,30 +343,73 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::set_rotation_from_moving_to.system().label("rot"))
         .with_system(systems::move_ships.system().label("pos"))
         // Dependent on updated rotations.
-        .with_system(systems::update_ship_rotation_matrix.system().label("rot_mat").after("rot"))
+        .with_system(
+            systems::update_ship_rotation_matrix
+                .system()
+                .label("rot_mat")
+                .after("rot"),
+        )
         // Dependent on updated rotation matrices.
-        .with_system(systems::set_world_space_bounding_box.system().label("bbox").after("pos").after("rot_mat"))
+        .with_system(
+            systems::set_world_space_bounding_box
+                .system()
+                .label("bbox")
+                .after("pos")
+                .after("rot_mat"),
+        )
         // Dependent on model movement.
-        .with_system(systems::move_camera_around_following.system().label("cam").after("pos"))
-        .with_system(systems::choose_enemy_target::<components::Friendly, components::Enemy>.system().after("pos"))
-        .with_system(systems::choose_enemy_target::<components::Enemy, components::Friendly>.system().after("pos"))
+        .with_system(
+            systems::move_camera_around_following
+                .system()
+                .label("cam")
+                .after("pos"),
+        )
+        .with_system(
+            systems::choose_enemy_target::<components::Friendly, components::Enemy>
+                .system()
+                .after("pos"),
+        )
+        .with_system(
+            systems::choose_enemy_target::<components::Enemy, components::Friendly>
+                .system()
+                .after("pos"),
+        )
         //.flush()
         .with_system(systems::run_steering.system().after("pos"))
         .with_system(systems::debug_draw_targets.system().after("pos"))
         // Dependent on model movement and updated matrices
-        .with_system(systems::collide_projectiles::<components::Friendly>.system().after("bbox"))
-        .with_system(systems::collide_projectiles::<components::Enemy>.system().after("bbox"))
+        .with_system(
+            systems::collide_projectiles::<components::Friendly>
+                .system()
+                .after("bbox"),
+        )
+        .with_system(
+            systems::collide_projectiles::<components::Enemy>
+                .system()
+                .after("bbox"),
+        )
         // Dependent on camera movement.
         .with_system(systems::update_ray.system().label("ray").after("cam"))
         // Dependent on an updated ray
-        .with_system(systems::update_ray_plane_point.system().label("ray_plane").after("ray"))
+        .with_system(
+            systems::update_ray_plane_point
+                .system()
+                .label("ray_plane")
+                .after("ray"),
+        )
         // Dependent on an updated ray, positions and matrices.
-        .with_system(systems::find_ship_under_cursor.system().label("under").after("bbox"))
+        .with_system(
+            systems::find_ship_under_cursor
+                .system()
+                .label("under")
+                .after("bbox"),
+        )
         // .with_system(systems::debug_find_ship_under_cursor.system())
         // Dependent on `find_ship_under_cursor_system`.
         .with_system(systems::handle_left_click.system().after("under"))
         // Staging
         .with_system(systems::render_movement_circle.system().after("ray_plane"))
+        //.with_system(systems::draw_agro_ranges.system().after("pos"));
         .with_system(systems::upload_instances.system().after("under"));
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
@@ -368,6 +418,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
         .with_system(systems::upload_buffer::<BackgroundVertex>.system())
+        .with_system(systems::upload_buffer::<RangeInstance>.system())
         .with_system(systems::upload_buffer::<CircleInstance>.system());
 
     let mut schedule = bevy_ecs::schedule::Schedule::default()

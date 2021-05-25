@@ -1,6 +1,6 @@
 use crate::resources::BoundingBox;
-use ultraviolet::{Mat3, Rotor3, Vec3};
 use bevy_ecs::prelude::Entity;
+use ultraviolet::{Mat3, Rotor3, Vec3};
 
 pub struct Position(pub Vec3);
 pub struct Rotation(pub Rotor3);
@@ -73,3 +73,5 @@ pub struct Evading(pub Entity);
 pub struct Velocity(pub Vec3);
 pub struct StagingVelocity(pub Vec3);
 pub struct RayCooldown(pub f32);
+
+pub struct AgroRange(pub f32);

@@ -1,7 +1,9 @@
 use components_and_resources::components::*;
-use components_and_resources::gpu_structs::{BackgroundVertex, CircleInstance, Instance};
+use components_and_resources::gpu_structs::{
+    BackgroundVertex, CircleInstance, Instance, RangeInstance,
+};
 use components_and_resources::resources::*;
-use ultraviolet::Vec3;
+use ultraviolet::{Vec3, Vec4};
 
 mod steering;
 
@@ -43,6 +45,7 @@ pub fn upload_ship_buffer(mut buffer: ResMut<ShipBuffer>, gpu_interface: Res<Gpu
     buffer.upload(&gpu_interface.device, &gpu_interface.queue);
 }
 
+#[profiling::function]
 pub fn upload_instances(
     query: Query<(
         Entity,
@@ -276,6 +279,7 @@ pub fn move_ships(
     })
 }
 
+#[profiling::function]
 pub fn set_rotation_from_moving_to(
     mut query: Query<(&Position, &Velocity, &mut Rotation), Changed<Velocity>>,
 ) {
@@ -418,6 +422,7 @@ pub fn update_projectiles(mut query: Query<&mut Projectile>, delta_time: Res<Del
     })
 }
 
+#[profiling::function]
 pub fn collide_projectiles<Side>(
     projectiles: Query<(Entity, &Projectile), With<Side>>,
     ships: Query<
@@ -510,6 +515,7 @@ pub fn increase_total_time(mut total_time: ResMut<TotalTime>, delta_time: Res<De
 // if we do them per ray.
 type SetWorldBBoxFilter = Or<(Changed<Position>, Changed<RotationMatrix>, Changed<Scale>)>;
 
+#[profiling::function]
 pub fn set_world_space_bounding_box(
     mut query: Query<
         (
@@ -610,19 +616,32 @@ fn average(positions: impl Iterator<Item = Vec3>) -> Option<Vec3> {
     }
 }
 
+#[profiling::function]
 pub fn choose_enemy_target<SideA, SideB>(
-    query: Query<(Entity, &Position), (With<SideA>, Without<Targetting>)>,
-    candidates: Query<(Entity, &Position), With<SideB>>,
+    query: Query<
+        (Entity, &Position, &AgroRange),
+        (With<SideA>, Without<Targetting>, Without<MovingTo>),
+    >,
+    candidates: Query<(Entity, &Position), (With<SideB>, Or<(With<Targetting>, With<MovingTo>)>)>,
     mut commands: Commands,
-)
-    where
-        SideA: Send + Sync + 'static,
-        SideB: Send + Sync + 'static,
+) where
+    SideA: Send + Sync + 'static,
+    SideB: Send + Sync + 'static,
 {
-    query.for_each(|(entity, pos)| {
+    query.for_each(|(entity, pos, agro_range)| {
+        let agro_range_sq = agro_range.0 * agro_range.0;
+
         let target = candidates
             .iter()
-            .map(|(target_entity, target_pos)| (target_entity, (target_pos.0 - pos.0).mag_sq()))
+            .filter_map(|(target_entity, target_pos)| {
+                let dist_sq = (target_pos.0 - pos.0).mag_sq();
+
+                if dist_sq < agro_range_sq {
+                    Some((target_entity, dist_sq))
+                } else {
+                    None
+                }
+            })
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((target_entity, _)) = target {
@@ -632,6 +651,7 @@ pub fn choose_enemy_target<SideA, SideB>(
     });
 }
 
+#[profiling::function]
 pub fn run_steering(
     mut query: Query<(
         Entity,
@@ -830,5 +850,18 @@ pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
                 Side::default(),
             ));
         }
+    })
+}
+
+pub fn draw_agro_ranges(
+    query: Query<(&Position, &AgroRange), (With<Friendly>, With<Selected>)>,
+    mut ranges: ResMut<GpuBuffer<RangeInstance>>,
+) {
+    query.for_each(|(position, range)| {
+        ranges.stage(&[RangeInstance {
+            translation: position.0,
+            scale: range.0,
+            colour: Vec4::one(),
+        }]);
     })
 }

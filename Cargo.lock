@@ -1921,6 +1921,20 @@ name = "profiling"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3a66d5e88679f2720126c11ee29da07a08f094eac52306b066edd7d393752d6"
+dependencies = [
+ "profiling-procmacros",
+ "tracy-client",
+]
+
+[[package]]
+name = "profiling-procmacros"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b83296b4ea7c60800e0832617bb9d274e4f5928abd08acc5a6ae8be0fb15969"
+dependencies = [
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "quote"
@@ -2435,6 +2449,7 @@ dependencies = [
  "bytemuck",
  "components-and-resources",
  "parking_lot",
+ "profiling",
  "ultraviolet",
 ]
 
@@ -2522,6 +2537,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
 dependencies = [
  "lazy_static 1.4.0",
+]
+
+[[package]]
+name = "tracy-client"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8088b69594669b5b4ea2bd90b04676fcd0480a8624a52056ea87c5eb3a66d8ae"
+dependencies = [
+ "tracy-client-sys",
+]
+
+[[package]]
+name = "tracy-client-sys"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6226e4e77f0d46ce7ebb0a4b1daa82790035248b75bbf605b932a1d7b3b22b6d"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

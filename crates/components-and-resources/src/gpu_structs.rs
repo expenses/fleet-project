@@ -56,3 +56,11 @@ pub struct CircleInstance {
     pub scale: f32,
     pub colour: Vec4,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct RangeInstance {
+    pub translation: Vec3,
+    pub scale: f32,
+    pub colour: Vec4,
+}

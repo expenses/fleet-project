@@ -229,6 +229,7 @@ pub struct Pipelines {
     tonemapper: wgpu::RenderPipeline,
     circle: wgpu::RenderPipeline,
     circle_outline: wgpu::RenderPipeline,
+    z_facing_circle_outline: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -336,6 +337,16 @@ impl Pipelines {
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStage::VERTEX,
                     range: 0..std::mem::size_of::<Mat4>() as u32,
+                }],
+            });
+
+        let seperate_perspective_view_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("seperate perspective view pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[wgpu::PushConstantRange {
+                    stages: wgpu::ShaderStage::VERTEX,
+                    range: 0..std::mem::size_of::<[Mat4; 2]>() as u32,
                 }],
             });
 
@@ -627,6 +638,35 @@ impl Pipelines {
                     layout: Some(&perspective_view_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &vs_circle,
+                        entry_point: "main",
+                        buffers: &[
+                            vec2_vertex_buffer_layout.clone(),
+                            circle_instance_buffer_layout.clone(),
+                        ],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[display_format.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            z_facing_circle_outline: {
+                let vs_z_facing = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/z_facing.vert.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("z facing circle outline pipeline"),
+                    layout: Some(&seperate_perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_z_facing,
                         entry_point: "main",
                         buffers: &[
                             vec2_vertex_buffer_layout.clone(),
