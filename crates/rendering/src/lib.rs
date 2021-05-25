@@ -230,6 +230,7 @@ pub struct Pipelines {
     circle: wgpu::RenderPipeline,
     circle_outline: wgpu::RenderPipeline,
     z_facing_circle_outline: wgpu::RenderPipeline,
+    lines_2d: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -251,6 +252,13 @@ impl Pipelines {
                 }],
             });
 
+        let empty_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("empty pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
         let model_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ModelVertex>() as u64,
             step_mode: wgpu::InputStepMode::Vertex,
@@ -261,6 +269,12 @@ impl Pipelines {
             array_stride: std::mem::size_of::<Instance>() as u64,
             step_mode: wgpu::InputStepMode::Instance,
             attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32],
+        };
+
+        let vertex_2d_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex2D>() as u64,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x3],
         };
 
         let depth_write = wgpu::DepthStencilState {
@@ -672,6 +686,31 @@ impl Pipelines {
                             vec2_vertex_buffer_layout.clone(),
                             circle_instance_buffer_layout.clone(),
                         ],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour,
+                        entry_point: "main",
+                        targets: &[display_format.into()],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
+            lines_2d: {
+                let vs_2d = device
+                    .create_shader_module(&wgpu::include_spirv!("../shaders/compiled/2d.vert.spv"));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("lines 2d pipeline"),
+                    layout: Some(&empty_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_2d,
+                        entry_point: "main",
+                        buffers: &[vertex_2d_buffer_layout.clone()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,

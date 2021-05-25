@@ -5,7 +5,7 @@ mod mouse;
 pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use keyboard::KeyboardState;
 pub use mouse::{MouseButtonState, MouseState};
-pub use ray_collisions::{BoundingBox, Projectile, Ray};
+pub use ray_collisions::{BoundingBox, Projectile, Ray, SelectionFrustum};
 
 use crate::components::ModelId;
 use crate::model::Model;
@@ -58,6 +58,12 @@ pub struct Dimensions {
     pub height: u32,
 }
 
+impl Dimensions {
+    pub fn to_vec(&self) -> Vec2 {
+        Vec2::new(self.width as f32, self.height as f32)
+    }
+}
+
 pub struct Orbit {
     pub longitude: f32,
     pub latitude: f32,
@@ -98,14 +104,21 @@ impl Orbit {
 #[derive(Clone)]
 pub struct PerspectiveView {
     pub perspective: Mat4,
+    perspective_with_far_plane: Mat4,
     pub view: Mat4,
     view_without_movement: Mat4,
     pub perspective_view: Mat4,
     pub perspective_view_without_movement: Mat4,
+    pub perspective_view_with_far_plane: Mat4,
 }
 
 impl PerspectiveView {
-    pub fn new(perspective: Mat4, eye: Vec3, center: Vec3) -> Self {
+    pub fn new(fov: f32, aspect_ratio: f32, eye: Vec3, center: Vec3) -> Self {
+        let perspective =
+            ultraviolet::projection::perspective_infinite_z_wgpu_dx(fov, aspect_ratio, 0.1);
+        let perspective_with_far_plane =
+            ultraviolet::projection::perspective_wgpu_dx(fov, aspect_ratio, 0.1, 1000.0);
+
         let view = Mat4::look_at(eye + center, center, Vec3::unit_y());
         let view_without_movement = Mat4::look_at(Vec3::zero(), -eye, Vec3::unit_y());
 
@@ -113,21 +126,30 @@ impl PerspectiveView {
             view,
             view_without_movement,
             perspective,
+            perspective_with_far_plane,
             perspective_view: perspective * view,
             perspective_view_without_movement: perspective * view_without_movement,
+            perspective_view_with_far_plane: perspective_with_far_plane * view,
         }
     }
 
-    pub fn set_perspective(&mut self, perspective: Mat4) {
-        self.perspective = perspective;
+    fn recalculate(&mut self) {
         self.perspective_view = self.perspective * self.view;
         self.perspective_view_without_movement = self.perspective * self.view_without_movement;
+        self.perspective_view_with_far_plane = self.perspective_with_far_plane * self.view;
+    }
+
+    pub fn set_perspective(&mut self, fov: f32, aspect_ratio: f32) {
+        self.perspective =
+            ultraviolet::projection::perspective_infinite_z_wgpu_dx(fov, aspect_ratio, 0.1);
+        self.perspective_with_far_plane =
+            ultraviolet::projection::perspective_wgpu_dx(fov, aspect_ratio, 0.1, 1000.0);
+        self.recalculate();
     }
 
     pub fn set_view(&mut self, orbit: Vec3, center: Vec3) {
         self.view = Mat4::look_at(orbit + center, center, Vec3::unit_y());
-        self.perspective_view = self.perspective * self.view;
         self.view_without_movement = Mat4::look_at(Vec3::zero(), -orbit, Vec3::unit_y());
-        self.perspective_view_without_movement = self.perspective * self.view_without_movement;
+        self.recalculate();
     }
 }

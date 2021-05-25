@@ -64,3 +64,10 @@ pub struct RangeInstance {
     pub scale: f32,
     pub colour: Vec4,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Vertex2D {
+    pub pos: Vec2,
+    pub colour: Vec3,
+}

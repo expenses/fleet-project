@@ -251,6 +251,11 @@ fn main() -> anyhow::Result<()> {
         "range instances",
         wgpu::BufferUsage::VERTEX,
     ));
+    world.insert_resource(resources::GpuBuffer::<Vertex2D>::new(
+        &device,
+        "lines 2d",
+        wgpu::BufferUsage::VERTEX,
+    ));
     world.insert_resource(resources::Models([
         load_ship_model(
             include_bytes!("../models/carrier.glb"),
@@ -287,11 +292,8 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::ShipUnderCursor::default());
     let orbit = resources::Orbit::new();
     world.insert_resource(resources::PerspectiveView::new(
-        ultraviolet::projection::perspective_infinite_z_wgpu_dx(
-            59.0_f32.to_radians(),
-            dimensions.width as f32 / dimensions.height as f32,
-            0.1,
-        ),
+        59.0_f32.to_radians(),
+        dimensions.width as f32 / dimensions.height as f32,
         orbit.as_vector(),
         Vec3::zero(),
     ));
@@ -326,6 +328,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<BackgroundVertex>.system())
         .with_system(systems::clear_buffer::<RangeInstance>.system())
+        .with_system(systems::clear_buffer::<Vertex2D>.system())
         .with_system(systems::clear_buffer::<CircleInstance>.system());
 
     // Need to update what the camera is following.
@@ -377,6 +380,7 @@ fn main() -> anyhow::Result<()> {
         //.flush()
         .with_system(systems::run_steering.system().after("pos"))
         .with_system(systems::debug_draw_targets.system().after("pos"))
+        .with_system(systems::handle_left_drag.system().after("pos"))
         // Dependent on model movement and updated matrices
         .with_system(
             systems::collide_projectiles::<components::Friendly>
@@ -409,7 +413,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::handle_left_click.system().after("under"))
         // Staging
         .with_system(systems::render_movement_circle.system().after("ray_plane"))
-        //.with_system(systems::draw_agro_ranges.system().after("pos"));
+        //.with_system(systems::draw_agro_ranges.system().after("pos"))
+        .with_system(systems::render_drag_box.system())
         .with_system(systems::upload_instances.system().after("under"));
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
@@ -419,6 +424,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::upload_ship_buffer.system())
         .with_system(systems::upload_buffer::<BackgroundVertex>.system())
         .with_system(systems::upload_buffer::<RangeInstance>.system())
+        .with_system(systems::upload_buffer::<Vertex2D>.system())
         .with_system(systems::upload_buffer::<CircleInstance>.system());
 
     let mut schedule = bevy_ecs::schedule::Schedule::default()
@@ -454,11 +460,8 @@ fn main() -> anyhow::Result<()> {
                     .unwrap();
 
                 perspective_view.set_perspective(
-                    ultraviolet::projection::perspective_infinite_z_wgpu_dx(
-                        59.0_f32.to_radians(),
-                        size.width as f32 / size.height as f32,
-                        0.1,
-                    ),
+                    59.0_f32.to_radians(),
+                    size.width as f32 / size.height as f32,
                 )
             }
             WindowEvent::KeyboardInput {

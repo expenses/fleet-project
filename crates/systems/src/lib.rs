@@ -1,9 +1,9 @@
 use components_and_resources::components::*;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, CircleInstance, Instance, RangeInstance,
+    BackgroundVertex, CircleInstance, Instance, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
-use ultraviolet::{Vec3, Vec4};
+use ultraviolet::{Vec2, Vec3, Vec4};
 
 mod steering;
 
@@ -208,8 +208,6 @@ pub fn update_ray(
     );
 }
 
-type SelectedFilter = (With<Selected>, With<Friendly>);
-
 pub fn handle_left_click(
     mut commands: Commands,
     selected: Query<Entity, With<Selected>>,
@@ -232,6 +230,40 @@ pub fn handle_left_click(
         }
     }
 }
+
+pub fn handle_left_drag(
+    mouse_state: Res<MouseState>,
+    dimensions: Res<Dimensions>,
+    perspective_view: Res<PerspectiveView>,
+    query: Query<(Entity, &Position), With<ModelId>>,
+    selected: Query<Entity, With<Selected>>,
+    mut commands: Commands,
+    keyboard_state: Res<KeyboardState>,
+) {
+    if let Some(start) = mouse_state.left_state.was_dragged() {
+        let frustum = SelectionFrustum::new_from_onscreen_box(
+            start.min_by_component(mouse_state.position),
+            start.max_by_component(mouse_state.position),
+            dimensions.width,
+            dimensions.height,
+            perspective_view.perspective_view_with_far_plane.inversed(),
+        );
+
+        if !keyboard_state.shift {
+            selected.for_each(|entity| {
+                commands.entity(entity).remove::<Selected>();
+            });
+        }
+
+        query.for_each(|(entity, pos)| {
+            if frustum.contains_point(pos.0) {
+                commands.entity(entity).insert(Selected);
+            }
+        })
+    }
+}
+
+type SelectedFilter = (With<Selected>, With<Friendly>);
 
 pub fn handle_right_clicks(
     mut commands: Commands,
@@ -306,7 +338,7 @@ pub fn update_ray_plane_point(
 ) {
     ray_plane_point.0 = match *mouse_mode {
         MouseMode::Movement { plane_y } => ray
-            .plane_intersection(plane_y)
+            .y_plane_intersection(plane_y)
             .map(|t| ray.get_intersection_point(t)),
         MouseMode::Normal => None,
     };
@@ -373,8 +405,18 @@ pub fn move_camera_around_following(
     mut perspective_view: ResMut<PerspectiveView>,
     orbit: Res<Orbit>,
     following: Query<&Position, With<CameraFollowing>>,
+    friendly_following: Query<&Position, (With<CameraFollowing>, With<Friendly>)>,
 ) {
-    if let Some(avg) = average(following.iter().map(|pos| pos.0)) {
+    // If any friendly units are being followed, follow only friendly units.
+    // This prevents problems where a whole bunch of units and a single asteroid
+    // are selected and it messes with the average position.
+    let avg = if friendly_following.iter().next().is_some() {
+        average(friendly_following.iter().map(|pos| pos.0))
+    } else {
+        average(following.iter().map(|pos| pos.0))
+    };
+
+    if let Some(avg) = avg {
         camera.center = avg;
     }
 
@@ -682,7 +724,7 @@ pub fn run_steering(
 
                     let force = boid.persue(target_boid, lead_factor);
 
-                    lines_buffer.stage(&[
+                    /*lines_buffer.stage(&[
                         BackgroundVertex {
                             position: pos.0,
                             colour: Vec3::unit_x(),
@@ -691,7 +733,7 @@ pub fn run_steering(
                             position: pos.0 + force,
                             colour: Vec3::unit_x(),
                         },
-                    ]);
+                    ]);*/
 
                     steering += force;
                 } else {
@@ -703,9 +745,9 @@ pub fn run_steering(
                 if let Ok(evading_boid) = boids.get(evading_entity) {
                     let evading_boid = to_boid(evading_boid);
 
-                    let force = boid.evade(evading_boid);
+                    let force = boid.evade(evading_boid) * 0.5;
 
-                    lines_buffer.stage(&[
+                    /*lines_buffer.stage(&[
                         BackgroundVertex {
                             position: pos.0,
                             colour: Vec3::unit_y(),
@@ -714,7 +756,7 @@ pub fn run_steering(
                             position: pos.0 + force,
                             colour: Vec3::unit_y(),
                         },
-                    ]);
+                    ]);*/
 
                     steering += force;
                 } else {
@@ -749,7 +791,7 @@ pub fn run_steering(
 
             let steering = truncate(steering, max_force);
 
-            lines_buffer.stage(&[
+            /*lines_buffer.stage(&[
                 BackgroundVertex {
                     position: pos.0,
                     colour: Vec3::unit_z(),
@@ -758,7 +800,7 @@ pub fn run_steering(
                     position: pos.0 + steering,
                     colour: Vec3::unit_z(),
                 },
-            ]);
+            ]);*/
 
             *sv = StagingVelocity(truncate(vel.0 + steering, max_speed.0));
         },
@@ -831,7 +873,7 @@ pub fn debug_draw_targets(
 }
 
 pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
-    mut query: Query<(&Position, &Velocity, &mut RayCooldown), With<Side>>,
+    mut query: Query<(&Position, &Velocity, &mut RayCooldown), (With<Side>, With<Targetting>)>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
@@ -864,4 +906,57 @@ pub fn draw_agro_ranges(
             colour: Vec4::one(),
         }]);
     })
+}
+
+pub fn render_drag_box(
+    mouse_state: Res<MouseState>,
+    dimensions: Res<Dimensions>,
+    mut lines_2d: ResMut<GpuBuffer<Vertex2D>>,
+) {
+    if let Some(start) = mouse_state.left_state.is_being_dragged() {
+        let dimensions = dimensions.to_vec();
+
+        let to_wgpu = |pos: Vec2| {
+            let scaled = pos / dimensions * 2.0;
+            Vec2::new(scaled.x - 1.0, 1.0 - scaled.y)
+        };
+
+        let start = to_wgpu(start);
+        let end = to_wgpu(mouse_state.position);
+
+        lines_2d.stage(&[
+            Vertex2D {
+                pos: start,
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: Vec2::new(end.x, start.y),
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: Vec2::new(end.x, start.y),
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: end,
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: end,
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: Vec2::new(start.x, end.y),
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: Vec2::new(start.x, end.y),
+                colour: Vec3::one(),
+            },
+            Vertex2D {
+                pos: start,
+                colour: Vec3::one(),
+            },
+        ]);
+    }
 }

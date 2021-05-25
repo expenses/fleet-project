@@ -17,10 +17,9 @@ impl Ray {
         inv_perspective: Mat4,
         inv_view: Mat4,
     ) -> Self {
-        let x = (mouse_position.x / width as f32 * 2.0) - 1.0;
-        let y = 1.0 - (mouse_position.y / height as f32 * 2.0);
+        let point = to_wgpu_coords(mouse_position, Vec2::new(width as f32, height as f32));
 
-        let clip = Vec4::new(x, y, -1.0, 1.0);
+        let clip = Vec4::new(point.x, point.y, -1.0, 1.0);
         let eye = inv_perspective * clip;
         let eye = Vec4::new(eye.x, eye.y, -1.0, 0.0);
 
@@ -53,7 +52,7 @@ impl Ray {
         )
     }
 
-    pub fn plane_intersection(&self, plane_y: f32) -> Option<f32> {
+    pub fn y_plane_intersection(&self, plane_y: f32) -> Option<f32> {
         if (self.origin.y > plane_y && self.direction.y > 0.0)
             || (self.origin.y < plane_y && self.direction.y < 0.0)
         {
@@ -335,5 +334,110 @@ impl rstar::RTreeObject for Triangle {
         let min = self.a.min_by_component(b).min_by_component(c);
         let max = self.a.max_by_component(b).max_by_component(c);
         rstar::AABB::from_corners(min.into(), max.into())
+    }
+}
+
+fn to_wgpu_coords(point: Vec2, dimensions: Vec2) -> Vec2 {
+    let scaled = point / dimensions * 2.0;
+
+    Vec2::new(scaled.x - 1.0, 1.0 - scaled.y)
+}
+
+#[derive(Debug)]
+struct Plane {
+    normal: Vec3,
+    // Distance from origin
+    constant: f32,
+}
+
+impl Plane {
+    fn new_from_normal_and_coplanar_point(normal: Vec3, point: Vec3) -> Self {
+        Self {
+            normal,
+            constant: point.dot(normal),
+        }
+    }
+
+    fn new_from_3_coplanar_points(a: Vec3, b: Vec3, c: Vec3) -> Self {
+        let normal = (c - b).cross(a - b).normalized();
+        Self::new_from_normal_and_coplanar_point(normal, a)
+    }
+
+    fn half_space(&self, point: Vec3) -> f32 {
+        self.normal.dot(point) - self.constant
+    }
+}
+
+#[derive(Debug)]
+pub struct SelectionFrustum {
+    planes: [Plane; 4],
+}
+
+impl SelectionFrustum {
+    pub fn new_from_onscreen_box(
+        min: Vec2,
+        max: Vec2,
+        screen_width: u32,
+        screen_height: u32,
+        inv_projection_view: Mat4,
+    ) -> Self {
+        let dimensions = Vec2::new(screen_width as f32, screen_height as f32);
+
+        let to_3d = |point: Vec2, depth| {
+            let point = to_wgpu_coords(point, dimensions);
+
+            let point = inv_projection_view * Vec4::new(point.x, point.y, depth, 1.0);
+            point.truncated() / point.w
+        };
+
+        let near = [
+            to_3d(min, -1.0),
+            to_3d(Vec2::new(max.x, min.y), -1.0),
+            to_3d(Vec2::new(min.x, max.y), -1.0),
+            to_3d(max, -1.0),
+        ];
+
+        let far = [
+            to_3d(min, 1.0),
+            to_3d(Vec2::new(max.x, min.y), 1.0),
+            to_3d(Vec2::new(min.x, max.y), 1.0),
+            to_3d(max, 1.0),
+        ];
+
+        Self::new_from_corners(near, far)
+    }
+
+    fn new_from_corners(near_corners: [Vec3; 4], far_corners: [Vec3; 4]) -> Self {
+        /*
+        let near = Plane::new_from_3_coplanar_points(
+            near_corners[0], near_corners[2], near_corners[1]
+        );
+
+        let far = Plane::new_from_3_coplanar_points(
+            far_corners[0], far_corners[3], far_corners[1]
+        );
+        */
+
+        let left =
+            Plane::new_from_3_coplanar_points(near_corners[0], far_corners[2], far_corners[0]);
+
+        let top =
+            Plane::new_from_3_coplanar_points(far_corners[1], near_corners[0], far_corners[0]);
+
+        let right =
+            Plane::new_from_3_coplanar_points(near_corners[3], far_corners[1], far_corners[3]);
+
+        let bot =
+            Plane::new_from_3_coplanar_points(far_corners[3], far_corners[2], near_corners[2]);
+
+        Self {
+            planes: [left, top, right, bot],
+        }
+    }
+
+    pub fn contains_point(&self, point: Vec3) -> bool {
+        self.planes
+            .iter()
+            .all(|plane| plane.half_space(point) >= 0.0)
     }
 }

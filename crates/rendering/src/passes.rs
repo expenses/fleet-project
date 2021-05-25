@@ -2,6 +2,7 @@ use crate::{Pipelines, Resizables};
 use components_and_resources::components::ModelId;
 use components_and_resources::gpu_structs::{
     BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants, RangeInstance,
+    Vertex2D,
 };
 use components_and_resources::resources;
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -206,6 +207,10 @@ pub fn run_render_passes(
         .get_resource::<resources::GpuBuffer<RangeInstance>>()
         .unwrap();
 
+    let lines_2d_buffer = world
+        .get_resource::<resources::GpuBuffer<Vertex2D>>()
+        .unwrap();
+
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("tonemap and ui render pass"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -250,6 +255,11 @@ pub fn run_render_passes(
 
     {
         render_pass.set_pipeline(&pipelines.bounding_boxes);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::VERTEX,
+            0,
+            bytemuck::bytes_of(&perspective_view.perspective_view),
+        );
         render_pass.set_index_buffer(
             constants.bounding_box_indices.slice(..),
             wgpu::IndexFormat::Uint16,
@@ -306,6 +316,14 @@ pub fn run_render_passes(
             wgpu::IndexFormat::Uint16,
         );
         render_pass.draw_indexed(0..(64 * 2), 0, 0..num_range_instances);
+    }
+
+    let (lines_2d_buffer, num_lines_2d) = lines_2d_buffer.slice();
+
+    if num_lines_2d > 0 {
+        render_pass.set_pipeline(&pipelines.lines_2d);
+        render_pass.set_vertex_buffer(0, lines_2d_buffer);
+        render_pass.draw(0..num_lines_2d, 0..1);
     }
 
     drop(render_pass);
