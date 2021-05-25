@@ -187,40 +187,29 @@ fn main() -> anyhow::Result<()> {
             rng.gen_range(-100.0..100.0),
         );
 
-        let (model, max_speed) = if true {
-            (components::ModelId::Fighter, components::MaxSpeed(10.0))
+        let mut spawner = world.spawn();
+
+        spawner.insert_bundle((
+            components::Position(position),
+            components::Rotation(Default::default()),
+            components::RotationMatrix::default(),
+            components::WorldSpaceBoundingBox::default(),
+            components::FollowsCommands,
+            components::Velocity(Vec3::zero()),
+            components::RayCooldown(rng.gen_range(0.0..1.0)),
+            components::StagingVelocity(Vec3::zero())
+        ));
+
+        if true {
+            spawner.insert_bundle((components::ModelId::Fighter, components::MaxSpeed(10.0)));
         } else {
-            (components::ModelId::Carrier, components::MaxSpeed(1.0))
-        };
+            spawner.insert_bundle((components::ModelId::Carrier, components::MaxSpeed(1.0)));
+        }
 
         if side {
-            world.spawn().insert_bundle((
-                components::Position(position),
-                components::Rotation(Default::default()),
-                components::RotationMatrix::default(),
-                model,
-                max_speed,
-                components::WorldSpaceBoundingBox::default(),
-                components::FollowsCommands,
-                components::Friendly,
-                components::Velocity(Vec3::zero()),
-                components::RayCooldown(rng.gen_range(0.0..1.0)),
-                components::StagingVelocity(Vec3::zero())
-            ));
+            spawner.insert(components::Friendly);
         } else {
-            world.spawn().insert_bundle((
-                components::Position(position),
-                components::Rotation(Default::default()),
-                components::RotationMatrix::default(),
-                model,
-                max_speed,
-                components::WorldSpaceBoundingBox::default(),
-                components::FollowsCommands,
-                components::Enemy,
-                components::Velocity(Vec3::zero()),
-                components::RayCooldown(rng.gen_range(0.0..1.0)),
-                components::StagingVelocity(Vec3::zero())
-            ));
+            spawner.insert(components::Enemy);
         }
     }
 

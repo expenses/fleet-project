@@ -169,7 +169,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "bevy_derive"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "Inflector",
  "bevy_macro_utils",
@@ -181,7 +181,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "async-channel",
  "bevy_ecs_macros",
@@ -201,7 +201,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macros"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -212,7 +212,7 @@ dependencies = [
 [[package]]
 name = "bevy_macro_utils"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "cargo-manifest",
  "proc-macro2",
@@ -222,7 +222,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "bevy_reflect_derive",
  "bevy_utils",
@@ -236,7 +236,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect_derive"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -248,7 +248,7 @@ dependencies = [
 [[package]]
 name = "bevy_tasks"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -262,7 +262,7 @@ dependencies = [
 [[package]]
 name = "bevy_utils"
 version = "0.5.0"
-source = "git+https://github.com/expenses/bevy?branch=checked-command-inserts#05f293be246b64c44130a1e6a9504a4cdc604dd4"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#d73189fa547f961707ba7c8d7d73f503da5d61e0"
 dependencies = [
  "ahash 0.7.3",
  "bevy_derive",
