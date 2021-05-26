@@ -498,6 +498,7 @@ dependencies = [
  "bytemuck",
  "gltf",
  "image",
+ "rand 0.8.3",
  "ray-collisions",
  "rstar",
  "ultraviolet",

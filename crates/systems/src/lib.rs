@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
+use components_and_resources::utils::*;
 use ultraviolet::Vec3;
 
 mod combat;
@@ -201,7 +202,10 @@ pub fn handle_right_clicks(
                     MouseMode::Movement { .. } => {
                         if let Some(point) = ray_plane_point.0 {
                             selected.for_each(|entity| {
-                                commands.entity(entity).insert(Command::MoveTo(point));
+                                commands.entity(entity).insert(Command::MoveTo {
+                                    point,
+                                    ty: MoveType::Normal,
+                                });
                             });
                         }
 
@@ -265,6 +269,8 @@ pub fn handle_keys(
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
     mut paused: ResMut<Paused>,
+    mut carrying: Query<(&Position, &mut Carrying), SelectedFriendly>,
+    mut rng: ResMut<SmallRng>,
 ) {
     if keyboard_state.stop.0 {
         selected_moving.for_each(|entity| {
@@ -274,6 +280,20 @@ pub fn handle_keys(
 
     if keyboard_state.pause.0 {
         paused.0 = !paused.0;
+    }
+
+    if keyboard_state.unload.0 {
+        carrying.for_each_mut(|(pos, mut carrying)| {
+            carrying.0.drain(..).for_each(|entity| {
+                commands
+                    .entity(entity)
+                    .insert(Position(pos.0))
+                    .insert(Command::MoveTo {
+                        point: pos.0 + uniform_sphere_distribution(&mut *rng) * 5.0,
+                        ty: MoveType::Attack,
+                    });
+            })
+        })
     }
 }
 

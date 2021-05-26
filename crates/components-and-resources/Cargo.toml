@@ -10,6 +10,7 @@ bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/comman
 bytemuck = { version = "1.5.1", features = ["derive"] }
 gltf = { version = "0.16.0", default-features = false, features = ["utils"] }
 image = { version = "0.23.14", features = ["png"], default-features = false }
+rand = { version = "=0.8.3", features = ["small_rng"] }
 ray-collisions = { path = "../ray-collisions/" }
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
 ultraviolet = { version = "0.8.1", features = ["bytemuck"] }

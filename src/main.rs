@@ -1,4 +1,5 @@
 use rand::Rng;
+use rand::SeedableRng;
 use ultraviolet::{Rotor3, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 use winit::event::*;
@@ -324,6 +325,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::MouseMode::Normal);
     world.insert_resource(resources::Paused(false));
     world.insert_resource(bevy_tasks::TaskPool::new());
+    world.insert_resource(resources::SmallRng::from_entropy());
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.

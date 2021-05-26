@@ -73,7 +73,7 @@ pub fn run_steering(
                         commands.entity(entity).remove::<Command>();
                     }
                 }
-                Command::MoveTo(point) => {
+                Command::MoveTo { point, ty } => {
                     let force = boid.seek(*point);
 
                     steering += force;

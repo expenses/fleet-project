@@ -1,9 +1,11 @@
-use components_and_resources::gpu_structs::BackgroundVertex;
+use components_and_resources::{gpu_structs::BackgroundVertex, utils};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use spade::delaunay::FloatDelaunayTriangulation;
 use tint::Colour;
 use ultraviolet::{Rotor3, Vec2, Vec3};
+
+pub use utils::uniform_sphere_distribution;
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 pub fn make_background(rng: &mut ThreadRng) -> Vec<BackgroundVertex> {
@@ -113,24 +115,6 @@ impl spade::PointN for ColouredVertex {
 }
 
 impl spade::TwoDimensional for ColouredVertex {}
-
-pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vec3 {
-    uniform_sphere_distribution_from_coords(rng.gen_range(0.0..1.0), rng.gen_range(0.0..1.0))
-}
-
-// http://corysimon.github.io/articles/uniformdistn-on-sphere/
-pub fn uniform_sphere_distribution_from_coords(x: f64, y: f64) -> Vec3 {
-    use std::f64::consts::PI;
-
-    let theta = 2.0 * PI * x;
-    let phi = (1.0 - 2.0 * y).acos();
-
-    Vec3::new(
-        (phi.sin() * theta.cos()) as f32,
-        (phi.sin() * theta.sin()) as f32,
-        phi.cos() as f32,
-    )
-}
 
 pub fn create_stars(rng: &mut ThreadRng) -> impl Iterator<Item = BackgroundVertex> + '_ {
     (0..2000).flat_map(move |_| {

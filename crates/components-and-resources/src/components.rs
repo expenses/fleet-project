@@ -74,8 +74,13 @@ pub struct RayCooldown(pub f32);
 pub struct AgroRange(pub f32);
 
 pub enum Command {
-    MoveTo(Vec3),
+    MoveTo { point: Vec3, ty: MoveType },
     Interact { target: Entity, ty: InteractionType },
+}
+
+pub enum MoveType {
+    Normal,
+    Attack,
 }
 
 pub enum InteractionType {
