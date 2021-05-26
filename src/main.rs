@@ -201,10 +201,19 @@ fn main() -> anyhow::Result<()> {
             components::AgroRange(200.0),
         ));
 
-        if true {
-            spawner.insert_bundle((components::ModelId::Fighter, components::MaxSpeed(10.0)));
+        if rng.gen_range(0.0..1.0) < 0.9 {
+            spawner.insert_bundle((
+                components::ModelId::Fighter,
+                components::CanAttack,
+                components::CanBeCarried,
+                components::MaxSpeed(10.0),
+            ));
         } else {
-            spawner.insert_bundle((components::ModelId::Carrier, components::MaxSpeed(1.0)));
+            spawner.insert_bundle((
+                components::ModelId::Carrier,
+                components::Carrying::default(),
+                components::MaxSpeed(1.0),
+            ));
         }
 
         if !side {

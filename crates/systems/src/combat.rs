@@ -96,9 +96,10 @@ pub fn choose_enemy_target<SideA, SideB>(
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((target_entity, _)) = target {
-            commands
-                .entity(entity)
-                .insert(Command::Attack(target_entity));
+            commands.entity(entity).insert(Command::Interact {
+                target: target_entity,
+                ty: InteractionType::Attack,
+            });
             commands.entity(target_entity).insert(Evading(entity));
         }
     });
@@ -113,7 +114,14 @@ pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
     query.for_each_mut(|(pos, vel, mut ray_cooldown, command)| {
         ray_cooldown.0 = (ray_cooldown.0 - delta_time.0).max(0.0);
 
-        if matches!(command, Command::Attack(_)) && ray_cooldown.0 == 0.0 {
+        if matches!(
+            command,
+            Command::Interact {
+                ty: InteractionType::Attack,
+                ..
+            }
+        ) && ray_cooldown.0 == 0.0
+        {
             ray_cooldown.0 = 1.0;
 
             let ray = Ray::new(pos.0, vel.0);

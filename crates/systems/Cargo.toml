@@ -10,6 +10,7 @@ bevy_tasks = { git = "https://github.com/NathanSWard/bevy", branch = "nward/comm
 bytemuck = "1.5.1"
 components-and-resources = { path = "../components-and-resources/" }
 glyph_brush = "0.7.2"
+log = "0.4.14"
 parking_lot = "0.11.1"
 profiling = "1.0.1"
 ultraviolet = "0.8.1"

@@ -156,28 +156,42 @@ pub fn handle_left_drag(
     }
 }
 
+type SelectedFriendly = (With<Selected>, With<Friendly>);
+
 pub fn handle_right_clicks(
     mut commands: Commands,
-    selected: Query<Entity, (With<Selected>, With<Friendly>)>,
+    selected: Query<Entity, SelectedFriendly>,
     mouse_button: Res<MouseState>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
     ray_plane_point: Res<RayPlanePoint>,
     ship_under_cursor: Res<ShipUnderCursor>,
     enemies: Query<&Enemy>,
-    can_attack: Query<Entity, (With<Selected>, With<Friendly>, With<CanAttack>)>,
+    can_carry: Query<&Carrying>,
+    can_attack: Query<Entity, (SelectedFriendly, With<CanAttack>)>,
+    can_be_carried: Query<Entity, (SelectedFriendly, With<CanBeCarried>)>,
 ) {
     if mouse_button.right_state.was_clicked() {
         match ship_under_cursor.0 {
             Some(target_entity) => {
                 if enemies.get(target_entity).is_ok() {
                     can_attack.for_each(|entity| {
-                        commands.entity(entity).insert(Command::Attack(target_entity));
+                        commands.entity(entity).insert(Command::Interact {
+                            target: target_entity,
+                            ty: InteractionType::Attack,
+                        });
+                    });
+                } else if can_carry.get(target_entity).is_ok() {
+                    can_be_carried.for_each(|entity| {
+                        commands.entity(entity).insert(Command::Interact {
+                            target: target_entity,
+                            ty: InteractionType::BeCarriedBy,
+                        });
                     });
                 }
 
                 *mouse_mode = MouseMode::Normal
-            },
+            }
             None => {
                 *mouse_mode = match *mouse_mode {
                     MouseMode::Normal => match average_selected_position.0 {
@@ -388,7 +402,7 @@ fn get_scale(scale: Option<&Scale>) -> f32 {
 
 pub fn calculate_average_selected_position(
     mut average_selected_position: ResMut<AverageSelectedPosition>,
-    selected_positions: Query<&Position, (With<Selected>, With<Friendly>)>,
+    selected_positions: Query<&Position, SelectedFriendly>,
 ) {
     average_selected_position.0 = average(selected_positions.iter().map(|pos| pos.0));
 }

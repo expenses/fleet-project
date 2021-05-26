@@ -2631,6 +2631,7 @@ dependencies = [
  "bytemuck",
  "components-and-resources",
  "glyph_brush",
+ "log",
  "parking_lot",
  "profiling",
  "ultraviolet",

@@ -74,8 +74,16 @@ pub struct RayCooldown(pub f32);
 pub struct AgroRange(pub f32);
 
 pub enum Command {
-    Attack(Entity),
     MoveTo(Vec3),
+    Interact { target: Entity, ty: InteractionType },
+}
+
+pub enum InteractionType {
+    BeCarriedBy,
+    Attack,
 }
 
 pub struct CanAttack;
+#[derive(Default)]
+pub struct Carrying(pub Vec<Entity>);
+pub struct CanBeCarried;
