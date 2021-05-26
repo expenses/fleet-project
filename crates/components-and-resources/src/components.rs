@@ -75,5 +75,5 @@ pub struct AgroRange(pub f32);
 
 pub enum Command {
     Attack(Entity),
-    MoveTo(Vec3)
+    MoveTo(Vec3),
 }

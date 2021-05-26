@@ -1,75 +1,159 @@
+use bevy_ecs::prelude::*;
+use components_and_resources::components::*;
+use components_and_resources::gpu_structs::BackgroundVertex;
+use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
-#[derive(Clone, Copy)]
-pub struct Boid {
-    pub pos: Vec3,
-    pub vel: Vec3,
-    pub max_vel: f32,
-    pub radius_sq: f32,
-}
+mod primitives;
 
-impl Boid {
-    fn position_at(self, time: f32) -> Vec3 {
-        self.pos + self.vel * time
-    }
+#[profiling::function]
+pub fn run_steering(
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&Command>,
+        Option<&Evading>,
+        &mut StagingVelocity,
+    )>,
+    boids: Query<(&Position, &Velocity, &MaxSpeed)>,
+    mut commands: Commands,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+) {
+    query.for_each_mut(|(entity, pos, vel, max_speed, command, evading, mut sv)| {
+        let mut steering = Vec3::zero();
+        let boid = to_boid((pos, vel, max_speed));
+        let max_force = max_speed.0 / 10.0;
 
-    pub fn persue(self, target: Boid, lead_factor: f32) -> Vec3 {
-        let distance = (self.pos - target.pos).mag();
+        if let Some(command) = command {
+            match *command {
+                Command::Attack(target_entity) => {
+                    if let Ok(target_boid) = boids.get(target_entity).map(to_boid) {
+                        // Because ships are constantly turning, the predicted
+                        // point of contact for a ship far away varies a lot, resulting
+                        // in an annoying visual wobble. So we disable leading here.
+                        // We should fix this someother how though.
+                        let lead_factor = 0.0;
 
-        let t = distance / self.max_vel * lead_factor;
-        let future_pos = target.position_at(t);
+                        let force = boid.persue(target_boid, lead_factor);
 
-        self.seek(future_pos)
-    }
+                        /*lines_buffer.stage(&[
+                            BackgroundVertex {
+                                position: pos.0,
+                                colour: Vec3::unit_x(),
+                            },
+                            BackgroundVertex {
+                                position: pos.0 + force,
+                                colour: Vec3::unit_x(),
+                            },
+                        ]);*/
 
-    pub fn evade(self, evading_from: Boid) -> Vec3 {
-        let distance = (self.pos - evading_from.pos).mag();
+                        steering += force;
+                    } else {
+                        commands.entity(entity).remove::<Command>();
+                    }
+                }
+                Command::MoveTo(point) => {
+                    let force = boid.seek(point);
 
-        let t = distance / self.max_vel;
-        let future_pos = evading_from.position_at(t);
+                    steering += force;
 
-        self.flee(future_pos)
-    }
-
-    pub fn seek(self, target: Vec3) -> Vec3 {
-        // todo: arrival using the braking distance:
-        // let arrival_distance = self.vel.mag_sq() / (2.0 / self.max_vel);
-
-        let desired_vel = normalize_to(target - self.pos, self.max_vel);
-        desired_vel - self.vel
-    }
-
-    fn flee(self, target: Vec3) -> Vec3 {
-        let desired_vel = normalize_to(self.pos - target, self.max_vel);
-        desired_vel - self.vel
-    }
-
-    pub fn avoidance(self, other: impl Iterator<Item = Boid>) -> Vec3 {
-        let mut sum = Vec3::zero();
-
-        for boid in other {
-            let vector = self.pos - boid.pos;
-            let distance_sq = vector.mag_sq();
-            if distance_sq != 0.0 && distance_sq < (self.radius_sq + boid.radius_sq) {
-                let force = normalize_to(vector, 1.0 / distance_sq.sqrt());
-                sum += force;
+                    if (boid.pos - point).mag_sq() < max_force {
+                        commands.entity(entity).remove::<Command>();
+                    }
+                }
             }
         }
 
-        if sum != Vec3::zero() {
-            let desired_vel = normalize_to(sum, self.max_vel);
-            desired_vel - self.vel
-        } else {
-            Vec3::zero()
+        if let Some(&Evading(evading_entity)) = evading {
+            if let Ok(evading_boid) = boids.get(evading_entity).map(to_boid) {
+                let force = boid.evade(evading_boid) * 0.5;
+
+                /*lines_buffer.stage(&[
+                    BackgroundVertex {
+                        position: pos.0,
+                        colour: Vec3::unit_y(),
+                    },
+                    BackgroundVertex {
+                        position: pos.0 + force,
+                        colour: Vec3::unit_y(),
+                    },
+                ]);*/
+
+                steering += force;
+            } else {
+                commands.entity(entity).remove::<Evading>();
+            }
         }
+
+        /*
+        {
+            let force = boid.avoidance(boids.iter(world).map(to_boid)) * 0.5;
+
+            steering += force;
+
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: pos.0,
+                    colour: Vec3::new(1.0, 0.5, 0.0)
+                },
+                BackgroundVertex {
+                    position: pos.0 + force,
+                    colour: Vec3::new(1.0, 0.5, 0.0)
+                }
+            ]);
+        }
+        */
+
+        if steering == Vec3::zero() {
+            steering = -boid.vel;
+        }
+
+        let steering = truncate(steering, max_force);
+
+        /*lines_buffer.stage(&[
+            BackgroundVertex {
+                position: pos.0,
+                colour: Vec3::unit_z(),
+            },
+            BackgroundVertex {
+                position: pos.0 + steering,
+                colour: Vec3::unit_z(),
+            },
+        ]);*/
+
+        *sv = StagingVelocity(truncate(vel.0 + steering, max_speed.0));
+    })
+}
+
+fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> primitives::Boid {
+    primitives::Boid {
+        pos: pos.0,
+        vel: vel.0,
+        max_vel: max_speed.0,
+        radius_sq: 4.0_f32.powi(2),
     }
 }
 
-fn normalize_to(vec: Vec3, new_mag: f32) -> Vec3 {
+fn truncate(vec: Vec3, max: f32) -> Vec3 {
     let mag = vec.mag();
-    if mag == 0.0 {
+    let new_mag = mag.min(max);
+    if new_mag == 0.0 {
         Vec3::zero()
     } else {
         vec / mag * new_mag
     }
+}
+
+pub fn apply_staging_velocity(
+    mut query: Query<(&mut Velocity, &StagingVelocity)>,
+    paused: Res<Paused>,
+) {
+    if paused.0 {
+        return;
+    }
+    query.for_each_mut(|(mut velocity, staging_velocity)| {
+        velocity.0 = staging_velocity.0;
+    });
 }

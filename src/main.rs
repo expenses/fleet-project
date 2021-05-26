@@ -377,7 +377,7 @@ fn main() -> anyhow::Result<()> {
         )
         //.flush()
         .with_system(systems::run_steering.system().after("pos"))
-        .with_system(systems::debug_draw_targets.system().after("pos"))
+        .with_system(systems::debug_render_targets.system().after("pos"))
         .with_system(systems::handle_left_drag.system().after("pos"))
         // Dependent on model movement and updated matrices
         .with_system(
@@ -413,7 +413,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::render_movement_circle.system().after("ray_plane"))
         //.with_system(systems::draw_agro_ranges.system().after("pos"))
         .with_system(systems::render_drag_box.system())
-        .with_system(systems::upload_instances.system().after("under"));
+        .with_system(systems::render_model_instances.system().after("under"));
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::update_mouse_state.system())
