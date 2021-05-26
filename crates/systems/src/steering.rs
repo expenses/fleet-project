@@ -62,8 +62,8 @@ pub fn run_steering(
                                 },
                                 Err(err) => {
                                     log::error!(
-                                        "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships.",
-                                        entity, target, target
+                                        "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships: {}",
+                                        entity, target, target, err
                                     );
                                     commands.entity(entity).remove::<Command>();
                                 }

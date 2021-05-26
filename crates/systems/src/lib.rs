@@ -284,17 +284,45 @@ pub fn handle_keys(
 
     if keyboard_state.unload.0 {
         carrying.for_each_mut(|(pos, mut carrying)| {
-            carrying.0.drain(..).for_each(|entity| {
-                commands
-                    .entity(entity)
-                    .insert(Position(pos.0))
-                    .insert(Command::MoveTo {
-                        point: pos.0 + uniform_sphere_distribution(&mut *rng) * 5.0,
-                        ty: MoveType::Attack,
-                    });
-            })
+            unload(pos.0, &mut carrying, &mut *rng, &mut commands);
         })
     }
+}
+
+pub fn handle_destruction(
+    mut query: Query<(Entity, &Position, Option<&mut Carrying>), With<Destroyed>>,
+    mut rng: ResMut<SmallRng>,
+    mut commands: Commands,
+    total_time: Res<TotalTime>,
+) {
+    query.for_each_mut(|(entity, pos, carrying)| {
+        if let Some(mut carrying) = carrying {
+            unload(pos.0, &mut carrying, &mut *rng, &mut commands);
+        }
+
+        commands.entity(entity).despawn();
+
+        commands.spawn_bundle((
+            Position(pos.0),
+            RotationMatrix::default(),
+            ModelId::Explosion,
+            Scale(0.0),
+            AliveUntil(total_time.0 + 2.5),
+            Expands,
+        ));
+    })
+}
+
+fn unload(pos: Vec3, carrying: &mut Carrying, rng: &mut SmallRng, commands: &mut Commands) {
+    carrying.0.drain(..).for_each(|entity| {
+        commands
+            .entity(entity)
+            .insert(Position(pos))
+            .insert(Command::MoveTo {
+                point: pos + uniform_sphere_distribution(rng) * 5.0,
+                ty: MoveType::Attack,
+            });
+    })
 }
 
 pub fn update_keyboard_state(mut keyboard_state: ResMut<KeyboardState>) {

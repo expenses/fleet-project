@@ -56,7 +56,7 @@ pub fn collide_projectiles<Side>(
 
             commands.entity(entity).despawn();
             if indestructible.get(ship_entity).is_err() {
-                commands.entity(ship_entity).despawn();
+                commands.entity(ship_entity).insert(Destroyed);
             }
             commands.spawn_bundle((
                 Position(position),

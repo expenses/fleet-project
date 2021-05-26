@@ -213,7 +213,7 @@ fn main() -> anyhow::Result<()> {
             spawner.insert_bundle((
                 components::ModelId::Carrier,
                 components::Carrying::default(),
-                components::MaxSpeed(1.0),
+                components::MaxSpeed(5.0),
             ));
         }
 
@@ -426,6 +426,7 @@ fn main() -> anyhow::Result<()> {
         )
         // .with_system(systems::debug_find_ship_under_cursor.system())
         // Dependent on `find_ship_under_cursor_system`.
+        // TODO: should ideally happen BEFORE ships are moved as the player is reacting to their last seen position onsceen.
         .with_system(systems::handle_left_click.system().after("under"))
         // Staging
         .with_system(systems::render_movement_circle.system().after("ray_plane"))
@@ -434,6 +435,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::render_model_instances.system().after("under"));
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
+        .with_system(systems::handle_destruction.system())
         .with_system(systems::count_selected.system())
         .with_system(systems::update_mouse_state.system())
         .with_system(systems::update_keyboard_state.system())
