@@ -14,7 +14,7 @@ pub struct RotationMatrix {
 
 pub struct Selected;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum ModelId {
     Carrier = 0,
     Fighter = 1,

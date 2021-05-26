@@ -407,3 +407,31 @@ pub fn apply_velocity(
         position.0 += velocity.0 * delta_time.0;
     });
 }
+
+pub fn count_selected(
+    friendly: Query<&ModelId, (With<Selected>, With<Friendly>)>,
+    neutral: Query<&ModelId, (With<Selected>, Without<Friendly>, Without<Enemy>)>,
+    enemy: Query<&ModelId, (With<Selected>, With<Enemy>)>,
+) {
+    let print = |prefix, counts: [u32; Models::COUNT]| {
+        for i in 0..Models::COUNT {
+            if counts[i] > 0 {
+                println!("{} {:?}s: {}", prefix, Models::ARRAY[i], counts[i])
+            }
+        }
+    };
+
+    print("Friendly", count(friendly.iter()));
+    print("Neutral", count(neutral.iter()));
+    print("Enemy", count(enemy.iter()));
+}
+
+fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {
+    let mut counts = [0; Models::COUNT];
+
+    for model in iter {
+        counts[*model as usize] += 1;
+    }
+
+    counts
+}

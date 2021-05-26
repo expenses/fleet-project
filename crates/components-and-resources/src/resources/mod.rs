@@ -42,6 +42,12 @@ pub struct Models(pub [Model; Self::COUNT]);
 
 impl Models {
     pub const COUNT: usize = 4;
+    pub const ARRAY: [ModelId; Self::COUNT] = [
+        ModelId::Carrier,
+        ModelId::Fighter,
+        ModelId::Explosion,
+        ModelId::Asteroid,
+    ];
 
     pub fn get(&self, id: ModelId) -> &Model {
         &self.0[id as usize]

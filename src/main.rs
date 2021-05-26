@@ -416,6 +416,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::render_model_instances.system().after("under"));
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
+        .with_system(systems::count_selected.system())
         .with_system(systems::update_mouse_state.system())
         .with_system(systems::update_keyboard_state.system())
         .with_system(systems::increase_total_time.system())
