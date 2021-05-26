@@ -327,6 +327,26 @@ pub fn run_render_passes(
     }
 
     drop(render_pass);
+
+    let mut staging_belt = wgpu::util::StagingBelt::new(100);
+
+    let dimensions = world.get_resource::<resources::Dimensions>().unwrap();
+    let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
+    let (width, height) = (dimensions.width, dimensions.height);
+
+    let mut glyph_brush =
+        unsafe { world.get_resource_unchecked_mut::<resources::GlyphBrush>() }.unwrap();
+
+    glyph_brush
+        .draw_queued(
+            &gpu_interface.device,
+            &mut staging_belt,
+            encoder,
+            &frame.output.view,
+            width,
+            height,
+        )
+        .unwrap();
 }
 
 fn uv_space_light_pos(perspective_view: &resources::PerspectiveView, sun_dir: Vec3) -> Vec2 {

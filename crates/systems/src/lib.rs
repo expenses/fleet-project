@@ -412,20 +412,35 @@ pub fn count_selected(
     friendly: Query<&ModelId, (With<Selected>, With<Friendly>)>,
     neutral: Query<&ModelId, (With<Selected>, Without<Friendly>, Without<Enemy>)>,
     enemy: Query<&ModelId, (With<Selected>, With<Enemy>)>,
+    mut glyph_brush: ResMut<GlyphBrush>,
 ) {
-    let print = |prefix, counts: [u32; Models::COUNT]| {
+    let mut section = glyph_brush::OwnedSection::default();
+
+    let print = |mut section: glyph_brush::OwnedSection, prefix, counts: [u32; Models::COUNT]| {
         for i in 0..Models::COUNT {
             let count = counts[i];
 
             if count > 0 {
-                println!("{} {:?}s: {}", prefix, Models::ARRAY[i], count)
+                section = section.add_text(
+                    glyph_brush::OwnedText::new(&format!(
+                        "{} {:?}s: {}\n",
+                        prefix,
+                        Models::ARRAY[i],
+                        count
+                    ))
+                    .with_color([1.0; 4]),
+                );
             }
         }
+
+        section
     };
 
-    print("Friendly", count(friendly.iter()));
-    print("Neutral", count(neutral.iter()));
-    print("Enemy", count(enemy.iter()));
+    section = print(section, "Friendly", count(friendly.iter()));
+    section = print(section, "Neutral", count(neutral.iter()));
+    section = print(section, "Enemy", count(enemy.iter()));
+
+    glyph_brush.queue(&section);
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {

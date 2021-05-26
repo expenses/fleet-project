@@ -11,6 +11,9 @@ use crate::components::ModelId;
 use crate::model::Model;
 use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
+use wgpu_glyph::ab_glyph::FontRef;
+
+pub type GlyphBrush = wgpu_glyph::GlyphBrush<(), FontRef<'static>>;
 
 pub struct Paused(pub bool);
 

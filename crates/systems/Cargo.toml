@@ -9,6 +9,7 @@ bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/comman
 bevy_tasks = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
 bytemuck = "1.5.1"
 components-and-resources = { path = "../components-and-resources/" }
+glyph_brush = "0.7.2"
 parking_lot = "0.11.1"
 profiling = { version = "1.0.1", features = ["profile-with-tracy"] }
 ultraviolet = "0.8.1"

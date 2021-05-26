@@ -27,6 +27,7 @@ colstodian = { git = "https://github.com/expenses/colstodian", branch = "bytemuc
 systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
+wgpu_glyph = "0.12.0"
 
 [workspace]
 members = [
