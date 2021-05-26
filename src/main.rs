@@ -290,7 +290,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::MouseState::default());
     world.insert_resource(resources::Ray::default());
     world.insert_resource(resources::ShipUnderCursor::default());
-    let orbit = resources::Orbit::new();
+    let orbit = resources::Orbit::default();
     world.insert_resource(resources::PerspectiveView::new(
         59.0_f32.to_radians(),
         dimensions.width as f32 / dimensions.height as f32,

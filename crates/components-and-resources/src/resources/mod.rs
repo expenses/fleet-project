@@ -77,14 +77,6 @@ pub struct Orbit {
 }
 
 impl Orbit {
-    pub fn new() -> Self {
-        Self {
-            longitude: 1.0,
-            latitude: 0.0,
-            distance: 10.0,
-        }
-    }
-
     pub fn rotate(&mut self, delta: Vec2) {
         use std::f32::consts::PI;
         let speed = 0.15;
@@ -104,6 +96,16 @@ impl Orbit {
         let x = horizontal_amount * self.latitude.sin();
         let z = horizontal_amount * self.latitude.cos();
         Vec3::new(x, y, z) * self.distance
+    }
+}
+
+impl Default for Orbit {
+    fn default() -> Self {
+        Self {
+            longitude: 1.0,
+            latitude: 0.0,
+            distance: 10.0,
+        }
     }
 }
 

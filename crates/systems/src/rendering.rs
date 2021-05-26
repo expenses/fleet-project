@@ -196,7 +196,7 @@ pub fn debug_render_targets(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     query.for_each(|(position, command)| {
-        if let &Command::Attack(target) = command {
+        if let Command::Attack(target) = *command {
             if let Ok(target_pos) = positions.get(target) {
                 lines_buffer.stage(&[
                     BackgroundVertex {

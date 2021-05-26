@@ -415,8 +415,10 @@ pub fn count_selected(
 ) {
     let print = |prefix, counts: [u32; Models::COUNT]| {
         for i in 0..Models::COUNT {
-            if counts[i] > 0 {
-                println!("{} {:?}s: {}", prefix, Models::ARRAY[i], counts[i])
+            let count = counts[i];
+
+            if count > 0 {
+                println!("{} {:?}s: {}", prefix, Models::ARRAY[i], count)
             }
         }
     };
