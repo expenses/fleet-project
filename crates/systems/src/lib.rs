@@ -416,19 +416,19 @@ pub fn count_selected(
 ) {
     let mut section = glyph_brush::OwnedSection::default();
 
-    let print = |mut section: glyph_brush::OwnedSection, prefix, counts: [u32; Models::COUNT]| {
+    let print = |mut section: glyph_brush::OwnedSection,
+                 prefix,
+                 colour,
+                 counts: [u32; Models::COUNT]| {
         for i in 0..Models::COUNT {
             let count = counts[i];
 
             if count > 0 {
+                section = section.add_text(glyph_brush::OwnedText::new(prefix).with_color(colour));
+
                 section = section.add_text(
-                    glyph_brush::OwnedText::new(&format!(
-                        "{} {:?}s: {}\n",
-                        prefix,
-                        Models::ARRAY[i],
-                        count
-                    ))
-                    .with_color([1.0; 4]),
+                    glyph_brush::OwnedText::new(&format!(" {:?}s: {}\n", Models::ARRAY[i], count))
+                        .with_color([1.0; 4]),
                 );
             }
         }
@@ -436,9 +436,24 @@ pub fn count_selected(
         section
     };
 
-    section = print(section, "Friendly", count(friendly.iter()));
-    section = print(section, "Neutral", count(neutral.iter()));
-    section = print(section, "Enemy", count(enemy.iter()));
+    section = print(
+        section,
+        "Friendly",
+        [0.25, 1.0, 0.25, 1.0],
+        count(friendly.iter()),
+    );
+    section = print(
+        section,
+        "Neutral",
+        [0.25, 0.25, 1.0, 1.0],
+        count(neutral.iter()),
+    );
+    section = print(
+        section,
+        "Enemy",
+        [1.0, 0.25, 0.25, 1.0],
+        count(enemy.iter()),
+    );
 
     glyph_brush.queue(&section);
 }
