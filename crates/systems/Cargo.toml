@@ -11,5 +11,8 @@ bytemuck = "1.5.1"
 components-and-resources = { path = "../components-and-resources/" }
 glyph_brush = "0.7.2"
 parking_lot = "0.11.1"
-profiling = { version = "1.0.1", features = ["profile-with-tracy"] }
+profiling = "1.0.1"
 ultraviolet = "0.8.1"
+
+[features]
+tracy = ["profiling/profile-with-tracy"]

@@ -29,6 +29,10 @@ components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
 wgpu_glyph = "0.12.0"
 
+[features]
+default = []
+tracy = ["systems/tracy"]
+
 [workspace]
 members = [
     ".",
@@ -46,3 +50,6 @@ opt-level = 3
 
 [profile.release]
 #debug = true
+
+#lto = 'fat'
+#codegen-units = 1

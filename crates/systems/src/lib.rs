@@ -156,32 +156,46 @@ pub fn handle_left_drag(
     }
 }
 
-type SelectedFilter = (With<Selected>, With<Friendly>);
-
 pub fn handle_right_clicks(
     mut commands: Commands,
-    selected: Query<Entity, SelectedFilter>,
+    selected: Query<Entity, (With<Selected>, With<Friendly>)>,
     mouse_button: Res<MouseState>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
     ray_plane_point: Res<RayPlanePoint>,
+    ship_under_cursor: Res<ShipUnderCursor>,
+    enemies: Query<&Enemy>,
+    can_attack: Query<Entity, (With<Selected>, With<Friendly>, With<CanAttack>)>,
 ) {
     if mouse_button.right_state.was_clicked() {
-        *mouse_mode = match *mouse_mode {
-            MouseMode::Normal => match average_selected_position.0 {
-                Some(avg) => MouseMode::Movement { plane_y: avg.y },
-                _ => MouseMode::Normal,
-            },
-            MouseMode::Movement { .. } => {
-                if let Some(point) = ray_plane_point.0 {
-                    selected.for_each(|entity| {
-                        commands.entity(entity).insert(Command::MoveTo(point));
+        match ship_under_cursor.0 {
+            Some(target_entity) => {
+                if enemies.get(target_entity).is_ok() {
+                    can_attack.for_each(|entity| {
+                        commands.entity(entity).insert(Command::Attack(target_entity));
                     });
                 }
 
-                MouseMode::Normal
+                *mouse_mode = MouseMode::Normal
+            },
+            None => {
+                *mouse_mode = match *mouse_mode {
+                    MouseMode::Normal => match average_selected_position.0 {
+                        Some(avg) => MouseMode::Movement { plane_y: avg.y },
+                        _ => MouseMode::Normal,
+                    },
+                    MouseMode::Movement { .. } => {
+                        if let Some(point) = ray_plane_point.0 {
+                            selected.for_each(|entity| {
+                                commands.entity(entity).insert(Command::MoveTo(point));
+                            });
+                        }
+
+                        MouseMode::Normal
+                    }
+                };
             }
-        };
+        }
     }
 }
 
@@ -374,7 +388,7 @@ fn get_scale(scale: Option<&Scale>) -> f32 {
 
 pub fn calculate_average_selected_position(
     mut average_selected_position: ResMut<AverageSelectedPosition>,
-    selected_positions: Query<&Position, SelectedFilter>,
+    selected_positions: Query<&Position, (With<Selected>, With<Friendly>)>,
 ) {
     average_selected_position.0 = average(selected_positions.iter().map(|pos| pos.0));
 }

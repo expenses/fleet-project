@@ -1,4 +1,4 @@
-use crate::get_scale;
+use super::get_scale;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::gpu_structs::{

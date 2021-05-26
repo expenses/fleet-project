@@ -77,3 +77,5 @@ pub enum Command {
     Attack(Entity),
     MoveTo(Vec3),
 }
+
+pub struct CanAttack;

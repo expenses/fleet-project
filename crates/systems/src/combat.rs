@@ -1,4 +1,4 @@
-use crate::get_scale;
+use super::get_scale;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
@@ -72,8 +72,8 @@ pub fn collide_projectiles<Side>(
 
 #[profiling::function]
 pub fn choose_enemy_target<SideA, SideB>(
-    query: Query<(Entity, &Position, &AgroRange), (With<SideA>, Without<Command>)>,
-    candidates: Query<(Entity, &Position), (With<SideB>, With<Command>)>,
+    query: Query<(Entity, &Position, &AgroRange), (With<SideA>, Without<Command>, With<CanAttack>)>,
+    candidates: Query<(Entity, &Position), With<SideB>>,
     mut commands: Commands,
 ) where
     SideA: Send + Sync + 'static,
