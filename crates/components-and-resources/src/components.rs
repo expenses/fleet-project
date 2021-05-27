@@ -78,6 +78,7 @@ pub enum Command {
     Interact { target: Entity, ty: InteractionType },
 }
 
+#[derive(Copy, Clone)]
 pub enum MoveType {
     Normal,
     Attack,
