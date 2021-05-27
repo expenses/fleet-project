@@ -15,6 +15,7 @@ pub struct KeyboardState {
     pub pause: Tapped,
     pub unload: Tapped,
     pub attack_move: bool,
+    pub escape: Tapped,
 }
 
 #[derive(Default)]
@@ -44,6 +45,7 @@ impl KeyboardState {
             VirtualKeyCode::P => self.pause.handle(pressed),
             VirtualKeyCode::U => self.unload.handle(pressed),
             VirtualKeyCode::A => self.attack_move = pressed,
+            VirtualKeyCode::Escape => self.escape.handle(pressed),
             _ => {}
         }
     }
@@ -53,6 +55,7 @@ impl KeyboardState {
         self.stop.reset();
         self.pause.reset();
         self.unload.reset();
+        self.escape.reset();
     }
 
     pub fn move_camera(&self, camera: &mut Camera, orbit: &Orbit) -> bool {

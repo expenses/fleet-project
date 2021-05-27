@@ -107,13 +107,16 @@ pub fn handle_left_click(
     keyboard_state: Res<KeyboardState>,
 ) {
     if mouse_button.left_state.was_clicked() {
+        if matches!(*mouse_mode, MouseMode::Movement { .. }) {
+            *mouse_mode = MouseMode::Normal;
+            return;
+        }
+
         if !keyboard_state.shift {
             selected.for_each(|entity| {
                 commands.entity(entity).remove::<Selected>();
             });
         }
-
-        *mouse_mode = MouseMode::Normal;
 
         if let Some(entity) = ship_under_cursor.0 {
             if keyboard_state.shift && selected.get(entity).is_ok() {
@@ -278,6 +281,7 @@ pub fn handle_keys(
     mut paused: ResMut<Paused>,
     mut carrying: Query<(&Position, &mut Carrying), SelectedFriendly>,
     mut rng: ResMut<SmallRng>,
+    mut mouse_mode: ResMut<MouseMode>,
 ) {
     if keyboard_state.stop.0 {
         selected_moving.for_each(|entity| {
@@ -293,6 +297,10 @@ pub fn handle_keys(
         carrying.for_each_mut(|(pos, mut carrying)| {
             unload(pos.0, &mut carrying, &mut *rng, &mut commands);
         })
+    }
+
+    if keyboard_state.escape.0 {
+        *mouse_mode = MouseMode::Normal;
     }
 }
 
