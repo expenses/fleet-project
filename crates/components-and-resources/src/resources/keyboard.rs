@@ -14,6 +14,7 @@ pub struct KeyboardState {
     pub stop: Tapped,
     pub pause: Tapped,
     pub unload: Tapped,
+    pub attack_move: bool,
 }
 
 #[derive(Default)]
@@ -42,6 +43,7 @@ impl KeyboardState {
             VirtualKeyCode::S => self.stop.handle(pressed),
             VirtualKeyCode::P => self.pause.handle(pressed),
             VirtualKeyCode::U => self.unload.handle(pressed),
+            VirtualKeyCode::A => self.attack_move = pressed,
             _ => {}
         }
     }

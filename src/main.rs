@@ -535,7 +535,7 @@ fn main() -> anyhow::Result<()> {
                 } else if keyboard_state.shift {
                     let mut mouse_mode = world.get_resource_mut::<resources::MouseMode>().unwrap();
 
-                    if let resources::MouseMode::Movement { plane_y } = &mut *mouse_mode {
+                    if let resources::MouseMode::Movement { plane_y, .. } = &mut *mouse_mode {
                         *plane_y -= delta.y / 10.0;
                     }
                 }

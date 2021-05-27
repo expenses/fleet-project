@@ -145,46 +145,52 @@ pub fn render_movement_circle(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
     ray_plane_point: Res<RayPlanePoint>,
     average_selected_position: Res<AverageSelectedPosition>,
+    mouse_mode: Res<MouseMode>,
 ) {
-    if let (Some(avg), Some(point)) = (average_selected_position.0, ray_plane_point.0) {
+    if let (Some(avg), Some(point), MouseMode::Movement { plane_y, ty }) =
+        (average_selected_position.0, ray_plane_point.0, &*mouse_mode)
+    {
         let mut circle_center = avg;
-        circle_center.y = point.y;
+        circle_center.y = *plane_y;
 
         let scale = (point - circle_center).mag();
 
-        let green = Vec3::unit_y();
-        let green_alpha = ultraviolet::Vec4::new(0.0, 1.0, 0.0, 0.15);
+        let colour = match ty {
+            MoveType::Normal => Vec3::unit_y(),
+            MoveType::Attack => Vec3::unit_x(),
+        };
+        let colour_with_alpha = ultraviolet::Vec4::new(colour.x, colour.y, colour.z, 0.15);
 
         circle_instances.stage(&[CircleInstance {
             translation: circle_center,
             scale,
-            colour: green_alpha,
+            colour: colour_with_alpha,
         }]);
 
         lines_buffer.stage(&[
             BackgroundVertex {
                 position: avg,
-                colour: green,
+                colour,
             },
             BackgroundVertex {
                 position: point,
-                colour: green,
+                colour,
             },
             BackgroundVertex {
                 position: point,
-                colour: green,
+                colour,
             },
             BackgroundVertex {
                 position: circle_center,
-                colour: green,
+                colour,
             },
             BackgroundVertex {
                 position: circle_center,
-                colour: green,
+                colour,
             },
             BackgroundVertex {
                 position: avg,
-                colour: green,
+                colour,
             },
         ])
     }

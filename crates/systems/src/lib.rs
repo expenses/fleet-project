@@ -171,6 +171,7 @@ pub fn handle_right_clicks(
     can_carry: Query<&Carrying>,
     can_attack: Query<Entity, (SelectedFriendly, With<CanAttack>)>,
     can_be_carried: Query<Entity, (SelectedFriendly, With<CanBeCarried>)>,
+    keyboard_state: Res<KeyboardState>,
 ) {
     if mouse_button.right_state.was_clicked() {
         match ship_under_cursor.0 {
@@ -196,16 +197,22 @@ pub fn handle_right_clicks(
             None => {
                 *mouse_mode = match *mouse_mode {
                     MouseMode::Normal => match average_selected_position.0 {
-                        Some(avg) => MouseMode::Movement { plane_y: avg.y },
+                        Some(avg) => {
+                            let ty = if keyboard_state.attack_move {
+                                MoveType::Attack
+                            } else {
+                                MoveType::Normal
+                            };
+                            MouseMode::Movement { plane_y: avg.y, ty }
+                        }
                         _ => MouseMode::Normal,
                     },
-                    MouseMode::Movement { .. } => {
+                    MouseMode::Movement { ty, .. } => {
                         if let Some(point) = ray_plane_point.0 {
                             selected.for_each(|entity| {
-                                commands.entity(entity).insert(Command::MoveTo {
-                                    point,
-                                    ty: MoveType::Normal,
-                                });
+                                commands
+                                    .entity(entity)
+                                    .insert(Command::MoveTo { point, ty });
                             });
                         }
 
@@ -243,7 +250,7 @@ pub fn update_ray_plane_point(
     mut ray_plane_point: ResMut<RayPlanePoint>,
 ) {
     ray_plane_point.0 = match *mouse_mode {
-        MouseMode::Movement { plane_y } => ray
+        MouseMode::Movement { plane_y, .. } => ray
             .y_plane_intersection(plane_y)
             .map(|t| ray.get_intersection_point(t)),
         MouseMode::Normal => None,

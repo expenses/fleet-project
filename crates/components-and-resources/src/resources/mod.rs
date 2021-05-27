@@ -8,7 +8,7 @@ pub use mouse::{MouseButtonState, MouseState};
 pub use rand::rngs::SmallRng;
 pub use ray_collisions::{BoundingBox, Projectile, Ray, SelectionFrustum};
 
-use crate::components::ModelId;
+use crate::components::{ModelId, MoveType};
 use crate::model::Model;
 use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
@@ -18,10 +18,9 @@ pub type GlyphBrush = wgpu_glyph::GlyphBrush<(), FontRef<'static>>;
 
 pub struct Paused(pub bool);
 
-#[derive(Clone, Copy)]
 pub enum MouseMode {
     Normal,
-    Movement { plane_y: f32 },
+    Movement { plane_y: f32, ty: MoveType },
 }
 
 #[derive(Default)]
