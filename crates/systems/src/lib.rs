@@ -491,11 +491,15 @@ pub fn apply_velocity(
     });
 }
 
+type SelectedUncarried = (With<Selected>, With<Position>);
+
 pub fn count_selected(
-    friendly: Query<&ModelId, (With<Selected>, With<Friendly>)>,
-    neutral: Query<&ModelId, (With<Selected>, Without<Friendly>, Without<Enemy>)>,
-    enemy: Query<&ModelId, (With<Selected>, With<Enemy>)>,
+    friendly: Query<&ModelId, (SelectedUncarried, With<Friendly>)>,
+    neutral: Query<&ModelId, (SelectedUncarried, Without<Friendly>, Without<Enemy>)>,
+    enemy: Query<&ModelId, (SelectedUncarried, With<Enemy>)>,
     mut glyph_brush: ResMut<GlyphBrush>,
+    friendly_carrying: Query<&Carrying, (SelectedUncarried, With<Friendly>)>,
+    all_models: Query<&ModelId>,
 ) {
     let mut section = glyph_brush::OwnedSection::default();
 
@@ -524,6 +528,17 @@ pub fn count_selected(
         "Friendly",
         [0.25, 1.0, 0.25, 1.0],
         count(friendly.iter()),
+    );
+    section = print(
+        section,
+        "Friendly (being carried)",
+        [0.25, 1.0, 0.25, 1.0],
+        count(
+            friendly_carrying
+                .iter()
+                .flat_map(|carrying| &carrying.0)
+                .filter_map(|&entity| all_models.get(entity).ok()),
+        ),
     );
     section = print(
         section,
