@@ -251,6 +251,11 @@ fn main() -> anyhow::Result<()> {
         "lines",
         wgpu::BufferUsage::VERTEX,
     ));
+    world.insert_resource(resources::GpuBuffer::<LaserVertex>::new(
+        &device,
+        "lasers",
+        wgpu::BufferUsage::VERTEX,
+    ));
     world.insert_resource(resources::GpuBuffer::<CircleInstance>::new(
         &device,
         "circle instances",
@@ -343,6 +348,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
+        .with_system(systems::clear_buffer::<LaserVertex>.system())
         .with_system(systems::clear_buffer::<BackgroundVertex>.system())
         .with_system(systems::clear_buffer::<RangeInstance>.system())
         .with_system(systems::clear_buffer::<Vertex2D>.system())
@@ -441,6 +447,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::update_keyboard_state.system())
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
+        .with_system(systems::upload_buffer::<LaserVertex>.system())
         .with_system(systems::upload_buffer::<BackgroundVertex>.system())
         .with_system(systems::upload_buffer::<RangeInstance>.system())
         .with_system(systems::upload_buffer::<Vertex2D>.system())

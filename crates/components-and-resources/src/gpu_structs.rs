@@ -32,6 +32,13 @@ pub struct BackgroundVertex {
 }
 
 #[repr(C)]
+#[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct LaserVertex {
+    pub position: Vec3,
+    pub colour: Vec3,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BlurSettings {
     pub scale: f32,

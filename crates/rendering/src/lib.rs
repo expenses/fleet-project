@@ -231,6 +231,7 @@ pub struct Pipelines {
     circle_outline: wgpu::RenderPipeline,
     z_facing_circle_outline: wgpu::RenderPipeline,
     lines_2d: wgpu::RenderPipeline,
+    lasers: wgpu::RenderPipeline,
 }
 
 impl Pipelines {
@@ -535,6 +536,36 @@ impl Pipelines {
                     multisample: wgpu::MultisampleState::default(),
                 })
             },
+            lasers: {
+                let fs_flat_colour_bloom = device.create_shader_module(&wgpu::include_spirv!(
+                    "../shaders/compiled/flat_colour_bloom.frag.spv"
+                ));
+
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("lasers pipeline"),
+                    layout: Some(&perspective_view_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vs_flat_colour,
+                        entry_point: "main",
+                        buffers: &[background_vertex_buffer_layout.clone()],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &fs_flat_colour_bloom,
+                        entry_point: "main",
+                        targets: &[
+                            HDR_FRAMEBUFFER_FORMAT.into(),
+                            EFFECT_BUFFER_FORMAT.into(),
+                            ignore_colour_state(EFFECT_BUFFER_FORMAT),
+                        ],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(depth_write.clone()),
+                    multisample: wgpu::MultisampleState::default(),
+                })
+            },
             lines: {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("lines pipeline"),
@@ -542,7 +573,7 @@ impl Pipelines {
                     vertex: wgpu::VertexState {
                         module: &vs_flat_colour,
                         entry_point: "main",
-                        buffers: &[background_vertex_buffer_layout],
+                        buffers: &[background_vertex_buffer_layout.clone()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &fs_flat_colour,

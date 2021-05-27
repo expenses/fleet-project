@@ -1,8 +1,8 @@
 use crate::{Pipelines, Resizables};
 use components_and_resources::components::ModelId;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, PushConstants, RangeInstance,
-    Vertex2D,
+    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, LaserVertex, PushConstants,
+    RangeInstance, Vertex2D,
 };
 use components_and_resources::resources;
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -35,10 +35,11 @@ pub fn run_render_passes(
 ) {
     let ship_buffer = world.get_resource::<resources::ShipBuffer>().unwrap();
     let models = world.get_resource::<resources::Models>().unwrap();
-    let line_buffer = world
-        .get_resource::<resources::GpuBuffer<BackgroundVertex>>()
-        .unwrap();
     let perspective_view = world.get_resource::<resources::PerspectiveView>().unwrap();
+
+    let laser_buffer = world
+        .get_resource::<resources::GpuBuffer<LaserVertex>>()
+        .unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("main render pass"),
@@ -108,6 +109,19 @@ pub fn run_render_passes(
 
             offset += num_instances;
         }
+    }
+
+    let (laser_buffer, num_laser_vertices) = laser_buffer.slice();
+
+    if num_laser_vertices > 0 {
+        render_pass.set_pipeline(&pipelines.lasers);
+        render_pass.set_vertex_buffer(0, laser_buffer);
+        render_pass.set_push_constants(
+            wgpu::ShaderStage::VERTEX,
+            0,
+            bytemuck::bytes_of(&perspective_view.perspective_view),
+        );
+        render_pass.draw(0..num_laser_vertices, 0..1);
     }
 
     render_pass.set_pipeline(&pipelines.background);
@@ -209,6 +223,10 @@ pub fn run_render_passes(
 
     let lines_2d_buffer = world
         .get_resource::<resources::GpuBuffer<Vertex2D>>()
+        .unwrap();
+
+    let line_buffer = world
+        .get_resource::<resources::GpuBuffer<BackgroundVertex>>()
         .unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

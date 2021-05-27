@@ -2,7 +2,7 @@ use super::get_scale;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, CircleInstance, Instance, RangeInstance, Vertex2D,
+    BackgroundVertex, CircleInstance, Instance, LaserVertex, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
 use ultraviolet::{Vec2, Vec3, Vec4};
@@ -122,19 +122,21 @@ pub fn debug_render_find_ship_under_cursor(
 
 pub fn render_projectiles(
     query: Query<&Projectile>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut lines_buffer: ResMut<GpuBuffer<LaserVertex>>,
 ) {
     query.for_each(|projectile| {
         let (start, end) = projectile.line_points(-0.1);
 
+        let colour = Vec3::new(0.75, 0.0, 1.0) * 0.75;
+
         lines_buffer.stage(&[
-            BackgroundVertex {
+            LaserVertex {
                 position: start,
-                colour: Vec3::new(0.75, 0.0, 1.0),
+                colour,
             },
-            BackgroundVertex {
+            LaserVertex {
                 position: end,
-                colour: Vec3::new(0.75, 0.0, 1.0),
+                colour,
             },
         ]);
     })
