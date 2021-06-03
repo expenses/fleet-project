@@ -220,9 +220,7 @@ pub fn handle_right_clicks(
                     MouseMode::Movement { ty, .. } => {
                         if let Some(point) = ray_plane_point.0 {
                             query_set.q0_mut().for_each_mut(|mut queue| {
-                                if !keyboard_state.shift {
-                                    queue.0.clear();
-                                }
+                                queue.0.clear();
                                 queue.0.push_back(Command::MoveTo { point, ty });
                             });
                         }

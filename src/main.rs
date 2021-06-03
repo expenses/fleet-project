@@ -183,7 +183,7 @@ fn main() -> anyhow::Result<()> {
         let side = rng.gen_range(0.0..1.0) > 0.5;
 
         let position = Vec3::new(
-            rng.gen_range(-100.0..100.0) + side as u8 as f32 * 250.0,
+            rng.gen_range(-100.0..100.0) + side as u8 as f32 * 500.0,
             rng.gen_range(-100.0..100.0),
             rng.gen_range(-100.0..100.0),
         );
