@@ -369,7 +369,7 @@ fn main() -> anyhow::Result<()> {
     // Flush the command buffer adding `MovingTo`s to ships.
     let stage_3 = bevy_ecs::schedule::SystemStage::parallel()
         // Dependent on `handle_right_clicks_system`.
-        .with_system(systems::set_rotation_from_moving_to.system().label("rot"))
+        .with_system(systems::set_rotation_from_velocity.system().label("rot"))
         // Dependent on updated rotations.
         .with_system(
             systems::update_ship_rotation_matrix
