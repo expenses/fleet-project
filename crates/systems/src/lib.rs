@@ -305,26 +305,28 @@ pub fn handle_keys(
 }
 
 pub fn handle_destruction(
-    mut query: Query<(Entity, &Position, Option<&mut Carrying>), With<Destroyed>>,
+    mut query: Query<(Entity, &Position, &Health, Option<&mut Carrying>)>,
     mut rng: ResMut<SmallRng>,
     mut commands: Commands,
     total_time: Res<TotalTime>,
 ) {
-    query.for_each_mut(|(entity, pos, carrying)| {
-        if let Some(mut carrying) = carrying {
-            unload(pos.0, &mut carrying, &mut *rng, &mut commands);
+    query.for_each_mut(|(entity, pos, health, carrying)| {
+        if health.0 == 0 {
+            if let Some(mut carrying) = carrying {
+                unload(pos.0, &mut carrying, &mut *rng, &mut commands);
+            }
+
+            commands.entity(entity).despawn();
+
+            commands.spawn_bundle((
+                Position(pos.0),
+                RotationMatrix::default(),
+                ModelId::Explosion,
+                Scale(0.0),
+                AliveUntil(total_time.0 + 2.5),
+                Expands,
+            ));
         }
-
-        commands.entity(entity).despawn();
-
-        commands.spawn_bundle((
-            Position(pos.0),
-            RotationMatrix::default(),
-            ModelId::Explosion,
-            Scale(0.0),
-            AliveUntil(total_time.0 + 2.5),
-            Expands,
-        ));
     })
 }
 

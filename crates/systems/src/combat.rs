@@ -21,12 +21,13 @@ pub fn collide_projectiles<Side>(
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     commands: Commands,
-    indestructible: Query<&Indestructible>,
+    health: Query<&mut Health>,
     task_pool: Res<bevy_tasks::TaskPool>,
 ) where
     Side: Send + Sync + 'static,
 {
     let commands = parking_lot::Mutex::new(commands);
+    let health = parking_lot::Mutex::new(health);
 
     projectiles.par_for_each(&task_pool, 16, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
@@ -47,7 +48,7 @@ pub fn collide_projectiles<Side>(
                     .locate_with_selection_function_with_data(ray)
                     .map(move |(_, scaled_t)| (ship_entity, scaled_t))
             })
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
@@ -55,8 +56,8 @@ pub fn collide_projectiles<Side>(
             let mut commands = commands.lock();
 
             commands.entity(entity).despawn();
-            if indestructible.get(ship_entity).is_err() {
-                commands.entity(ship_entity).insert(Destroyed);
+            if let Ok(mut health) = health.lock().get_mut(ship_entity) {
+                health.0 = health.0.saturating_sub(10);
             }
             commands.spawn_bundle((
                 Position(position),

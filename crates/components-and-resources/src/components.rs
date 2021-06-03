@@ -63,8 +63,6 @@ pub struct Friendly;
 #[derive(Default)]
 pub struct Enemy;
 
-pub struct Indestructible;
-
 pub struct Evading(pub Entity);
 
 pub struct Velocity(pub Vec3);
@@ -93,4 +91,4 @@ pub struct CanAttack;
 #[derive(Default)]
 pub struct Carrying(pub Vec<Entity>);
 pub struct CanBeCarried;
-pub struct Destroyed;
+pub struct Health(pub u16);
