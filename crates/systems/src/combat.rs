@@ -1,4 +1,4 @@
-use super::get_scale;
+use super::{get_scale, spawn_explosion};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
@@ -59,14 +59,7 @@ pub fn collide_projectiles<Side>(
             if let Ok(mut health) = health.lock().get_mut(ship_entity) {
                 health.0 = health.0.saturating_sub(10);
             }
-            commands.spawn_bundle((
-                Position(position),
-                RotationMatrix::default(),
-                ModelId::Explosion,
-                Scale(0.0),
-                AliveUntil(total_time.0 + 2.5),
-                Expands,
-            ));
+            spawn_explosion(position, total_time.0, &mut commands);
         }
     });
 }

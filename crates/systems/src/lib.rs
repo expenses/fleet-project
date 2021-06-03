@@ -325,17 +325,20 @@ pub fn handle_destruction(
             }
 
             commands.entity(entity).despawn();
-
-            commands.spawn_bundle((
-                Position(pos.0),
-                RotationMatrix::default(),
-                ModelId::Explosion,
-                Scale(0.0),
-                AliveUntil(total_time.0 + 2.5),
-                Expands,
-            ));
+            spawn_explosion(pos.0, total_time.0, &mut commands);
         }
     })
+}
+
+fn spawn_explosion(pos: Vec3, total_time: f32, commands: &mut Commands) {
+    commands.spawn_bundle((
+        Position(pos),
+        RotationMatrix::default(),
+        ModelId::Explosion,
+        Scale(0.0),
+        AliveUntil(total_time + 2.5),
+        Expands,
+    ));
 }
 
 fn unload(pos: Vec3, carrying: &mut Carrying, rng: &mut SmallRng, commands: &mut Commands) {
