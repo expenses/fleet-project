@@ -73,54 +73,65 @@ pub fn collide_projectiles<Side>(
 
 #[profiling::function]
 pub fn choose_enemy_target<SideA, SideB>(
-    query: Query<(Entity, &Position, &AgroRange), (With<SideA>, Without<Command>, With<CanAttack>)>,
+    mut query: Query<
+        (Entity, &Position, &AgroRange, &mut CommandQueue),
+        (With<SideA>, With<CanAttack>),
+    >,
     candidates: Query<(Entity, &Position), With<SideB>>,
     mut commands: Commands,
 ) where
     SideA: Send + Sync + 'static,
     SideB: Send + Sync + 'static,
 {
-    query.for_each(|(entity, pos, agro_range)| {
-        let agro_range_sq = agro_range.0 * agro_range.0;
+    query.for_each_mut(|(entity, pos, agro_range, mut queue)| {
+        if matches!(
+            queue.0.front(),
+            None | Some(Command::MoveTo {
+                ty: MoveType::Attack,
+                ..
+            }),
+        ) {
+            let agro_range_sq = agro_range.0 * agro_range.0;
 
-        let target = candidates
-            .iter()
-            .filter_map(|(target_entity, target_pos)| {
-                let dist_sq = (target_pos.0 - pos.0).mag_sq();
+            let target = candidates
+                .iter()
+                .filter_map(|(target_entity, target_pos)| {
+                    let dist_sq = (target_pos.0 - pos.0).mag_sq();
 
-                if dist_sq < agro_range_sq {
-                    Some((target_entity, dist_sq))
-                } else {
-                    None
-                }
-            })
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                    if dist_sq < agro_range_sq {
+                        Some((target_entity, dist_sq))
+                    } else {
+                        None
+                    }
+                })
+                .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some((target_entity, _)) = target {
-            commands.entity(entity).insert(Command::Interact {
-                target: target_entity,
-                ty: InteractionType::Attack,
-            });
-            commands.entity(target_entity).insert(Evading(entity));
+            if let Some((target_entity, _)) = target {
+                queue.0.push_front(Command::Interact {
+                    target: target_entity,
+                    ty: InteractionType::Attack,
+                });
+                commands.entity(target_entity).insert(Evading(entity));
+            }
         }
     });
 }
 
 pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
-    mut query: Query<(&Position, &Velocity, &mut RayCooldown, &Command), With<Side>>,
+    mut query: Query<(&Position, &Velocity, &mut RayCooldown, &CommandQueue), With<Side>>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
 ) {
-    query.for_each_mut(|(pos, vel, mut ray_cooldown, command)| {
+    query.for_each_mut(|(pos, vel, mut ray_cooldown, queue)| {
         ray_cooldown.0 = (ray_cooldown.0 - delta_time.0).max(0.0);
 
         if matches!(
-            command,
-            Command::Interact {
+            queue.0.front(),
+            Some(Command::Interact {
                 ty: InteractionType::Attack,
                 ..
-            }
+            })
         ) && ray_cooldown.0 == 0.0
         {
             ray_cooldown.0 = 1.0;

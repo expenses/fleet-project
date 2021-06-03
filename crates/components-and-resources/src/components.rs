@@ -1,5 +1,6 @@
 use crate::resources::BoundingBox;
 use bevy_ecs::prelude::Entity;
+use std::collections::VecDeque;
 use ultraviolet::{Mat3, Rotor3, Vec3};
 
 pub struct Position(pub Vec3);
@@ -70,6 +71,9 @@ pub struct StagingVelocity(pub Vec3);
 pub struct RayCooldown(pub f32);
 
 pub struct AgroRange(pub f32);
+
+#[derive(Default)]
+pub struct CommandQueue(pub VecDeque<Command>);
 
 pub enum Command {
     MoveTo { point: Vec3, ty: MoveType },

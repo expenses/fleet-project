@@ -13,7 +13,7 @@ pub fn run_steering(
         &Position,
         &Velocity,
         &MaxSpeed,
-        Option<&Command>,
+        Option<&mut CommandQueue>,
         Option<&Evading>,
         &mut StagingVelocity,
     )>,
@@ -22,14 +22,14 @@ pub fn run_steering(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
     mut carrying: Query<&mut Carrying>,
 ) {
-    query.for_each_mut(|(entity, pos, vel, max_speed, command, evading, mut sv)| {
+    query.for_each_mut(|(entity, pos, vel, max_speed, queue, evading, mut sv)| {
         let mut steering = Vec3::zero();
         let boid = to_boid((pos, vel, max_speed));
         let max_force = max_speed.0 / 10.0;
 
-        if let Some(command) = command {
-            match command {
-                Command::Interact { target, ty } => {
+        if let Some(mut queue) = queue {
+            match queue.0.front().clone() {
+                Some(Command::Interact { target, ty }) => {
                     if let Ok(target_boid) = boids.get(*target).map(to_boid) {
                         // Because ships are constantly turning, the predicted
                         // point of contact for a ship far away varies a lot, resulting
@@ -57,7 +57,6 @@ pub fn run_steering(
                                 Ok(mut carrying) => {
                                     carrying.0.push(entity);
                                     commands.entity(entity)
-                                        .remove::<Command>()
                                         .remove::<Position>();
                                 },
                                 Err(err) => {
@@ -65,23 +64,24 @@ pub fn run_steering(
                                         "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships: {}",
                                         entity, target, target, err
                                     );
-                                    commands.entity(entity).remove::<Command>();
+                                    queue.0.pop_front();
                                 }
                             }
                         }
                     } else {
-                        commands.entity(entity).remove::<Command>();
+                        queue.0.pop_front();
                     }
                 }
-                Command::MoveTo { point, ty } => {
+                Some(Command::MoveTo { point, .. }) => {
                     let force = boid.seek(*point);
 
                     steering += force;
 
                     if (boid.pos - *point).mag_sq() < max_force {
-                        commands.entity(entity).remove::<Command>();
+                        queue.0.pop_front();
                     }
                 }
+                None => {}
             }
         }
 

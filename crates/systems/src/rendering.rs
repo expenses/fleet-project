@@ -199,17 +199,17 @@ pub fn render_movement_circle(
 }
 
 pub fn debug_render_targets(
-    query: Query<(&Position, &Command), With<Selected>>,
+    query: Query<(&Position, &CommandQueue), With<Selected>>,
     positions: Query<&Position>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
-    query.for_each(|(position, command)| {
-        if let Command::Interact {
+    query.for_each(|(position, queue)| {
+        if let Some(Command::Interact {
             target,
             ty: InteractionType::Attack,
-        } = *command
+        }) = queue.0.front()
         {
-            if let Ok(target_pos) = positions.get(target) {
+            if let Ok(target_pos) = positions.get(*target) {
                 lines_buffer.stage(&[
                     BackgroundVertex {
                         position: position.0,

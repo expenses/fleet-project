@@ -200,6 +200,7 @@ fn main() -> anyhow::Result<()> {
             components::RayCooldown(rng.gen_range(0.0..1.0)),
             components::StagingVelocity(Vec3::zero()),
             components::AgroRange(200.0),
+            components::CommandQueue::default(),
         ));
 
         if rng.gen_range(0.0..1.0) < 0.9 {

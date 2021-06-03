@@ -163,32 +163,39 @@ pub fn handle_left_drag(
 type SelectedFriendly = (With<Selected>, With<Friendly>);
 
 pub fn handle_right_clicks(
-    mut commands: Commands,
-    selected: Query<Entity, SelectedFriendly>,
+    mut query_set: QuerySet<(
+        Query<&mut CommandQueue, SelectedFriendly>,
+        Query<&mut CommandQueue, (SelectedFriendly, With<CanAttack>)>,
+        Query<&mut CommandQueue, (SelectedFriendly, With<CanBeCarried>)>,
+    )>,
+    enemies: Query<&Enemy>,
     mouse_button: Res<MouseState>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
     ray_plane_point: Res<RayPlanePoint>,
     ship_under_cursor: Res<ShipUnderCursor>,
-    enemies: Query<&Enemy>,
     can_carry: Query<&Carrying>,
-    can_attack: Query<Entity, (SelectedFriendly, With<CanAttack>)>,
-    can_be_carried: Query<Entity, (SelectedFriendly, With<CanBeCarried>)>,
     keyboard_state: Res<KeyboardState>,
 ) {
     if mouse_button.right_state.was_clicked() {
         match ship_under_cursor.0 {
             Some(target_entity) => {
                 if enemies.get(target_entity).is_ok() {
-                    can_attack.for_each(|entity| {
-                        commands.entity(entity).insert(Command::Interact {
+                    query_set.q1_mut().for_each_mut(|mut queue| {
+                        if !keyboard_state.shift {
+                            queue.0.clear();
+                        }
+                        queue.0.push_back(Command::Interact {
                             target: target_entity,
                             ty: InteractionType::Attack,
                         });
                     });
                 } else if can_carry.get(target_entity).is_ok() {
-                    can_be_carried.for_each(|entity| {
-                        commands.entity(entity).insert(Command::Interact {
+                    query_set.q2_mut().for_each_mut(|mut queue| {
+                        if !keyboard_state.shift {
+                            queue.0.clear();
+                        }
+                        queue.0.push_back(Command::Interact {
                             target: target_entity,
                             ty: InteractionType::BeCarriedBy,
                         });
@@ -212,10 +219,11 @@ pub fn handle_right_clicks(
                     },
                     MouseMode::Movement { ty, .. } => {
                         if let Some(point) = ray_plane_point.0 {
-                            selected.for_each(|entity| {
-                                commands
-                                    .entity(entity)
-                                    .insert(Command::MoveTo { point, ty });
+                            query_set.q0_mut().for_each_mut(|mut queue| {
+                                if !keyboard_state.shift {
+                                    queue.0.clear();
+                                }
+                                queue.0.push_back(Command::MoveTo { point, ty });
                             });
                         }
 
@@ -275,7 +283,7 @@ pub fn move_camera(
 }
 
 pub fn handle_keys(
-    selected_moving: Query<Entity, With<Selected>>,
+    mut selected_moving: Query<&mut CommandQueue, With<Selected>>,
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
     mut paused: ResMut<Paused>,
@@ -284,8 +292,8 @@ pub fn handle_keys(
     mut mouse_mode: ResMut<MouseMode>,
 ) {
     if keyboard_state.stop.0 {
-        selected_moving.for_each(|entity| {
-            commands.entity(entity).remove::<Command>();
+        selected_moving.for_each_mut(|mut queue| {
+            queue.0.clear();
         });
     }
 
