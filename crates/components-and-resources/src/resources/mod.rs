@@ -14,6 +14,42 @@ use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu_glyph::ab_glyph::FontRef;
 
+#[derive(Default)]
+pub struct UnitButtons(pub Vec<(ModelId, UnitStatus)>);
+
+impl UnitButtons {
+    pub const LINE_HEIGHT: f32 = 18.0;
+    pub const BUTTON_WIDTH: f32 = 150.0;
+}
+
+#[derive(Default)]
+pub struct SelectedButton(pub Option<usize>);
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum UnitStatus {
+    Friendly { carried: bool },
+    Neutral,
+    Enemy,
+}
+
+impl UnitStatus {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Self::Friendly { carried: false } => "Friendly",
+            Self::Friendly { carried: true } => "Friendly (being carried)",
+            Self::Neutral => "Neutral",
+            Self::Enemy => "Enemy",
+        }
+    }
+
+    pub fn from_bools(friendly: bool, enemy: bool, carried: bool) -> Self {
+        match (friendly, enemy) {
+            (true, false) => Self::Friendly { carried },
+            (false, true) => Self::Enemy,
+            _ => Self::Neutral,
+        }
+    }
+}
 pub type GlyphBrush = wgpu_glyph::GlyphBrush<(), FontRef<'static>>;
 
 pub struct Paused(pub bool);

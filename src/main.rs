@@ -334,6 +334,8 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::Paused(false));
     world.insert_resource(bevy_tasks::TaskPool::new());
     world.insert_resource(resources::SmallRng::from_entropy());
+    world.insert_resource(resources::UnitButtons::default());
+    world.insert_resource(resources::SelectedButton::default());
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
@@ -349,6 +351,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::apply_velocity.system())
         .with_system(systems::spawn_projectile_from_ships::<components::Friendly>.system())
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
+        .with_system(systems::count_selected.system())
+        .with_system(systems::set_selected_button.system())
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())
@@ -445,11 +449,13 @@ fn main() -> anyhow::Result<()> {
 
     let final_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::handle_destruction.system())
-        .with_system(systems::count_selected.system())
         .with_system(systems::update_mouse_state.system())
         .with_system(systems::update_keyboard_state.system())
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
+        .with_system(systems::render_buttons.system());
+
+    let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::upload_buffer::<LaserVertex>.system())
         .with_system(systems::upload_buffer::<BackgroundVertex>.system())
         .with_system(systems::upload_buffer::<RangeInstance>.system())
@@ -460,7 +466,8 @@ fn main() -> anyhow::Result<()> {
         .with_stage("stage 1", stage_1)
         .with_stage_after("stage 1", "stage 2", stage_2)
         .with_stage_after("stage 2", "stage 3", stage_3)
-        .with_stage_after("stage 3", "final stage", final_stage);
+        .with_stage_after("stage 3", "final stage", final_stage)
+        .with_stage_after("final stage", "buffer upload stage", upload_buffer_stage);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {

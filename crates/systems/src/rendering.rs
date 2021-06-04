@@ -244,15 +244,8 @@ pub fn render_drag_box(
     mut lines_2d: ResMut<GpuBuffer<Vertex2D>>,
 ) {
     if let Some(start) = mouse_state.left_state.is_being_dragged() {
-        let dimensions = dimensions.to_vec();
-
-        let to_wgpu = |pos: Vec2| {
-            let scaled = pos / dimensions * 2.0;
-            Vec2::new(scaled.x - 1.0, 1.0 - scaled.y)
-        };
-
-        let start = to_wgpu(start);
-        let end = to_wgpu(mouse_state.position);
+        let start = to_wgpu(start, &dimensions);
+        let end = to_wgpu(mouse_state.position, &dimensions);
 
         lines_2d.stage(&[
             Vertex2D {
@@ -288,5 +281,47 @@ pub fn render_drag_box(
                 colour: Vec3::one(),
             },
         ]);
+    }
+}
+
+fn to_wgpu(point: Vec2, dimensions: &Dimensions) -> Vec2 {
+    let dimensions = dimensions.to_vec();
+
+    let scaled = point / dimensions * 2.0;
+    Vec2::new(scaled.x - 1.0, 1.0 - scaled.y)
+}
+
+pub fn render_buttons(
+    buttons: Res<UnitButtons>,
+    selected_button: Res<SelectedButton>,
+    mut lines_2d: ResMut<GpuBuffer<Vertex2D>>,
+    dimensions: Res<Dimensions>,
+) {
+    for i in 0..buttons.0.len() {
+        let colour = if selected_button.0 == Some(i) {
+            Vec3::one()
+        } else {
+            Vec3::unit_x()
+        };
+
+        lines_2d.stage(&[
+            Vertex2D {
+                pos: to_wgpu(
+                    Vec2::new(0.0, (i + 1) as f32 * UnitButtons::LINE_HEIGHT),
+                    &dimensions,
+                ),
+                colour,
+            },
+            Vertex2D {
+                pos: to_wgpu(
+                    Vec2::new(
+                        UnitButtons::BUTTON_WIDTH,
+                        (i + 1) as f32 * UnitButtons::LINE_HEIGHT,
+                    ),
+                    &dimensions,
+                ),
+                colour,
+            },
+        ])
     }
 }

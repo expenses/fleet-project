@@ -105,8 +105,32 @@ pub fn handle_left_click(
     ship_under_cursor: Res<ShipUnderCursor>,
     mut mouse_mode: ResMut<MouseMode>,
     keyboard_state: Res<KeyboardState>,
+    unit_buttons: Res<UnitButtons>,
+    selected_button: Res<SelectedButton>,
+    button_selection: Query<(Entity, &ModelId, Option<&Friendly>, Option<&Enemy>)>,
 ) {
     if mouse_button.left_state.was_clicked() {
+        if let Some(button_index) = selected_button.0 {
+            if let Some((button_model, button_status)) = unit_buttons.0.get(button_index) {
+                let is_being_carried =
+                    matches!(button_status, UnitStatus::Friendly { carried: true });
+                // can't handle this case yet
+                if is_being_carried {
+                    return;
+                }
+                button_selection.for_each(|(entity, model_id, friendly, enemy)| {
+                    let matches = model_id == button_model
+                        && button_status
+                            == &UnitStatus::from_bools(friendly.is_some(), enemy.is_some(), false);
+
+                    if !matches {
+                        commands.entity(entity).remove::<Selected>();
+                    }
+                });
+            }
+            return;
+        }
+
         if matches!(*mouse_mode, MouseMode::Movement { .. }) {
             *mouse_mode = MouseMode::Normal;
             return;
@@ -516,18 +540,23 @@ pub fn count_selected(
     mut glyph_brush: ResMut<GlyphBrush>,
     friendly_carrying: Query<&Carrying, (SelectedUncarried, With<Friendly>)>,
     all_models: Query<&ModelId>,
+    mut buttons: ResMut<UnitButtons>,
 ) {
     let mut section = glyph_brush::OwnedSection::default();
+    buttons.0.clear();
 
-    let print = |mut section: glyph_brush::OwnedSection,
-                 prefix,
-                 colour,
-                 counts: [u32; Models::COUNT]| {
-        for i in 0..Models::COUNT {
+    let mut print = |mut section: glyph_brush::OwnedSection,
+                     status: UnitStatus,
+                     colour,
+                     counts: [u32; Models::COUNT]| {
+        for model_id in Models::ARRAY.iter().cloned() {
+            let i = model_id as usize;
             let count = counts[i];
 
             if count > 0 {
-                section = section.add_text(glyph_brush::OwnedText::new(prefix).with_color(colour));
+                buttons.0.push((model_id, status));
+                section = section
+                    .add_text(glyph_brush::OwnedText::new(status.to_str()).with_color(colour));
 
                 section = section.add_text(
                     glyph_brush::OwnedText::new(&format!(" {:?}s: {}\n", Models::ARRAY[i], count))
@@ -541,13 +570,13 @@ pub fn count_selected(
 
     section = print(
         section,
-        "Friendly",
+        UnitStatus::Friendly { carried: false },
         [0.25, 1.0, 0.25, 1.0],
         count(friendly.iter()),
     );
     section = print(
         section,
-        "Friendly (being carried)",
+        UnitStatus::Friendly { carried: true },
         [0.25, 1.0, 0.25, 1.0],
         count(
             friendly_carrying
@@ -558,13 +587,13 @@ pub fn count_selected(
     );
     section = print(
         section,
-        "Neutral",
+        UnitStatus::Neutral,
         [0.25, 0.25, 1.0, 1.0],
         count(neutral.iter()),
     );
     section = print(
         section,
-        "Enemy",
+        UnitStatus::Enemy,
         [1.0, 0.25, 0.25, 1.0],
         count(enemy.iter()),
     );
@@ -580,4 +609,25 @@ fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {
     }
 
     counts
+}
+
+pub fn set_selected_button(
+    buttons: Res<UnitButtons>,
+    mut selected_button: ResMut<SelectedButton>,
+    mouse_state: Res<MouseState>,
+) {
+    if mouse_state.position.x > UnitButtons::BUTTON_WIDTH {
+        selected_button.0 = None;
+        return;
+    }
+
+    let index = mouse_state.position.y / UnitButtons::LINE_HEIGHT;
+
+    let index = index as usize;
+
+    selected_button.0 = if index < buttons.0.len() {
+        Some(index)
+    } else {
+        None
+    };
 }
