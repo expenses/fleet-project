@@ -294,17 +294,12 @@ fn to_wgpu(point: Vec2, dimensions: &Dimensions) -> Vec2 {
 }
 
 pub fn render_buttons(
-    buttons: Res<UnitButtons>,
     selected_button: Res<SelectedButton>,
     mut lines_2d: ResMut<GpuBuffer<Vertex2D>>,
     dimensions: Res<Dimensions>,
 ) {
-    for i in 0..buttons.0.len() {
-        let colour = if selected_button.0 == Some(i) {
-            Vec3::one()
-        } else {
-            Vec3::unit_x()
-        };
+    if let Some(i) = selected_button.0 {
+        let colour = Vec3::one();
 
         lines_2d.stage(&[
             Vertex2D {

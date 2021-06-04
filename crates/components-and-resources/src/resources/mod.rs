@@ -19,7 +19,7 @@ pub struct UnitButtons(pub Vec<(ModelId, UnitStatus)>);
 
 impl UnitButtons {
     pub const LINE_HEIGHT: f32 = 18.0;
-    pub const BUTTON_WIDTH: f32 = 150.0;
+    pub const BUTTON_WIDTH: f32 = 130.0;
 }
 
 #[derive(Default)]
