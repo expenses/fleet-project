@@ -1,3 +1,7 @@
+// These are unavoidable when using an ecs really
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
