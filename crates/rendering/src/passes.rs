@@ -29,7 +29,7 @@ pub fn run_render_passes(
     pipelines: &Pipelines,
     world: &bevy_ecs::world::World,
     star_system: &StarSystem,
-    tonemapper: &colstodian::LottesTonemapper,
+    tonemapper: &colstodian::tonemapper::LottesTonemapper,
     constants: &Constants,
     draw_godrays: bool,
 ) {

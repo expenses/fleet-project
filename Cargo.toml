@@ -13,8 +13,8 @@ wgpu = { version = "0.8.1", features = ["cross"] }
 winit = "0.25.0"
 web-sys = { version = "0.3.50", optional = true }
 rand = "0.8.3"
-bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
-bevy_tasks = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
+bevy_ecs = "0.5.0"
+bevy_tasks = "0.5.0"
 env_logger = "0.8.3"
 
 # Background
@@ -22,7 +22,7 @@ spade = "1.8.2"
 tint = "1.0.1"
 noise = { version = "0.7.0", default-features = false }
 
-colstodian = { git = "https://github.com/expenses/colstodian", branch = "bytemuck", features = ["bytemuck"] }
+colstodian = { git = "https://github.com/termhn/colstodian", branch = "main" }
 
 systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
@@ -53,3 +53,7 @@ opt-level = 3
 
 #lto = 'fat'
 #codegen-units = 1
+
+[patch.crates-io]
+bevy_ecs = { git = "https://github.com/bevyengine/bevy", branch = "main" }
+bevy_tasks = { git = "https://github.com/bevyengine/bevy", branch = "main" }

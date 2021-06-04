@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
 
     let draw_godrays = false;
 
-    let tonemapper = colstodian::LottesTonemapper::new(colstodian::LottesTonemaperParams {
+    let tonemapper = colstodian::tonemapper::LottesTonemapper::new(colstodian::tonemapper::LottesTonemapperParams {
         gray_point_in: 0.15,
         crosstalk: 10.0,
         ..Default::default()
