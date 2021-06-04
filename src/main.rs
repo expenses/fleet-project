@@ -201,6 +201,7 @@ fn main() -> anyhow::Result<()> {
             components::StagingVelocity(Vec3::zero()),
             components::AgroRange(200.0),
             components::CommandQueue::default(),
+            components::Selectable,
         ));
 
         if rng.gen_range(0.0..1.0) < 0.9 {
@@ -245,6 +246,7 @@ fn main() -> anyhow::Result<()> {
             components::Spin::new(background::uniform_sphere_distribution(&mut rng)),
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health(1000.0),
+            components::Selectable,
         ));
     }
 

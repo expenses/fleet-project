@@ -96,3 +96,5 @@ pub struct CanAttack;
 pub struct Carrying(pub Vec<Entity>);
 pub struct CanBeCarried;
 pub struct Health(pub f32);
+
+pub struct Selectable;

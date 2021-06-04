@@ -49,14 +49,17 @@ pub fn upload_ship_buffer(mut buffer: ResMut<ShipBuffer>, gpu_interface: Res<Gpu
 }
 
 pub fn find_ship_under_cursor(
-    query: Query<(
-        Entity,
-        &WorldSpaceBoundingBox,
-        &ModelId,
-        &Position,
-        &RotationMatrix,
-        Option<&Scale>,
-    )>,
+    query: Query<
+        (
+            Entity,
+            &WorldSpaceBoundingBox,
+            &ModelId,
+            &Position,
+            &RotationMatrix,
+            Option<&Scale>,
+        ),
+        With<Selectable>,
+    >,
     ray: Res<Ray>,
     models: Res<Models>,
     mut ship_under_cursor: ResMut<ShipUnderCursor>,
@@ -156,7 +159,7 @@ pub fn handle_left_drag(
     mouse_state: Res<MouseState>,
     dimensions: Res<Dimensions>,
     perspective_view: Res<PerspectiveView>,
-    query: Query<(Entity, &Position), With<ModelId>>,
+    query: Query<(Entity, &Position), (With<ModelId>, With<Selectable>)>,
     selected: Query<Entity, With<Selected>>,
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
