@@ -206,7 +206,9 @@ fn main() -> anyhow::Result<()> {
             components::FollowsCommands,
             components::Velocity(Vec3::zero()),
             components::RayCooldown(rng.gen_range(0.0..1.0)),
-            components::StagingVelocity(Vec3::zero()),
+            components::StagingPersuitForce(Vec3::zero()),
+            components::StagingEvasionForce(Vec3::zero()),
+            components::StagingAvoidanceForce(Vec3::zero()),
             components::AgroRange(200.0),
             components::CommandQueue::default(),
             components::Selectable,
@@ -421,7 +423,9 @@ fn main() -> anyhow::Result<()> {
                 .after("pos"),
         )
         //.flush()
-        .with_system(systems::run_steering.system().after("pos"))
+        .with_system(systems::run_persuit.system().after("pos"))
+        .with_system(systems::run_evasion.system().after("pos"))
+        .with_system(systems::run_avoidance.system().after("pos"))
         .with_system(systems::debug_render_targets.system().after("pos"))
         .with_system(systems::handle_left_drag.system().after("pos"))
         // Dependent on model movement and updated matrices

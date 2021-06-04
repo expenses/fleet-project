@@ -67,7 +67,9 @@ pub struct Enemy;
 pub struct Evading(pub Entity);
 
 pub struct Velocity(pub Vec3);
-pub struct StagingVelocity(pub Vec3);
+pub struct StagingPersuitForce(pub Vec3);
+pub struct StagingEvasionForce(pub Vec3);
+pub struct StagingAvoidanceForce(pub Vec3);
 pub struct RayCooldown(pub f32);
 
 pub struct AgroRange(pub f32);
@@ -100,6 +102,7 @@ pub struct MaxHealth(pub f32);
 
 pub struct Selectable;
 
+#[derive(Debug)]
 pub struct OnBoard(pub Vec<Entity>);
 
 pub enum PersonType {

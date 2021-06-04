@@ -1,71 +1,58 @@
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
-use components_and_resources::gpu_structs::BackgroundVertex;
 use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
 mod primitives;
 
 #[profiling::function]
-pub fn run_steering(
+pub fn run_persuit(
     mut query: Query<(
         Entity,
         &Position,
         &Velocity,
         &MaxSpeed,
         Option<&mut CommandQueue>,
-        Option<&Evading>,
-        &mut StagingVelocity,
-        Option<&OnBoard>,
+        &mut StagingPersuitForce,
     )>,
+    on_board: Query<&mut OnBoard>,
     boids: Query<(&Position, &Velocity, &MaxSpeed)>,
-    commands: Commands,
-    carrying: Query<(&mut Carrying, &mut OnBoard)>,
-    task_pool: Res<bevy_tasks::TaskPool>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut commands: Commands,
+    mut carrying: Query<&mut Carrying>,
 ) {
-    let commands = parking_lot::Mutex::new(commands);
-    let carrying = parking_lot::Mutex::new(carrying);
-
-    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, queue, evading, mut sv, on_board)| {
-        let mut steering = Vec3::zero();
-        let boid = to_boid((pos, vel, max_speed));
+    query.for_each_mut(|(entity, pos, vel, max_speed, queue, mut staging_persuit_force)| {
+        let boid = to_boid(pos, vel, max_speed);
         let max_force = max_speed.0 / 10.0;
 
         if let Some(mut queue) = queue {
             match queue.0.front() {
                 Some(Command::Interact { target, ty }) => {
-                    if let Ok(target_boid) = boids.get(*target).map(to_boid) {
+                    if let Ok(target_boid) = boids.get(*target).map(|(p, v, ms)| to_boid(p, v, ms)) {
                         // Because ships are constantly turning, the predicted
                         // point of contact for a ship far away varies a lot, resulting
                         // in an annoying visual wobble. So we disable leading here.
                         // We should fix this someother how though.
                         let lead_factor = 0.0;
 
-                        let force = boid.persue(target_boid, lead_factor);
-
-                        /*lines_buffer.stage(&[
-                            BackgroundVertex {
-                                position: pos.0,
-                                colour: Vec3::unit_x(),
-                            },
-                            BackgroundVertex {
-                                position: pos.0 + force,
-                                colour: Vec3::unit_x(),
-                            },
-                        ]);*/
-
-                        steering += force;
+                        staging_persuit_force.0 = boid.persue(target_boid, lead_factor);
 
                         if matches!(*ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
-                            match carrying.lock().get_mut(*target) {
-                                Ok((mut carrying, mut carrying_on_board)) => {
+                            match carrying.get_mut(*target) {
+                                Ok(mut carrying) => {
                                     carrying.0.push(entity);
-                                    commands.lock().entity(entity)
-                                        .insert(OnBoard(Vec::new()))
+                                    commands.entity(entity)
                                         .remove::<Position>();
-                                    if let Some(on_board) = on_board {
-                                        carrying_on_board.0.clone_from_slice(&on_board.0);
+
+                                    let ship_on_board = unsafe {
+                                        on_board.get_unchecked(entity)
+                                    };
+
+                                    let carrying_on_board = unsafe {
+                                        on_board.get_unchecked(*target)
+                                    };
+
+                                    if let (Ok(mut ship_on_board), Ok(mut carrying_on_board)) = (ship_on_board, carrying_on_board) {
+                                        carrying_on_board.0.append(&mut ship_on_board.0);
                                     }
                                 },
                                 Err(err) => {
@@ -82,80 +69,105 @@ pub fn run_steering(
                     }
                 }
                 Some(Command::MoveTo { point, .. }) => {
-                    let force = boid.seek(*point);
-
-                    steering += force;
+                    staging_persuit_force.0 = boid.seek(*point);
 
                     if (boid.pos - *point).mag_sq() < max_force {
                         queue.0.pop_front();
                     }
                 }
-                None => {}
-            }
-        }
-
-        if let Some(&Evading(evading_entity)) = evading {
-            if let Ok(evading_boid) = boids.get(evading_entity).map(to_boid) {
-                let force = boid.evade(evading_boid) * 0.5;
-
-                /*lines_buffer.stage(&[
-                    BackgroundVertex {
-                        position: pos.0,
-                        colour: Vec3::unit_y(),
-                    },
-                    BackgroundVertex {
-                        position: pos.0 + force,
-                        colour: Vec3::unit_y(),
-                    },
-                ]);*/
-
-                steering += force;
-            } else {
-                commands.lock().entity(entity).remove::<Evading>();
-            }
-        }
-
-        {
-            let force = boid.avoidance(boids.iter().map(to_boid));
-
-            steering += force;
-
-            /*
-            lines_buffer.stage(&[
-                BackgroundVertex {
-                    position: pos.0,
-                    colour: Vec3::new(1.0, 0.5, 0.0)
-                },
-                BackgroundVertex {
-                    position: pos.0 + force,
-                    colour: Vec3::new(1.0, 0.5, 0.0)
+                None => {
+                    staging_persuit_force.0 = Vec3::zero();
                 }
-            ]);
-            */
+            }
+        } else {
+            staging_persuit_force.0 = Vec3::zero();
         }
-
-        if steering == Vec3::zero() {
-            steering = -boid.vel;
-        }
-
-        let steering = truncate(steering, max_force);
-
-        /*lines_buffer.stage(&[
-            BackgroundVertex {
-                position: pos.0,
-                colour: Vec3::unit_z(),
-            },
-            BackgroundVertex {
-                position: pos.0 + steering,
-                colour: Vec3::unit_z(),
-            },
-        ]);*/
-
-        *sv = StagingVelocity(truncate(vel.0 + steering, max_speed.0));
     })
 }
 
-fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> primitives::Boid {
+#[profiling::function]
+pub fn run_evasion(
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&Evading>,
+        &mut StagingEvasionForce,
+    )>,
+    boids: Query<(&Position, &Velocity, &MaxSpeed)>,
+    mut commands: Commands,
+) {
+    query.for_each_mut(
+        |(entity, pos, vel, max_speed, evading, mut staging_evasion_force)| {
+            if let Some(&Evading(entity_to_avoid)) = evading {
+                let boid = to_boid(pos, vel, max_speed);
+
+                if let Ok(evading_boid) = boids
+                    .get(entity_to_avoid)
+                    .map(|(p, v, ms)| to_boid(p, v, ms))
+                {
+                    staging_evasion_force.0 = boid.evade(evading_boid) * 0.5;
+                } else {
+                    staging_evasion_force.0 = Vec3::zero();
+                    commands.entity(entity).remove::<Evading>();
+                }
+            } else {
+                staging_evasion_force.0 = Vec3::zero();
+            }
+        },
+    )
+}
+
+#[profiling::function]
+pub fn run_avoidance(
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&CommandQueue>,
+        &mut StagingAvoidanceForce,
+    )>,
+    boids: Query<(
+        Entity,
+        Option<&CommandQueue>,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+    )>,
+    task_pool: Res<bevy_tasks::TaskPool>,
+) {
+    query.par_for_each_mut(
+        &task_pool,
+        8,
+        |(entity, pos, vel, max_speed, queue, mut steering_avoidance_force)| {
+            let boid = to_boid(pos, vel, max_speed);
+
+            let get_proximity_interact_entity =
+                |queue: Option<&CommandQueue>| match queue.and_then(|queue| queue.0.front()) {
+                    Some(Command::Interact {
+                        target,
+                        ty: InteractionType::BeCarriedBy,
+                    }) => Some(*target),
+                    _ => None,
+                };
+
+            let proximity_interact_entity = get_proximity_interact_entity(queue);
+            let iter = boids
+                .iter()
+                .filter(|&(avoid_entity, queue, ..)| {
+                    Some(avoid_entity) != proximity_interact_entity
+                        && get_proximity_interact_entity(queue) != Some(entity)
+                })
+                .map(|(.., p, v, ms)| to_boid(p, v, ms));
+
+            steering_avoidance_force.0 = boid.avoidance(iter);
+        },
+    )
+}
+
+fn to_boid(pos: &Position, vel: &Velocity, max_speed: &MaxSpeed) -> primitives::Boid {
     primitives::Boid {
         pos: pos.0,
         vel: vel.0,
@@ -174,14 +186,31 @@ fn truncate(vec: Vec3, max: f32) -> Vec3 {
     }
 }
 
+#[profiling::function]
 pub fn apply_staging_velocity(
-    mut query: Query<(&mut Velocity, &StagingVelocity)>,
+    mut query: Query<(
+        &mut Velocity,
+        &MaxSpeed,
+        &StagingPersuitForce,
+        &StagingEvasionForce,
+        &StagingAvoidanceForce,
+    )>,
     paused: Res<Paused>,
 ) {
     if paused.0 {
         return;
     }
-    query.for_each_mut(|(mut velocity, staging_velocity)| {
-        velocity.0 = staging_velocity.0;
+    query.for_each_mut(|(mut velocity, max_speed, persuit, evasion, avoidance)| {
+        let max_force = max_speed.0 / 10.0;
+
+        let mut steering = persuit.0 + evasion.0 + avoidance.0;
+
+        if steering == Vec3::zero() {
+            steering = -velocity.0;
+        }
+
+        let steering = truncate(steering, max_force);
+
+        velocity.0 = truncate(velocity.0 + steering, max_speed.0);
     });
 }
