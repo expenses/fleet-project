@@ -13,26 +13,35 @@ pub fn run_steering(
         &Position,
         &Velocity,
         &MaxSpeed,
-        Option<&mut CommandQueue>,
         Option<&Evading>,
         &mut StagingVelocity,
         Option<&OnBoard>,
     )>,
-    boids: Query<(&Position, &Velocity, &MaxSpeed)>,
+    mut queues: Query<&mut CommandQueue>,
+    boids: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+    )>,
     commands: Commands,
-    carrying: Query<(&mut Carrying, &mut OnBoard)>,
+    carrying: Query<(&mut Carrying, &OnBoard)>,
     task_pool: Res<bevy_tasks::TaskPool>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     let commands = parking_lot::Mutex::new(commands);
     let carrying = parking_lot::Mutex::new(carrying);
+    let queues = parking_lot::RwLock::new(queues);
 
-    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, queue, evading, mut sv, on_board)| {
+    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, evading, mut sv, on_board)| {
         let mut steering = Vec3::zero();
-        let boid = to_boid((pos, vel, max_speed));
+        let boid = to_boid((entity, pos, vel, max_speed));
         let max_force = max_speed.0 / 10.0;
 
-        if let Some(mut queue) = queue {
+        let mut queues = queues.write();
+        let mut queue = queues.get_mut(entity).ok();
+
+        if let Some(queue) = queue.as_mut() {
             match queue.0.front() {
                 Some(Command::Interact { target, ty }) => {
                     if let Ok(target_boid) = boids.get(*target).map(to_boid) {
@@ -59,13 +68,16 @@ pub fn run_steering(
 
                         if matches!(*ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
                             match carrying.lock().get_mut(*target) {
-                                Ok((mut carrying, mut carrying_on_board)) => {
+                                Ok((mut carrying, carrying_on_board)) => {
                                     carrying.0.push(entity);
-                                    commands.lock().entity(entity)
+                                    let mut commands = commands.lock();
+                                    commands.entity(entity)
                                         .insert(OnBoard(Vec::new()))
                                         .remove::<Position>();
                                     if let Some(on_board) = on_board {
-                                        carrying_on_board.0.clone_from_slice(&on_board.0);
+                                        let mut new_carrying_on_board = carrying_on_board.0.clone();
+                                        new_carrying_on_board.extend_from_slice(&on_board.0);
+                                        commands.entity(*target).insert(OnBoard(new_carrying_on_board));
                                     }
                                 },
                                 Err(err) => {
@@ -94,6 +106,8 @@ pub fn run_steering(
             }
         }
 
+        let queues = parking_lot::RwLockWriteGuard::downgrade(queues);
+
         if let Some(&Evading(evading_entity)) = evading {
             if let Ok(evading_boid) = boids.get(evading_entity).map(to_boid) {
                 let force = boid.evade(evading_boid) * 0.5;
@@ -116,7 +130,19 @@ pub fn run_steering(
         }
 
         {
-            let force = boid.avoidance(boids.iter().map(to_boid));
+            let get_proximity_interact_entity = |queue: Option<&CommandQueue>| match queue.and_then(|queue| queue.0.front()) {
+                    Some(Command::Interact { target, ty: InteractionType::BeCarriedBy }) => Some(*target),
+                _ => None
+            };
+            let proximity_interact_entity = get_proximity_interact_entity(queue.as_ref().map(|queue| &**queue));
+            let iter = boids.iter()
+                .filter(|&(avoid_entity, ..)| {
+                    let avoid_queue = queues.get(avoid_entity).ok();
+                    Some(avoid_entity) != proximity_interact_entity &&
+                       get_proximity_interact_entity(avoid_queue.as_ref().map(move |q| &**q)) != Some(entity)
+                })
+                .map(to_boid);
+            let force = boid.avoidance(iter);
 
             steering += force;
 
@@ -155,7 +181,63 @@ pub fn run_steering(
     })
 }
 
-fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> primitives::Boid {
+pub fn run_avoidance(
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&CommandQueue>,
+        &mut StagingAvoidanceForce,
+    )>,
+    boids: Query<(
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+        Option<&CommandQueue>
+    )>,
+) {
+    {
+        let get_proximity_interact_entity = |queue: Option<&CommandQueue>| match queue.and_then(|queue| queue.0.front()) {
+                Some(Command::Interact { target, ty: InteractionType::BeCarriedBy }) => Some(*target),
+            _ => None
+        };
+        let proximity_interact_entity = get_proximity_interact_entity(queue.as_ref().map(|queue| &**queue));
+        /*let iter = boids.iter()
+            .filter(|&(avoid_entity, ..)| {
+                let avoid_queue = queues.get(avoid_entity).ok();
+                Some(avoid_entity) != proximity_interact_entity &&
+                   get_proximity_interact_entity(avoid_queue.as_ref().map(move |q| &**q)) != Some(entity)
+            })
+            .map(to_boid);
+        let force = boid.avoidance(iter);
+
+        steering += force;*/
+
+        /*
+        lines_buffer.stage(&[
+            BackgroundVertex {
+                position: pos.0,
+                colour: Vec3::new(1.0, 0.5, 0.0)
+            },
+            BackgroundVertex {
+                position: pos.0 + force,
+                colour: Vec3::new(1.0, 0.5, 0.0)
+            }
+        ]);
+        */
+    }
+}
+
+fn to_boid(
+    (_, pos, vel, max_speed): (
+        Entity,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+    ),
+) -> primitives::Boid {
     primitives::Boid {
         pos: pos.0,
         vel: vel.0,
