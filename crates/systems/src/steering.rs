@@ -16,17 +16,18 @@ pub fn run_steering(
         Option<&mut CommandQueue>,
         Option<&Evading>,
         &mut StagingVelocity,
+        Option<&OnBoard>,
     )>,
     boids: Query<(&Position, &Velocity, &MaxSpeed)>,
     commands: Commands,
-    carrying: Query<&mut Carrying>,
+    carrying: Query<(&mut Carrying, &mut OnBoard)>,
     task_pool: Res<bevy_tasks::TaskPool>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     let commands = parking_lot::Mutex::new(commands);
     let carrying = parking_lot::Mutex::new(carrying);
 
-    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, queue, evading, mut sv)| {
+    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, queue, evading, mut sv, on_board)| {
         let mut steering = Vec3::zero();
         let boid = to_boid((pos, vel, max_speed));
         let max_force = max_speed.0 / 10.0;
@@ -58,10 +59,14 @@ pub fn run_steering(
 
                         if matches!(*ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
                             match carrying.lock().get_mut(*target) {
-                                Ok(mut carrying) => {
+                                Ok((mut carrying, mut carrying_on_board)) => {
                                     carrying.0.push(entity);
                                     commands.lock().entity(entity)
+                                        .insert(OnBoard(Vec::new()))
                                         .remove::<Position>();
+                                    if let Some(on_board) = on_board {
+                                        carrying_on_board.0.clone_from_slice(&on_board.0);
+                                    }
                                 },
                                 Err(err) => {
                                     log::error!(

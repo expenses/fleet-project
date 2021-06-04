@@ -357,7 +357,7 @@ pub fn handle_destruction(
             commands.entity(entity).despawn();
 
             if let Some(on_board) = on_board {
-                for &entity in &on_board.0 {
+                for &entity in on_board.0.iter() {
                     commands.entity(entity).despawn();
                 }
             }
