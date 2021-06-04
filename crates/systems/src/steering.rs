@@ -165,7 +165,7 @@ pub fn run_avoidance(
                 })
                 .map(|(.., p, v, ms)| to_boid(p, v, ms));
 
-            steering_avoidance_force.0 = boid.avoidance(iter);
+            steering_avoidance_force.0 = boid.avoidance(iter) * 0.1;
         },
     )
 }
@@ -175,7 +175,7 @@ fn to_boid(pos: &Position, vel: &Velocity, max_speed: &MaxSpeed) -> primitives::
         pos: pos.0,
         vel: vel.0,
         max_vel: max_speed.0,
-        radius_sq: 1.0_f32.powi(2),
+        radius_sq: 1.5_f32.powi(2),
     }
 }
 
