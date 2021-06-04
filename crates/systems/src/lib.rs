@@ -221,6 +221,7 @@ pub fn handle_right_clicks(
                         queue.0.push_back(Command::Interact {
                             target: target_entity,
                             ty: InteractionType::Attack,
+                            range_sq: 0.0,
                         });
                     });
                 } else if can_carry.get(target_entity).is_ok() {
@@ -231,6 +232,7 @@ pub fn handle_right_clicks(
                         queue.0.push_back(Command::Interact {
                             target: target_entity,
                             ty: InteractionType::BeCarriedBy,
+                            range_sq: 0.0,
                         });
                     });
                 }

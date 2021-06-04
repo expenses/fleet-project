@@ -103,6 +103,7 @@ pub fn choose_enemy_target<SideA, SideB>(
                 queue.0.push_front(Command::Interact {
                     target: target_entity,
                     ty: InteractionType::Attack,
+                    range_sq: 0.0,
                 });
                 commands.entity(target_entity).insert(Evading(entity));
             }

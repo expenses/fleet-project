@@ -52,11 +52,13 @@ fn main() -> anyhow::Result<()> {
 
     let draw_godrays = false;
 
-    let tonemapper = colstodian::tonemapper::LottesTonemapper::new(colstodian::tonemapper::LottesTonemapperParams {
-        gray_point_in: 0.15,
-        crosstalk: 10.0,
-        ..Default::default()
-    });
+    let tonemapper = colstodian::tonemapper::LottesTonemapper::new(
+        colstodian::tonemapper::LottesTonemapperParams {
+            gray_point_in: 0.15,
+            crosstalk: 10.0,
+            ..Default::default()
+        },
+    );
 
     let dimensions = resources::Dimensions {
         width: window_size.width,
@@ -362,7 +364,11 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::move_camera.system())
         .with_system(systems::set_camera_following.system())
         .with_system(systems::handle_keys.system())
-        .with_system(systems::apply_staging_velocity.system().label("staging vel"))
+        .with_system(
+            systems::apply_staging_velocity
+                .system()
+                .label("staging vel"),
+        )
         .with_system(systems::apply_velocity.system().after("staging vel"))
         .with_system(systems::spawn_projectile_from_ships::<components::Friendly>.system())
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
@@ -424,7 +430,12 @@ fn main() -> anyhow::Result<()> {
         )
         //.flush()
         // This has to go before persuit as both use the command queue.
-        .with_system(systems::run_avoidance.system().label("avoidance").after("pos"))
+        .with_system(
+            systems::run_avoidance
+                .system()
+                .label("avoidance")
+                .after("pos"),
+        )
         .with_system(systems::run_persuit.system().after("avoidance"))
         .with_system(systems::run_evasion.system().after("pos"))
         .with_system(systems::debug_render_targets.system().after("pos"))

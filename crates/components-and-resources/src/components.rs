@@ -79,8 +79,15 @@ pub struct CommandQueue(pub VecDeque<Command>);
 
 #[derive(Clone)]
 pub enum Command {
-    MoveTo { point: Vec3, ty: MoveType },
-    Interact { target: Entity, ty: InteractionType },
+    MoveTo {
+        point: Vec3,
+        ty: MoveType,
+    },
+    Interact {
+        target: Entity,
+        ty: InteractionType,
+        range_sq: f32,
+    },
 }
 
 #[derive(Copy, Clone)]
@@ -93,6 +100,7 @@ pub enum MoveType {
 pub enum InteractionType {
     BeCarriedBy,
     Attack,
+    Mine,
 }
 
 pub struct CanAttack;
