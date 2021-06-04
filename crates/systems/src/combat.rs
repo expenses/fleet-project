@@ -57,7 +57,7 @@ pub fn collide_projectiles<Side>(
 
             commands.entity(entity).despawn();
             if let Ok(mut health) = health.lock().get_mut(ship_entity) {
-                health.0 = health.0.saturating_sub(10);
+                health.0 -= 10.0;
             }
             spawn_explosion(position, total_time.0, &mut commands);
         }

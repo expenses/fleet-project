@@ -95,4 +95,4 @@ pub struct CanAttack;
 #[derive(Default)]
 pub struct Carrying(pub Vec<Entity>);
 pub struct CanBeCarried;
-pub struct Health(pub u16);
+pub struct Health(pub f32);

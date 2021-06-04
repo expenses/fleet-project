@@ -18,11 +18,15 @@ pub fn run_steering(
         &mut StagingVelocity,
     )>,
     boids: Query<(&Position, &Velocity, &MaxSpeed)>,
-    mut commands: Commands,
+    commands: Commands,
+    carrying: Query<&mut Carrying>,
+    task_pool: Res<bevy_tasks::TaskPool>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
-    mut carrying: Query<&mut Carrying>,
 ) {
-    query.for_each_mut(|(entity, pos, vel, max_speed, queue, evading, mut sv)| {
+    let commands = parking_lot::Mutex::new(commands);
+    let carrying = parking_lot::Mutex::new(carrying);
+
+    query.par_for_each_mut(&task_pool, 8, |(entity, pos, vel, max_speed, queue, evading, mut sv)| {
         let mut steering = Vec3::zero();
         let boid = to_boid((pos, vel, max_speed));
         let max_force = max_speed.0 / 10.0;
@@ -53,10 +57,10 @@ pub fn run_steering(
                         steering += force;
 
                         if matches!(*ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
-                            match carrying.get_mut(*target) {
+                            match carrying.lock().get_mut(*target) {
                                 Ok(mut carrying) => {
                                     carrying.0.push(entity);
-                                    commands.entity(entity)
+                                    commands.lock().entity(entity)
                                         .remove::<Position>();
                                 },
                                 Err(err) => {
@@ -102,7 +106,7 @@ pub fn run_steering(
 
                 steering += force;
             } else {
-                commands.entity(entity).remove::<Evading>();
+                commands.lock().entity(entity).remove::<Evading>();
             }
         }
 

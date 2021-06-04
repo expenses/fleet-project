@@ -338,7 +338,7 @@ pub fn handle_destruction(
     total_time: Res<TotalTime>,
 ) {
     query.for_each_mut(|(entity, pos, health, carrying)| {
-        if health.0 == 0 {
+        if health.0 <= 0.0 {
             if let Some(mut carrying) = carrying {
                 unload(pos.0, &mut carrying, &mut *rng, &mut commands);
             }
