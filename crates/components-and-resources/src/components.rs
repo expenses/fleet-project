@@ -77,6 +77,7 @@ pub struct AgroRange(pub f32);
 #[derive(Default)]
 pub struct CommandQueue(pub VecDeque<Command>);
 
+#[derive(Clone)]
 pub enum Command {
     MoveTo { point: Vec3, ty: MoveType },
     Interact { target: Entity, ty: InteractionType },
@@ -88,6 +89,7 @@ pub enum MoveType {
     Attack,
 }
 
+#[derive(Copy, Clone)]
 pub enum InteractionType {
     BeCarriedBy,
     Attack,

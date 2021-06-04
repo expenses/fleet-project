@@ -362,8 +362,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::move_camera.system())
         .with_system(systems::set_camera_following.system())
         .with_system(systems::handle_keys.system())
-        .with_system(systems::apply_staging_velocity.system())
-        .with_system(systems::apply_velocity.system())
+        .with_system(systems::apply_staging_velocity.system().label("staging vel"))
+        .with_system(systems::apply_velocity.system().after("staging vel"))
         .with_system(systems::spawn_projectile_from_ships::<components::Friendly>.system())
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
         .with_system(systems::count_selected.system())
@@ -423,9 +423,10 @@ fn main() -> anyhow::Result<()> {
                 .after("pos"),
         )
         //.flush()
-        .with_system(systems::run_persuit.system().after("pos"))
+        // This has to go before persuit as both use the command queue.
+        .with_system(systems::run_avoidance.system().label("avoidance").after("pos"))
+        .with_system(systems::run_persuit.system().after("avoidance"))
         .with_system(systems::run_evasion.system().after("pos"))
-        .with_system(systems::run_avoidance.system().after("pos"))
         .with_system(systems::debug_render_targets.system().after("pos"))
         .with_system(systems::handle_left_drag.system().after("pos"))
         // Dependent on model movement and updated matrices

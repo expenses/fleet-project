@@ -25,9 +25,9 @@ pub fn run_persuit(
         let max_force = max_speed.0 / 10.0;
 
         if let Some(mut queue) = queue {
-            match queue.0.front() {
+            match queue.0.front().cloned() {
                 Some(Command::Interact { target, ty }) => {
-                    if let Ok(target_boid) = boids.get(*target).map(|(p, v, ms)| to_boid(p, v, ms)) {
+                    if let Ok(target_boid) = boids.get(target).map(|(p, v, ms)| to_boid(p, v, ms)) {
                         // Because ships are constantly turning, the predicted
                         // point of contact for a ship far away varies a lot, resulting
                         // in an annoying visual wobble. So we disable leading here.
@@ -36,10 +36,11 @@ pub fn run_persuit(
 
                         staging_persuit_force.0 = boid.persue(target_boid, lead_factor);
 
-                        if matches!(*ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
-                            match carrying.get_mut(*target) {
+                        if matches!(ty, InteractionType::BeCarriedBy) && (boid.pos - target_boid.pos).mag_sq() < max_force {
+                            match carrying.get_mut(target) {
                                 Ok(mut carrying) => {
                                     carrying.0.push(entity);
+                                    queue.0.clear();
                                     commands.entity(entity)
                                         .remove::<Position>();
 
@@ -48,7 +49,7 @@ pub fn run_persuit(
                                     };
 
                                     let carrying_on_board = unsafe {
-                                        on_board.get_unchecked(*target)
+                                        on_board.get_unchecked(target)
                                     };
 
                                     if let (Ok(mut ship_on_board), Ok(mut carrying_on_board)) = (ship_on_board, carrying_on_board) {
@@ -69,9 +70,9 @@ pub fn run_persuit(
                     }
                 }
                 Some(Command::MoveTo { point, .. }) => {
-                    staging_persuit_force.0 = boid.seek(*point);
+                    staging_persuit_force.0 = boid.seek(point);
 
-                    if (boid.pos - *point).mag_sq() < max_force {
+                    if (boid.pos - point).mag_sq() < max_force {
                         queue.0.pop_front();
                     }
                 }
@@ -144,7 +145,7 @@ pub fn run_avoidance(
         |(entity, pos, vel, max_speed, queue, mut steering_avoidance_force)| {
             let boid = to_boid(pos, vel, max_speed);
 
-            let get_proximity_interact_entity =
+            let get_be_carried_by_entity =
                 |queue: Option<&CommandQueue>| match queue.and_then(|queue| queue.0.front()) {
                     Some(Command::Interact {
                         target,
@@ -153,12 +154,14 @@ pub fn run_avoidance(
                     _ => None,
                 };
 
-            let proximity_interact_entity = get_proximity_interact_entity(queue);
+            let be_carried_by_entity = get_be_carried_by_entity(queue);
             let iter = boids
                 .iter()
-                .filter(|&(avoid_entity, queue, ..)| {
-                    Some(avoid_entity) != proximity_interact_entity
-                        && get_proximity_interact_entity(queue) != Some(entity)
+                .filter(|&(avoid_entity, avoid_queue, ..)| {
+                    let avoid_entity_carry_target = get_be_carried_by_entity(avoid_queue) ;
+
+                    Some(avoid_entity) != be_carried_by_entity
+                        && avoid_entity_carry_target != Some(entity)
                 })
                 .map(|(.., p, v, ms)| to_boid(p, v, ms));
 

@@ -1,6 +1,6 @@
 use ultraviolet::Vec3;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Boid {
     pub pos: Vec3,
     pub vel: Vec3,
@@ -50,7 +50,7 @@ impl Boid {
         for boid in other {
             let vector = self.pos - boid.pos;
             let distance_sq = vector.mag_sq();
-            if distance_sq != 0.0 && distance_sq < (self.radius_sq + boid.radius_sq) {
+            if distance_sq > 0.0 && distance_sq < (self.radius_sq + boid.radius_sq) {
                 let force = normalize_to(vector, 1.0 / distance_sq.sqrt());
                 sum += force;
             }
