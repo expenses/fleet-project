@@ -5,10 +5,12 @@ use components_and_resources::utils::*;
 use ultraviolet::Vec3;
 
 mod combat;
+mod people;
 mod rendering;
 mod steering;
 
 pub use combat::*;
+pub use people::*;
 pub use rendering::*;
 pub use steering::*;
 
@@ -335,18 +337,31 @@ pub fn handle_keys(
 }
 
 pub fn handle_destruction(
-    mut query: Query<(Entity, &Position, &Health, Option<&mut Carrying>)>,
+    mut query: Query<(
+        Entity,
+        &Position,
+        &Health,
+        Option<&mut Carrying>,
+        Option<&OnBoard>,
+    )>,
     mut rng: ResMut<SmallRng>,
     mut commands: Commands,
     total_time: Res<TotalTime>,
 ) {
-    query.for_each_mut(|(entity, pos, health, carrying)| {
+    query.for_each_mut(|(entity, pos, health, carrying, on_board)| {
         if health.0 <= 0.0 {
             if let Some(mut carrying) = carrying {
                 unload(pos.0, &mut carrying, &mut *rng, &mut commands);
             }
 
             commands.entity(entity).despawn();
+
+            if let Some(on_board) = on_board {
+                for &entity in &on_board.0 {
+                    commands.entity(entity).despawn();
+                }
+            }
+
             spawn_explosion(pos.0, total_time.0, &mut commands);
         }
     })

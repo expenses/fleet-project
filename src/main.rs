@@ -188,6 +188,14 @@ fn main() -> anyhow::Result<()> {
             rng.gen_range(-100.0..100.0),
         );
 
+        let is_fighter = rng.gen_range(0.0..1.0) < 0.9;
+
+        let crew = if !is_fighter {
+            Some(world.spawn().insert(components::PersonType::Engineer).id())
+        } else {
+            None
+        };
+
         let mut spawner = world.spawn();
 
         spawner.insert_bundle((
@@ -202,22 +210,25 @@ fn main() -> anyhow::Result<()> {
             components::AgroRange(200.0),
             components::CommandQueue::default(),
             components::Selectable,
+            components::OnBoard(crew.map(|crew| vec![crew]).unwrap_or_default()),
         ));
 
-        if rng.gen_range(0.0..1.0) < 0.9 {
+        if is_fighter {
             spawner.insert_bundle((
                 components::ModelId::Fighter,
                 components::CanAttack,
                 components::CanBeCarried,
                 components::MaxSpeed(10.0),
                 components::Health(50.0),
+                components::MaxHealth(50.0),
             ));
         } else {
             spawner.insert_bundle((
                 components::ModelId::Carrier,
                 components::Carrying::default(),
                 components::MaxSpeed(5.0),
-                components::Health(250.0),
+                components::Health(125.0),
+                components::MaxHealth(250.0),
             ));
         }
 
@@ -355,6 +366,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
         .with_system(systems::count_selected.system())
         .with_system(systems::set_selected_button.system())
+        .with_system(systems::repair_ships.system())
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())
@@ -455,6 +467,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::update_keyboard_state.system())
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
+        .with_system(systems::render_health.system())
         .with_system(systems::render_buttons.system());
 
     let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()

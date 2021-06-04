@@ -322,3 +322,16 @@ pub fn render_buttons(
         ])
     }
 }
+
+pub fn render_health(
+    query: Query<(&Position, &Health), With<Selected>>,
+    mut glyph_brush: ResMut<GlyphBrush>,
+) {
+    query.for_each(|(pos, health)| {
+        let screen_pos = Vec2::broadcast(100.0);
+        let mut section = glyph_brush::OwnedSection::default().with_screen_position(screen_pos);
+        section = section
+            .add_text(glyph_brush::OwnedText::new(format!("{}", health.0)).with_color([1.0; 4]));
+        glyph_brush.queue(&section);
+    })
+}

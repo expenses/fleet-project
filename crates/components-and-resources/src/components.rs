@@ -96,5 +96,13 @@ pub struct CanAttack;
 pub struct Carrying(pub Vec<Entity>);
 pub struct CanBeCarried;
 pub struct Health(pub f32);
+pub struct MaxHealth(pub f32);
 
 pub struct Selectable;
+
+pub struct OnBoard(pub Vec<Entity>);
+
+pub enum PersonType {
+    Civilian,
+    Engineer,
+}
