@@ -204,23 +204,25 @@ pub fn debug_render_targets(
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     query.for_each(|(position, queue)| {
-        if let Some(Command::Interact {
-            target,
-            ty: InteractionType::Attack,
-        }) = queue.0.front()
-        {
-            if let Ok(target_pos) = positions.get(*target) {
-                lines_buffer.stage(&[
-                    BackgroundVertex {
-                        position: position.0,
-                        colour: Vec3::zero(),
-                    },
-                    BackgroundVertex {
-                        position: target_pos.0,
-                        colour: Vec3::one(),
-                    },
-                ]);
+        let target_pos = match queue.0.front() {
+            Some(Command::MoveTo { point, .. }) => Some(*point),
+            Some(Command::Interact { target, .. }) => {
+                positions.get(*target).ok().map(|position| position.0)
             }
+            None => None,
+        };
+
+        if let Some(target_pos) = target_pos {
+            lines_buffer.stage(&[
+                BackgroundVertex {
+                    position: position.0,
+                    colour: Vec3::zero(),
+                },
+                BackgroundVertex {
+                    position: target_pos,
+                    colour: Vec3::one(),
+                },
+            ]);
         }
     })
 }

@@ -28,7 +28,7 @@ pub fn run_steering(
         let max_force = max_speed.0 / 10.0;
 
         if let Some(mut queue) = queue {
-            match queue.0.front().clone() {
+            match queue.0.front() {
                 Some(Command::Interact { target, ty }) => {
                     if let Ok(target_boid) = boids.get(*target).map(to_boid) {
                         // Because ships are constantly turning, the predicted
@@ -106,12 +106,12 @@ pub fn run_steering(
             }
         }
 
-        /*
         {
-            let force = boid.avoidance(boids.iter(world).map(to_boid)) * 0.5;
+            let force = boid.avoidance(boids.iter().map(to_boid));
 
             steering += force;
 
+            /*
             lines_buffer.stage(&[
                 BackgroundVertex {
                     position: pos.0,
@@ -122,8 +122,8 @@ pub fn run_steering(
                     colour: Vec3::new(1.0, 0.5, 0.0)
                 }
             ]);
+            */
         }
-        */
 
         if steering == Vec3::zero() {
             steering = -boid.vel;
@@ -151,7 +151,7 @@ fn to_boid((pos, vel, max_speed): (&Position, &Velocity, &MaxSpeed)) -> primitiv
         pos: pos.0,
         vel: vel.0,
         max_vel: max_speed.0,
-        radius_sq: 4.0_f32.powi(2),
+        radius_sq: 1.0_f32.powi(2),
     }
 }
 
