@@ -193,7 +193,7 @@ fn main() -> anyhow::Result<()> {
         let crew = if !is_fighter {
             Some(world.spawn().insert(components::PersonType::Engineer).id())
         } else {
-            None
+            Some(world.spawn().insert(components::PersonType::Engineer).id())
         };
 
         let mut spawner = world.spawn();
