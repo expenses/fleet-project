@@ -123,7 +123,7 @@ pub fn handle_left_click(
                         && button_status
                             == &UnitStatus::from_bools(friendly.is_some(), enemy.is_some(), false);
 
-                    if !matches {
+                    if !matches ^ keyboard_state.shift {
                         commands.entity(entity).remove::<Selected>();
                     }
                 });
