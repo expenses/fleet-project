@@ -25,6 +25,14 @@ pub enum ModelId {
 }
 
 pub struct Scale(pub f32);
+
+impl Scale {
+    pub fn range_sq(&self) -> f32 {
+        let range = self.0 + 10.0;
+        range * range
+    }
+}
+
 pub struct Expands;
 
 pub struct AliveUntil(pub f32);
@@ -134,5 +142,8 @@ pub struct CanBeMined {
     pub minerals: f32,
 }
 
-pub struct StoredMinerals(pub f32);
+pub struct StoredMinerals {
+    pub stored: f32,
+    pub capacity: f32,
+}
 pub struct StoredFuel(pub f32);

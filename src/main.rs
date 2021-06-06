@@ -234,7 +234,10 @@ fn main() -> anyhow::Result<()> {
                 components::MaxSpeed(5.0),
                 components::Health(125.0),
                 components::MaxHealth(250.0),
-                components::StoredMinerals(0.0),
+                components::StoredMinerals {
+                    stored: 0.0,
+                    capacity: f32::INFINITY,
+                },
                 components::StoredFuel(0.0),
             ));
         } else {
@@ -245,7 +248,10 @@ fn main() -> anyhow::Result<()> {
                 components::Health(40.0),
                 components::MaxHealth(40.0),
                 components::CanMine,
-                components::StoredMinerals(0.0),
+                components::StoredMinerals {
+                    stored: 0.0,
+                    capacity: 10.0,
+                },
             ));
         };
 
@@ -275,7 +281,7 @@ fn main() -> anyhow::Result<()> {
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health(1000.0),
             components::Selectable,
-            components::CanBeMined { minerals: 10.0 },
+            components::CanBeMined { minerals: 100.0 },
         ));
     }
 

@@ -240,9 +240,6 @@ pub fn handle_right_clicks(
                         });
                     });
                 } else if let Ok(scale) = can_be_mined.get(target_entity) {
-                    let range = scale.0 + 10.0;
-                    let range_sq = range * range;
-
                     query_set.q3_mut().for_each_mut(|mut queue| {
                         if !keyboard_state.shift {
                             queue.0.clear();
@@ -250,7 +247,7 @@ pub fn handle_right_clicks(
                         queue.0.push_back(Command::Interact {
                             target: target_entity,
                             ty: InteractionType::Mine,
-                            range_sq,
+                            range_sq: scale.range_sq(),
                         });
                     });
                 }

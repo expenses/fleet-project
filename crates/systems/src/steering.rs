@@ -44,9 +44,11 @@ pub fn run_persuit(
                                     match carrying.get_mut(target) {
                                         Ok(mut carrying) => {
                                             carrying.0.push(entity);
-                                            queue.0.clear();
-                                            commands.entity(entity)
-                                                .remove::<Position>();
+                                            if queue.0.len() == 1 {
+                                                commands.entity(entity)
+                                                    .remove::<Position>();
+                                            }
+                                            queue.0.pop_front();
 
                                             let ship_to_transfer = unsafe {
                                                 to_transfer.get_unchecked(entity)
@@ -60,8 +62,8 @@ pub fn run_persuit(
                                                 carrier_people.0.append(&mut ship_people.0);
 
                                                 if let (Some(mut ship_minerals), Some(mut carrier_minerals)) = (ship_minerals, carrier_minerals) {
-                                                    carrier_minerals.0 += ship_minerals.0;
-                                                    ship_minerals.0 = 0.0;
+                                                    carrier_minerals.stored += ship_minerals.stored;
+                                                    ship_minerals.stored = 0.0;
                                                 }
                                             }
                                         },
