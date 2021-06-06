@@ -19,8 +19,9 @@ pub struct Selected;
 pub enum ModelId {
     Carrier = 0,
     Fighter = 1,
-    Explosion = 2,
-    Asteroid = 3,
+    Miner = 2,
+    Explosion = 3,
+    Asteroid = 4,
 }
 
 pub struct Scale(pub f32);

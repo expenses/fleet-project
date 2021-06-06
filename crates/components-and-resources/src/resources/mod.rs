@@ -80,10 +80,11 @@ pub struct ShipUnderCursor(pub Option<Entity>);
 pub struct Models(pub [Model; Self::COUNT]);
 
 impl Models {
-    pub const COUNT: usize = 4;
+    pub const COUNT: usize = 5;
     pub const ARRAY: [ModelId; Self::COUNT] = [
         ModelId::Carrier,
         ModelId::Fighter,
+        ModelId::Miner,
         ModelId::Explosion,
         ModelId::Asteroid,
     ];

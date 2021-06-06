@@ -190,7 +190,8 @@ fn main() -> anyhow::Result<()> {
             rng.gen_range(-100.0..100.0),
         );
 
-        let is_fighter = rng.gen_range(0.0..1.0) < 0.9;
+        let model_rng = rng.gen_range(0.0..1.0);
+        let is_fighter = model_rng < 0.8;
 
         let crew = if !is_fighter {
             Some(world.spawn().insert(components::PersonType::Engineer).id())
@@ -226,7 +227,7 @@ fn main() -> anyhow::Result<()> {
                 components::Health(50.0),
                 components::MaxHealth(50.0),
             ));
-        } else {
+        } else if model_rng < 0.95 {
             spawner.insert_bundle((
                 components::ModelId::Carrier,
                 components::Carrying::default(),
@@ -234,7 +235,15 @@ fn main() -> anyhow::Result<()> {
                 components::Health(125.0),
                 components::MaxHealth(250.0),
             ));
-        }
+        } else {
+            spawner.insert_bundle((
+                components::ModelId::Miner,
+                components::CanBeCarried,
+                components::MaxSpeed(5.0),
+                components::Health(40.0),
+                components::MaxHealth(40.0),
+            ));
+        };
 
         if !side {
             spawner.insert(components::Friendly);
@@ -301,6 +310,13 @@ fn main() -> anyhow::Result<()> {
         )?,
         load_ship_model(
             include_bytes!("../models/fighter.glb"),
+            &device,
+            &queue,
+            &resources.ship_bgl,
+            &resources.nearest_sampler,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/miner.glb"),
             &device,
             &queue,
             &resources.ship_bgl,
