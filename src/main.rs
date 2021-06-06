@@ -234,6 +234,7 @@ fn main() -> anyhow::Result<()> {
                 components::MaxSpeed(5.0),
                 components::Health(125.0),
                 components::MaxHealth(250.0),
+                components::StoredMinerals(0.0),
                 components::StoredFuel(0.0),
             ));
         } else {
@@ -245,7 +246,6 @@ fn main() -> anyhow::Result<()> {
                 components::MaxHealth(40.0),
                 components::CanMine,
                 components::StoredMinerals(0.0),
-                components::StoredFuel(0.0),
             ));
         };
 

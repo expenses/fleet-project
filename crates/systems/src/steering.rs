@@ -15,7 +15,7 @@ pub fn run_persuit(
         Option<&mut CommandQueue>,
         &mut StagingPersuitForce,
     )>,
-    on_board: Query<&mut OnBoard>,
+    to_transfer: Query<(&mut OnBoard, Option<&mut StoredMinerals>)>,
     boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
     mut commands: Commands,
     mut carrying: Query<&mut Carrying>,
@@ -48,16 +48,21 @@ pub fn run_persuit(
                                             commands.entity(entity)
                                                 .remove::<Position>();
 
-                                            let ship_on_board = unsafe {
-                                                on_board.get_unchecked(entity)
+                                            let ship_to_transfer = unsafe {
+                                                to_transfer.get_unchecked(entity)
                                             };
 
-                                            let carrying_on_board = unsafe {
-                                                on_board.get_unchecked(target)
+                                            let carrier_to_transfer = unsafe {
+                                                to_transfer.get_unchecked(target)
                                             };
 
-                                            if let (Ok(mut ship_on_board), Ok(mut carrying_on_board)) = (ship_on_board, carrying_on_board) {
-                                                carrying_on_board.0.append(&mut ship_on_board.0);
+                                            if let (Ok((mut ship_people, ship_minerals)), Ok((mut carrier_people, carrier_minerals))) = (ship_to_transfer, carrier_to_transfer) {
+                                                carrier_people.0.append(&mut ship_people.0);
+
+                                                if let (Some(mut ship_minerals), Some(mut carrier_minerals)) = (ship_minerals, carrier_minerals) {
+                                                    carrier_minerals.0 += ship_minerals.0;
+                                                    ship_minerals.0 = 0.0;
+                                                }
                                             }
                                         },
                                         Err(err) => {

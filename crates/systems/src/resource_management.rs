@@ -5,6 +5,7 @@ use components_and_resources::resources::*;
 pub fn mine(
     mut query: Query<(&Position, &MaxSpeed, &mut CommandQueue, &mut StoredMinerals)>,
     mut targets: Query<(&Position, &mut CanBeMined)>,
+    new_targets: Query<(Entity, &Position, &Scale), With<CanBeMined>>,
     delta_time: Res<DeltaTime>,
     mut commands: Commands,
 ) {
@@ -32,6 +33,26 @@ pub fn mine(
                 }
             } else {
                 queue.0.pop_front();
+                let new_target = new_targets
+                    .iter()
+                    .map(|(entity, new_pos, scale)| {
+                        let dist_sq = (pos.0 - new_pos.0).mag_sq();
+                        (entity, dist_sq, scale)
+                    })
+                    .min_by(|(_, a, _), (_, b, _)| {
+                        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                    });
+
+                if let Some((entity, _, scale)) = new_target {
+                    let range = scale.0 + 10.0;
+                    let range_sq = range * range;
+
+                    queue.0.push_back(Command::Interact {
+                        target: entity,
+                        ty: InteractionType::Mine,
+                        range_sq,
+                    });
+                }
             }
         }
     })
