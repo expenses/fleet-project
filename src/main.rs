@@ -344,6 +344,7 @@ fn main() -> anyhow::Result<()> {
     let glyph_brush: resources::GlyphBrush = wgpu_glyph::GlyphBrushBuilder::using_font(
         wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!("../TinyUnicode.ttf"))?,
     )
+    .draw_cache_position_tolerance(1.0)
     .build(&device, display_format);
 
     world.insert_resource(glyph_brush);
