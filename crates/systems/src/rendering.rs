@@ -18,12 +18,23 @@ pub fn render_model_instances(
         Option<&Scale>,
         Option<&Friendly>,
         Option<&Enemy>,
+        Option<&CanBeMined>,
     )>,
     ship_under_cursor: Res<ShipUnderCursor>,
     mut ship_buffer: ResMut<ShipBuffer>,
 ) {
     query.for_each(
-        |(entity, selected, position, rotation_matrix, model_id, scale, friendly, enemy)| {
+        |(
+            entity,
+            selected,
+            position,
+            rotation_matrix,
+            model_id,
+            scale,
+            friendly,
+            enemy,
+            can_be_mined,
+        )| {
             let base_colour = if friendly.is_some() {
                 Vec3::unit_y()
             } else if enemy.is_some() {
@@ -46,6 +57,12 @@ pub fn render_model_instances(
                     rotation: rotation_matrix.matrix,
                     colour,
                     scale: get_scale(scale),
+                    diffuse_multiplier: if *model_id == ModelId::Asteroid && can_be_mined.is_none()
+                    {
+                        1.0 / 2.5
+                    } else {
+                        1.0
+                    },
                 },
                 *model_id as usize,
             );

@@ -10,6 +10,7 @@ layout(location = 5) in vec3 rotation_3;
 layout(location = 6) in vec3 translation;
 layout(location = 7) in vec3 colour;
 layout(location = 8) in float scale;
+layout(location = 9) in float diffuse_multiplier;
 
 layout(push_constant) uniform PushConstants {
     mat4 perspective_view;
@@ -18,6 +19,7 @@ layout(push_constant) uniform PushConstants {
 
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec2 out_uv;
+layout(location = 2) out float out_diffuse_multiplier;
 
 void main() {
     mat3 rotation = mat3(rotation_1, rotation_2, rotation_3);
@@ -27,4 +29,5 @@ void main() {
 
     out_normal = rotation * normal;
     out_uv = uv;
+    out_diffuse_multiplier = diffuse_multiplier;
 }
