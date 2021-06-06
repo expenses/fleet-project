@@ -242,14 +242,10 @@ pub fn handle_right_clicks(
             None => {
                 *mouse_mode = match *mouse_mode {
                     MouseMode::Normal => match average_selected_position.0 {
-                        Some(avg) => {
-                            let ty = if keyboard_state.attack_move {
-                                MoveType::Attack
-                            } else {
-                                MoveType::Normal
-                            };
-                            MouseMode::Movement { plane_y: avg.y, ty }
-                        }
+                        Some(avg) => MouseMode::Movement {
+                            plane_y: avg.y,
+                            ty: MoveType::Normal,
+                        },
                         _ => MouseMode::Normal,
                     },
                     MouseMode::Movement { ty, .. } => {
@@ -319,6 +315,7 @@ pub fn handle_keys(
     mut paused: ResMut<Paused>,
     mut carrying: Query<(&Position, &mut Carrying), SelectedFriendly>,
     mut rng: ResMut<SmallRng>,
+    average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
 ) {
     if keyboard_state.stop.0 {
@@ -339,6 +336,20 @@ pub fn handle_keys(
 
     if keyboard_state.escape.0 {
         *mouse_mode = MouseMode::Normal;
+    }
+
+    if keyboard_state.attack_move.0 {
+        match *mouse_mode {
+            MouseMode::Movement { ref mut ty, .. } => *ty = MoveType::Attack,
+            _ => {
+                if let Some(avg) = average_selected_position.0 {
+                    *mouse_mode = MouseMode::Movement {
+                        plane_y: avg.y,
+                        ty: MoveType::Attack,
+                    };
+                }
+            }
+        }
     }
 }
 
