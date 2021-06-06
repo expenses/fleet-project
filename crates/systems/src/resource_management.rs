@@ -36,3 +36,18 @@ pub fn mine(
         }
     })
 }
+
+pub fn convert_minerals_to_fuel(
+    mut query: Query<(&mut StoredMinerals, &mut StoredFuel)>,
+    delta_time: Res<DeltaTime>,
+) {
+    query.for_each_mut(|(mut minerals, mut fuel)| {
+        if minerals.0 > 0.0 {
+            let to_convert = 0.5 * delta_time.0;
+            let to_convert = to_convert.min(minerals.0);
+
+            minerals.0 -= to_convert;
+            fuel.0 += to_convert;
+        }
+    })
+}

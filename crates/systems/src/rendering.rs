@@ -347,7 +347,8 @@ pub fn render_health(
     dimensions: Res<Dimensions>,
 ) {
     query.for_each(|(pos, health)| {
-        let projected = perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
+        let projected =
+            perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
         if projected.z > 0.0 {
             let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
@@ -358,7 +359,8 @@ pub fn render_health(
             );
             let unnormalised_pos = uv_space_pos * dimensions.to_vec();
 
-            let section = glyph_brush::OwnedSection::default().with_screen_position(unnormalised_pos)
+            let section = glyph_brush::OwnedSection::default()
+                .with_screen_position(unnormalised_pos)
                 .add_text(glyph_brush::OwnedText::new(format!("{}", health.0)).with_color([1.0; 4]))
                 .with_layout(glyph_brush::Layout::default_single_line());
             glyph_brush.queue(&section);

@@ -135,3 +135,4 @@ pub struct CanBeMined {
 }
 
 pub struct StoredMinerals(pub f32);
+pub struct StoredFuel(pub f32);

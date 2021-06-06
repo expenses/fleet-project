@@ -234,6 +234,7 @@ fn main() -> anyhow::Result<()> {
                 components::MaxSpeed(5.0),
                 components::Health(125.0),
                 components::MaxHealth(250.0),
+                components::StoredFuel(0.0),
             ));
         } else {
             spawner.insert_bundle((
@@ -244,6 +245,7 @@ fn main() -> anyhow::Result<()> {
                 components::MaxHealth(40.0),
                 components::CanMine,
                 components::StoredMinerals(0.0),
+                components::StoredFuel(0.0),
             ));
         };
 
@@ -400,7 +402,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::count_selected.system())
         .with_system(systems::set_selected_button.system())
         .with_system(systems::repair_ships.system())
-        .with_system(systems::mine.system().after("vel"))
+        .with_system(systems::mine.system().label("mine").after("vel"))
+        .with_system(systems::convert_minerals_to_fuel.system().after("mine"))
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())
