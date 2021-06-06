@@ -242,6 +242,7 @@ fn main() -> anyhow::Result<()> {
                 components::MaxSpeed(5.0),
                 components::Health(40.0),
                 components::MaxHealth(40.0),
+                components::CanMine,
             ));
         };
 
@@ -271,6 +272,7 @@ fn main() -> anyhow::Result<()> {
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health(1000.0),
             components::Selectable,
+            components::CanBeMined,
         ));
     }
 

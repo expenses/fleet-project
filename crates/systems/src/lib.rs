@@ -200,6 +200,7 @@ pub fn handle_right_clicks(
         Query<&mut CommandQueue, SelectedFriendly>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanAttack>)>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanBeCarried>)>,
+        Query<&mut CommandQueue, (SelectedFriendly, With<CanMine>)>,
     )>,
     enemies: Query<&Enemy>,
     mouse_button: Res<MouseState>,
@@ -208,6 +209,7 @@ pub fn handle_right_clicks(
     ray_plane_point: Res<RayPlanePoint>,
     ship_under_cursor: Res<ShipUnderCursor>,
     can_carry: Query<&Carrying>,
+    can_be_mined: Query<&Scale, With<CanBeMined>>,
     keyboard_state: Res<KeyboardState>,
 ) {
     if mouse_button.right_state.was_clicked() {
@@ -233,6 +235,20 @@ pub fn handle_right_clicks(
                             target: target_entity,
                             ty: InteractionType::BeCarriedBy,
                             range_sq: 0.0,
+                        });
+                    });
+                } else if let Ok(scale) = can_be_mined.get(target_entity) {
+                    let range = scale.0 + 10.0;
+                    let range_sq = range * range;
+
+                    query_set.q3_mut().for_each_mut(|mut queue| {
+                        if !keyboard_state.shift {
+                            queue.0.clear();
+                        }
+                        queue.0.push_back(Command::Interact {
+                            target: target_entity,
+                            ty: InteractionType::Mine,
+                            range_sq,
                         });
                     });
                 }

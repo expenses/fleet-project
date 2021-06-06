@@ -32,6 +32,7 @@ pub struct AliveUntil(pub f32);
 #[derive(Default)]
 pub struct WorldSpaceBoundingBox(pub BoundingBox);
 
+#[derive(Clone, Default)]
 pub struct MaxSpeed(pub f32);
 
 pub struct Spin {
@@ -67,6 +68,7 @@ pub struct Enemy;
 
 pub struct Evading(pub Entity);
 
+#[derive(Clone, Default)]
 pub struct Velocity(pub Vec3);
 pub struct StagingPersuitForce(pub Vec3);
 pub struct StagingEvasionForce(pub Vec3);
@@ -120,3 +122,6 @@ pub enum PersonType {
     Civilian,
     Engineer,
 }
+
+pub struct CanMine;
+pub struct CanBeMined;

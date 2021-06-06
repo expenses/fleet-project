@@ -16,7 +16,7 @@ pub fn run_persuit(
         &mut StagingPersuitForce,
     )>,
     on_board: Query<&mut OnBoard>,
-    boids: Query<(&Position, &Velocity, &MaxSpeed)>,
+    boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
     mut commands: Commands,
     mut carrying: Query<&mut Carrying>,
 ) {
@@ -27,18 +27,20 @@ pub fn run_persuit(
         if let Some(mut queue) = queue {
             match queue.0.front().cloned() {
                 Some(Command::Interact { target, ty, range_sq }) => {
-                    if let Ok(target_boid) = boids.get(target).map(|(p, v, ms)| to_boid(p, v, ms)) {
+                    if let Ok(target_boid) = boids.get(target).map(|(p, v, ms)| to_boid(p, &v.cloned().unwrap_or_default(), &ms.cloned().unwrap_or_default())) {
                         // Because ships are constantly turning, the predicted
                         // point of contact for a ship far away varies a lot, resulting
                         // in an annoying visual wobble. So we disable leading here.
                         // We should fix this someother how though.
                         let lead_factor = 0.0;
 
-                        staging_persuit_force.0 = boid.persue(target_boid, lead_factor);
+
 
                         let within_range = (boid.pos - target_boid.pos).mag_sq() < range_sq + max_force;
 
-                        if within_range {
+                        staging_persuit_force.0 = if !within_range {
+                            boid.persue(target_boid, lead_factor)
+                        } else {
                             match ty {
                                 InteractionType::BeCarriedBy => {
                                     match carrying.get_mut(target) {
@@ -72,6 +74,8 @@ pub fn run_persuit(
                                 InteractionType::Mine => {}
                                 InteractionType::Attack => {}
                             }
+
+                            Vec3::zero()
                         }
                     } else {
                         queue.0.pop_front();
