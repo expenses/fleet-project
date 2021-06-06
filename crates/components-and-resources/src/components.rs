@@ -35,6 +35,12 @@ pub struct WorldSpaceBoundingBox(pub BoundingBox);
 #[derive(Clone, Default)]
 pub struct MaxSpeed(pub f32);
 
+impl MaxSpeed {
+    pub fn max_force(&self) -> f32 {
+        self.0 / 10.0
+    }
+}
+
 pub struct Spin {
     angle: f32,
     plane: ultraviolet::Bivec3,
@@ -124,4 +130,8 @@ pub enum PersonType {
 }
 
 pub struct CanMine;
-pub struct CanBeMined;
+pub struct CanBeMined {
+    pub minerals: f32,
+}
+
+pub struct StoredMinerals(pub f32);

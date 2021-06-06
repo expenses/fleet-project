@@ -11,11 +11,13 @@ use ultraviolet::Vec3;
 mod combat;
 mod people;
 mod rendering;
+mod resource_management;
 mod steering;
 
 pub use combat::*;
 pub use people::*;
 pub use rendering::*;
+pub use resource_management::*;
 pub use steering::*;
 
 pub fn update_ship_rotation_matrix(

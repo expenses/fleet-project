@@ -22,7 +22,7 @@ pub fn run_persuit(
 ) {
     query.for_each_mut(|(entity, pos, vel, max_speed, queue, mut staging_persuit_force)| {
         let boid = to_boid(pos, vel, max_speed);
-        let max_force = max_speed.0 / 10.0;
+        let max_force = max_speed.max_force();
 
         if let Some(mut queue) = queue {
             match queue.0.front().cloned() {
@@ -33,8 +33,6 @@ pub fn run_persuit(
                         // in an annoying visual wobble. So we disable leading here.
                         // We should fix this someother how though.
                         let lead_factor = 0.0;
-
-
 
                         let within_range = (boid.pos - target_boid.pos).mag_sq() < range_sq + max_force;
 
@@ -217,7 +215,7 @@ pub fn apply_staging_velocity(
         return;
     }
     query.for_each_mut(|(mut velocity, max_speed, persuit, evasion, avoidance)| {
-        let max_force = max_speed.0 / 10.0;
+        let max_force = max_speed.max_force();
 
         let mut steering = persuit.0 + evasion.0 + avoidance.0;
 

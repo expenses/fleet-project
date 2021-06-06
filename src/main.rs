@@ -243,6 +243,7 @@ fn main() -> anyhow::Result<()> {
                 components::Health(40.0),
                 components::MaxHealth(40.0),
                 components::CanMine,
+                components::StoredMinerals(0.0),
             ));
         };
 
@@ -272,7 +273,7 @@ fn main() -> anyhow::Result<()> {
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health(1000.0),
             components::Selectable,
-            components::CanBeMined,
+            components::CanBeMined { minerals: 10.0 },
         ));
     }
 
@@ -387,12 +388,18 @@ fn main() -> anyhow::Result<()> {
                 .system()
                 .label("staging vel"),
         )
-        .with_system(systems::apply_velocity.system().after("staging vel"))
+        .with_system(
+            systems::apply_velocity
+                .system()
+                .label("vel")
+                .after("staging vel"),
+        )
         .with_system(systems::spawn_projectile_from_ships::<components::Friendly>.system())
         .with_system(systems::spawn_projectile_from_ships::<components::Enemy>.system())
         .with_system(systems::count_selected.system())
         .with_system(systems::set_selected_button.system())
         .with_system(systems::repair_ships.system())
+        .with_system(systems::mine.system().after("vel"))
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())
