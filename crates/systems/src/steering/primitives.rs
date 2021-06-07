@@ -39,7 +39,7 @@ impl Boid {
         desired_vel - self.vel
     }
 
-    fn flee(self, target: Vec3) -> Vec3 {
+    pub fn flee(self, target: Vec3) -> Vec3 {
         let desired_vel = normalize_to(self.pos - target, self.max_vel);
         desired_vel - self.vel
     }

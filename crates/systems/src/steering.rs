@@ -125,7 +125,7 @@ pub fn run_evasion(
                     .get(entity_to_avoid)
                     .map(|(p, v, ms)| to_boid(p, v, ms))
                 {
-                    staging_evasion_force.0 = boid.evade(evading_boid) * 0.5;
+                    staging_evasion_force.0 = boid.flee(evading_boid.pos) * 0.5;
                 } else {
                     staging_evasion_force.0 = Vec3::zero();
                     commands.entity(entity).remove::<Evading>();
