@@ -370,7 +370,10 @@ impl Plane {
 
 #[derive(Debug)]
 pub struct SelectionFrustum {
-    planes: [Plane; 4],
+    left: Plane,
+    right: Plane,
+    top: Plane,
+    bot: Plane,
 }
 
 impl SelectionFrustum {
@@ -418,26 +421,29 @@ impl SelectionFrustum {
         );
         */
 
-        let left =
-            Plane::new_from_3_coplanar_points(near_corners[0], far_corners[2], far_corners[0]);
-
-        let top =
-            Plane::new_from_3_coplanar_points(far_corners[1], near_corners[0], far_corners[0]);
-
-        let right =
-            Plane::new_from_3_coplanar_points(near_corners[3], far_corners[1], far_corners[3]);
-
-        let bot =
-            Plane::new_from_3_coplanar_points(far_corners[3], far_corners[2], near_corners[2]);
-
         Self {
-            planes: [left, top, right, bot],
+            left: Plane::new_from_3_coplanar_points(
+                near_corners[0],
+                far_corners[2],
+                far_corners[0],
+            ),
+
+            top: Plane::new_from_3_coplanar_points(far_corners[1], near_corners[0], far_corners[0]),
+
+            right: Plane::new_from_3_coplanar_points(
+                near_corners[3],
+                far_corners[1],
+                far_corners[3],
+            ),
+
+            bot: Plane::new_from_3_coplanar_points(far_corners[3], far_corners[2], near_corners[2]),
         }
     }
 
     pub fn contains_point(&self, point: Vec3) -> bool {
-        self.planes
-            .iter()
-            .all(|plane| plane.half_space(point) >= 0.0)
+        self.left.half_space(point) >= 0.0
+            && self.right.half_space(point) >= 0.0
+            && self.top.half_space(point) >= 0.0
+            && self.bot.half_space(point) >= 0.0
     }
 }
