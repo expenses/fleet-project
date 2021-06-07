@@ -20,12 +20,6 @@ struct MinHeapItem<T> {
     data: T,
 }
 
-impl<T> MinHeapItem<T> {
-    fn new(priority: f32, data: T) -> Self {
-        Self { priority, data }
-    }
-}
-
 impl<T> PartialEq for MinHeapItem<T> {
     fn eq(&self, other: &Self) -> bool {
         self.priority == other.priority
@@ -49,6 +43,7 @@ impl<T> std::cmp::PartialOrd for MinHeapItem<T> {
     }
 }
 
+// See https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf for details
 pub struct DynamicBvh<T> {
     nodes: slab::Slab<Node<T>>,
     root: usize,
@@ -66,6 +61,7 @@ impl<T> Default for DynamicBvh<T> {
 }
 
 impl<T> DynamicBvh<T> {
+    // See https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf
     pub fn insert(&mut self, data: T, bounding_box: BoundingBox) -> usize {
         let leaf_index = self.nodes.insert(Node {
             bounding_box,
@@ -79,6 +75,8 @@ impl<T> DynamicBvh<T> {
             self.root = leaf_index;
             return leaf_index;
         }
+
+        // Stage 1: find the best sibling for the new leaf
 
         let sibling = self.find_best_sibling(bounding_box);
 
@@ -119,17 +117,17 @@ impl<T> DynamicBvh<T> {
         self.nodes.clear();
     }
 
+    // Implementation of the 'Branch and Bound' algorithm to find the best sibling
+    // for a bounding box via the surface area heuristic.
+    // Implemented from https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf
     fn find_best_sibling(&mut self, bounding_box: BoundingBox) -> usize {
-        let mut lowest_cost = self.nodes[self.root]
-            .bounding_box
-            .union_with(bounding_box)
-            .surface_area();
+        let mut lowest_cost = f32::INFINITY;
         let mut best_sibling = self.root;
 
         self.insertion_priority_queue.clear();
 
         self.insertion_priority_queue
-            .push(MinHeapItem::new(lowest_cost, (self.root, 0.0)));
+            .push(MinHeapItem { priority: 0.0, data: (self.root, 0.0)});
 
         while let Some(MinHeapItem {
             data: (index, parent_delta_surface_area),
@@ -153,14 +151,14 @@ impl<T> DynamicBvh<T> {
                 let lower_bound = bounding_box.surface_area() + delta_surface_area;
 
                 if lower_bound < lowest_cost {
-                    self.insertion_priority_queue.push(MinHeapItem::new(
-                        lower_bound,
-                        (node.left_child, delta_surface_area),
-                    ));
-                    self.insertion_priority_queue.push(MinHeapItem::new(
-                        lower_bound,
-                        (node.right_child, delta_surface_area),
-                    ));
+                    self.insertion_priority_queue.push(MinHeapItem {
+                        priority: lower_bound,
+                        data: (node.left_child, delta_surface_area),
+                    });
+                    self.insertion_priority_queue.push(MinHeapItem {
+                        priority: lower_bound,
+                        data: (node.right_child, delta_surface_area),
+                    });
                 }
             }
         }
@@ -224,6 +222,7 @@ impl<T> DynamicBvh<T> {
         }
     }
 
+    #[inline]
     pub fn find<FN: Fn(BoundingBox) -> bool>(&self, predicate: FN) -> BvhIterator<T, FN> {
         BvhIterator {
             stack: if let Some(node) = self.nodes.get(self.root) {
@@ -252,6 +251,7 @@ pub struct BvhIterator<'a, T, FN> {
 impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {
     type Item = &'a T;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(node) = self.stack.pop() {
             if (self.predicate)(node.bounding_box) {
