@@ -126,8 +126,10 @@ impl<T> DynamicBvh<T> {
 
         self.insertion_priority_queue.clear();
 
-        self.insertion_priority_queue
-            .push(MinHeapItem { priority: 0.0, data: (self.root, 0.0)});
+        self.insertion_priority_queue.push(MinHeapItem {
+            priority: 0.0,
+            data: (self.root, 0.0),
+        });
 
         while let Some(MinHeapItem {
             data: (index, parent_delta_surface_area),

@@ -32,6 +32,7 @@ impl Ray {
         Self::new(origin, direction)
     }
 
+    #[inline]
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
             origin,
@@ -40,6 +41,7 @@ impl Ray {
         }
     }
 
+    #[inline]
     pub fn get_intersection_point(&self, t: f32) -> Vec3 {
         self.origin + self.direction * t
     }
@@ -56,6 +58,7 @@ impl Ray {
         )
     }
 
+    #[inline]
     pub fn y_plane_intersection(&self, plane_y: f32) -> Option<f32> {
         if (self.origin.y > plane_y && self.direction.y > 0.0)
             || (self.origin.y < plane_y && self.direction.y < 0.0)
@@ -171,6 +174,7 @@ impl Projectile {
         self.flipped_ray.origin -= self.flipped_ray.direction * self.max_t(delta_time);
     }
 
+    #[inline]
     pub fn bounding_box(&self, delta_time: f32) -> BoundingBox {
         let max_t = self.max_t(delta_time);
         let end_point = self.flipped_ray.get_intersection_point(max_t);
@@ -247,14 +251,17 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    #[inline]
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
 
+    #[inline]
     fn new_checked(a: Vec3, b: Vec3) -> Self {
         Self::new(a.min_by_component(b), a.max_by_component(b))
     }
 
+    #[inline]
     pub fn rotate(self, matrix: Mat3) -> Self {
         let corners = self.corners();
 
@@ -271,6 +278,7 @@ impl BoundingBox {
         Self::new(min, max)
     }
 
+    #[inline]
     pub fn intersects(self, other: Self) -> bool {
         self.min.x <= other.max.x
             && self.min.y <= other.max.y
@@ -280,6 +288,7 @@ impl BoundingBox {
             && self.max.z >= other.min.z
     }
 
+    #[inline]
     pub fn corners(self) -> [Vec3; 8] {
         [
             Vec3::new(self.min.x, self.min.y, self.min.z),
@@ -293,6 +302,7 @@ impl BoundingBox {
         ]
     }
 
+    #[inline]
     fn union_with(self, other: Self) -> Self {
         Self {
             min: self.min.min_by_component(other.min),
@@ -300,11 +310,13 @@ impl BoundingBox {
         }
     }
 
+    #[inline]
     fn surface_area(self) -> f32 {
         let inner = self.max - self.min;
         2.0 * (inner.x * inner.y + inner.y * inner.z + inner.z * inner.x)
     }
 
+    #[inline]
     pub fn expand(self, by: Vec3) -> Self {
         Self {
             min: self.min - by,
