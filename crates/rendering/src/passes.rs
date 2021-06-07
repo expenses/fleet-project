@@ -11,8 +11,6 @@ pub struct StarSystem {
     pub sun_dir: Vec3,
     pub background_vertices: wgpu::Buffer,
     pub num_background_vertices: u32,
-    pub star_vertices: wgpu::Buffer,
-    pub num_stars: u32,
 }
 
 pub struct Constants {
@@ -119,9 +117,6 @@ pub fn run_render_passes(
         bytemuck::bytes_of(&perspective_view.perspective_view_without_movement),
     );
     render_pass.draw(0..star_system.num_background_vertices, 0..1);
-
-    render_pass.set_vertex_buffer(0, star_system.star_vertices.slice(..));
-    render_pass.draw(0..star_system.num_stars, 0..1);
 
     drop(render_pass);
 

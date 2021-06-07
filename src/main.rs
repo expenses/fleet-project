@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     let mut rng = rand::thread_rng();
-    let background = background::make_background(&mut rng);
+    let mut background = background::make_background(&mut rng);
 
     let mut sun_dir = background::uniform_sphere_distribution(&mut rng);
     sun_dir.y = sun_dir.y.abs();
@@ -91,18 +91,14 @@ fn main() -> anyhow::Result<()> {
         ))
         .collect::<Vec<_>>();
 
+    background.extend_from_slice(&stars);
+
     let star_system = rendering::passes::StarSystem {
         sun_dir,
         num_background_vertices: background.len() as u32,
         background_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("background vertices"),
             contents: bytemuck::cast_slice(&background),
-            usage: wgpu::BufferUsage::VERTEX,
-        }),
-        num_stars: stars.len() as u32,
-        star_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("star vertices"),
-            contents: bytemuck::cast_slice(&stars),
             usage: wgpu::BufferUsage::VERTEX,
         }),
     };
