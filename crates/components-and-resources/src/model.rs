@@ -4,8 +4,6 @@ use ultraviolet::Vec3;
 use wgpu::util::DeviceExt;
 
 pub struct Model {
-    pub vertices: wgpu::Buffer,
-    pub indices: wgpu::Buffer,
     pub num_indices: u32,
     pub bind_group: wgpu::BindGroup,
     pub bounding_box_buffer: wgpu::Buffer,
@@ -19,12 +17,13 @@ pub fn load_ship_model(
     queue: &wgpu::Queue,
     bgl: &wgpu::BindGroupLayout,
     sampler: &wgpu::Sampler,
+    merged_vertices: &mut Vec<ModelVertex>,
+    merged_indices: &mut Vec<u16>,
 ) -> anyhow::Result<Model> {
     let gltf = gltf::Gltf::from_slice(bytes)?;
 
     let buffer_blob = gltf.blob.as_ref().unwrap();
 
-    let mut vertices = Vec::new();
     let mut indices = Vec::new();
 
     for mesh in gltf.meshes() {
@@ -34,7 +33,7 @@ pub fn load_ship_model(
                 Some(buffer_blob)
             });
 
-            let num_vertices = vertices.len() as u16;
+            let num_vertices = merged_vertices.len() as u16;
 
             let read_indices = match reader.read_indices().unwrap() {
                 gltf::mesh::util::ReadIndices::U16(indices) => indices,
@@ -54,7 +53,7 @@ pub fn load_ship_model(
                 .zip(normals)
                 .zip(uvs)
                 .for_each(|((position, normal), uv)| {
-                    vertices.push(ModelVertex {
+                    merged_vertices.push(ModelVertex {
                         position: position.into(),
                         normal: normal.into(),
                         uv: uv.into(),
@@ -75,27 +74,17 @@ pub fn load_ship_model(
             .chunks(3)
             .map(|chunk| {
                 Triangle::new(
-                    vertices[chunk[0] as usize].position,
-                    vertices[chunk[1] as usize].position,
-                    vertices[chunk[2] as usize].position,
+                    merged_vertices[chunk[0] as usize].position,
+                    merged_vertices[chunk[1] as usize].position,
+                    merged_vertices[chunk[2] as usize].position,
                 )
             })
             .collect(),
     );
 
-    let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        usage: wgpu::BufferUsage::VERTEX,
-        contents: bytemuck::cast_slice(&vertices),
-    });
-
     let num_indices = indices.len() as u32;
 
-    let indices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        usage: wgpu::BufferUsage::INDEX,
-        contents: bytemuck::cast_slice(&indices),
-    });
+    merged_indices.extend_from_slice(&indices);
 
     let material = gltf.materials().next().unwrap();
 
@@ -132,8 +121,6 @@ pub fn load_ship_model(
     let bounding_box = BoundingBox::new(min, max);
 
     Ok(Model {
-        vertices,
-        indices,
         num_indices,
         bind_group,
         acceleration_tree,

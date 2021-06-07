@@ -311,43 +311,67 @@ fn main() -> anyhow::Result<()> {
         "lines 2d",
         wgpu::BufferUsage::VERTEX,
     ));
-    world.insert_resource(resources::Models([
-        load_ship_model(
-            include_bytes!("../models/carrier.glb"),
-            &device,
-            &queue,
-            &resources.ship_bgl,
-            &resources.nearest_sampler,
-        )?,
-        load_ship_model(
-            include_bytes!("../models/fighter.glb"),
-            &device,
-            &queue,
-            &resources.ship_bgl,
-            &resources.nearest_sampler,
-        )?,
-        load_ship_model(
-            include_bytes!("../models/miner.glb"),
-            &device,
-            &queue,
-            &resources.ship_bgl,
-            &resources.nearest_sampler,
-        )?,
-        load_ship_model(
-            include_bytes!("../models/explosion.glb"),
-            &device,
-            &queue,
-            &resources.ship_bgl,
-            &resources.nearest_sampler,
-        )?,
-        load_ship_model(
-            include_bytes!("../models/asteroid.glb"),
-            &device,
-            &queue,
-            &resources.ship_bgl,
-            &resources.nearest_sampler,
-        )?,
-    ]));
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    world.insert_resource(resources::Models {
+        models: [
+            load_ship_model(
+                include_bytes!("../models/carrier.glb"),
+                &device,
+                &queue,
+                &resources.ship_bgl,
+                &resources.nearest_sampler,
+                &mut vertices,
+                &mut indices,
+            )?,
+            load_ship_model(
+                include_bytes!("../models/fighter.glb"),
+                &device,
+                &queue,
+                &resources.ship_bgl,
+                &resources.nearest_sampler,
+                &mut vertices,
+                &mut indices,
+            )?,
+            load_ship_model(
+                include_bytes!("../models/miner.glb"),
+                &device,
+                &queue,
+                &resources.ship_bgl,
+                &resources.nearest_sampler,
+                &mut vertices,
+                &mut indices,
+            )?,
+            load_ship_model(
+                include_bytes!("../models/explosion.glb"),
+                &device,
+                &queue,
+                &resources.ship_bgl,
+                &resources.nearest_sampler,
+                &mut vertices,
+                &mut indices,
+            )?,
+            load_ship_model(
+                include_bytes!("../models/asteroid.glb"),
+                &device,
+                &queue,
+                &resources.ship_bgl,
+                &resources.nearest_sampler,
+                &mut vertices,
+                &mut indices,
+            )?,
+        ],
+        vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsage::VERTEX,
+            contents: bytemuck::cast_slice(&vertices),
+        }),
+        indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsage::INDEX,
+            contents: bytemuck::cast_slice(&indices),
+        }),
+    });
 
     let glyph_brush: resources::GlyphBrush = wgpu_glyph::GlyphBrushBuilder::using_font(
         wgpu_glyph::ab_glyph::FontRef::try_from_slice(include_bytes!("../TinyUnicode.ttf"))?,

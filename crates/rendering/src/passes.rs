@@ -90,25 +90,30 @@ pub fn run_render_passes(
             light_dir: star_system.sun_dir,
         }),
     );
+    render_pass.set_vertex_buffer(0, models.vertices.slice(..));
     render_pass.set_vertex_buffer(1, instance_buffer);
+    render_pass.set_index_buffer(models.indices.slice(..), wgpu::IndexFormat::Uint16);
 
     let mut offset = 0;
+    let mut index_offset = 0;
 
     for i in 0..resources::Models::COUNT {
         let num_instances = num_instances[i];
 
+        let model = &models.models[i];
+
         if num_instances > 0 {
-            render_pass.set_bind_group(0, &models.0[i].bind_group, &[]);
-            render_pass.set_vertex_buffer(0, models.0[i].vertices.slice(..));
-            render_pass.set_index_buffer(models.0[i].indices.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_bind_group(0, &model.bind_group, &[]);
             render_pass.draw_indexed(
-                0..models.0[i].num_indices,
+                index_offset..index_offset + model.num_indices,
                 0,
                 offset..offset + num_instances,
             );
 
             offset += num_instances;
         }
+
+        index_offset += model.num_indices;
     }
 
     let (laser_buffer, num_laser_vertices) = laser_buffer.slice();
@@ -290,7 +295,7 @@ pub fn run_render_passes(
             let num_instances = num_instances[i];
 
             if num_instances > 0 && i != ModelId::Explosion as usize {
-                render_pass.set_vertex_buffer(0, models.0[i].bounding_box_buffer.slice(..));
+                render_pass.set_vertex_buffer(0, models.models[i].bounding_box_buffer.slice(..));
                 render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
 
                 offset += num_instances;

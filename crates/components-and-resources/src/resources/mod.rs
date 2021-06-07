@@ -77,7 +77,11 @@ pub struct GpuInterface {
 #[derive(Default)]
 pub struct ShipUnderCursor(pub Option<Entity>);
 
-pub struct Models(pub [Model; Self::COUNT]);
+pub struct Models {
+    pub vertices: wgpu::Buffer,
+    pub indices: wgpu::Buffer,
+    pub models: [Model; Self::COUNT],
+}
 
 impl Models {
     pub const COUNT: usize = 5;
@@ -90,7 +94,7 @@ impl Models {
     ];
 
     pub fn get(&self, id: ModelId) -> &Model {
-        &self.0[id as usize]
+        &self.models[id as usize]
     }
 }
 
