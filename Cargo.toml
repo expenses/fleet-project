@@ -55,5 +55,5 @@ opt-level = 3
 #codegen-units = 1
 
 [patch.crates-io]
-bevy_ecs = { git = "https://github.com/bevyengine/bevy", branch = "main" }
-bevy_tasks = { git = "https://github.com/bevyengine/bevy", branch = "main" }
+bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
+bevy_tasks = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
