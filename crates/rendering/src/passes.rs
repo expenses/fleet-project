@@ -79,7 +79,8 @@ pub fn run_render_passes(
         }),
     });
 
-    let (instance_buffer, num_instances) = ship_buffer.slice();
+    let (instance_buffer, num_instances, draw_indirect_buffer, draw_indirect_count) =
+        ship_buffer.slice();
 
     render_pass.set_pipeline(&pipelines.ship);
     render_pass.set_push_constants(
@@ -95,26 +96,7 @@ pub fn run_render_passes(
     render_pass.set_index_buffer(models.indices.slice(..), wgpu::IndexFormat::Uint16);
     render_pass.set_bind_group(0, &models.bind_group, &[]);
 
-    let mut offset = 0;
-    let mut index_offset = 0;
-
-    for i in 0..resources::Models::COUNT {
-        let num_instances = num_instances[i];
-
-        let model = &models.models[i];
-
-        if num_instances > 0 {
-            render_pass.draw_indexed(
-                index_offset..index_offset + model.num_indices,
-                0,
-                offset..offset + num_instances,
-            );
-
-            offset += num_instances;
-        }
-
-        index_offset += model.num_indices;
-    }
+    render_pass.multi_draw_indexed_indirect(&draw_indirect_buffer, 0, draw_indirect_count);
 
     let (laser_buffer, num_laser_vertices) = laser_buffer.slice();
 

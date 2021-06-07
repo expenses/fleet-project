@@ -52,8 +52,12 @@ pub fn clear_ship_buffer(mut buffer: ResMut<ShipBuffer>) {
     buffer.clear();
 }
 
-pub fn upload_ship_buffer(mut buffer: ResMut<ShipBuffer>, gpu_interface: Res<GpuInterface>) {
-    buffer.upload(&gpu_interface.device, &gpu_interface.queue);
+pub fn upload_ship_buffer(
+    mut buffer: ResMut<ShipBuffer>,
+    gpu_interface: Res<GpuInterface>,
+    models: Res<Models>,
+) {
+    buffer.upload(&gpu_interface.device, &gpu_interface.queue, &models);
 }
 
 pub fn find_ship_under_cursor(

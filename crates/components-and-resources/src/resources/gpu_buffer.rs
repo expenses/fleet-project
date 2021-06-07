@@ -1,4 +1,4 @@
-use crate::gpu_structs::Instance;
+use crate::gpu_structs::{DrawIndexedIndirect, Instance};
 use crate::resources::Models;
 
 pub struct GpuBuffer<T> {
@@ -70,6 +70,8 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
 pub struct ShipBuffer {
     staging: [Vec<Instance>; Models::COUNT],
     buffer: wgpu::Buffer,
+    draw_indirect_buffer: wgpu::Buffer,
+    draw_indirect_count: u32,
     capacity_in_bytes: usize,
 }
 
@@ -88,6 +90,13 @@ impl ShipBuffer {
                 usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::VERTEX,
                 mapped_at_creation: false,
             }),
+            draw_indirect_buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("draw indirect buffer"),
+                size: (std::mem::size_of::<DrawIndexedIndirect>() * Models::COUNT) as u64,
+                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::INDIRECT,
+                mapped_at_creation: false,
+            }),
+            draw_indirect_count: 0,
         }
     }
 
@@ -97,21 +106,26 @@ impl ShipBuffer {
         }
     }
 
-    pub fn slice(&self) -> (wgpu::BufferSlice, [u32; Models::COUNT]) {
+    pub fn slice(&self) -> (wgpu::BufferSlice, [u32; Models::COUNT], &wgpu::Buffer, u32) {
         let mut lengths = [0; Models::COUNT];
         #[allow(clippy::needless_range_loop)]
         for i in 0..Models::COUNT {
             lengths[i] = self.staging[i].len() as u32;
         }
 
-        (self.buffer.slice(..), lengths)
+        (
+            self.buffer.slice(..),
+            lengths,
+            &self.draw_indirect_buffer,
+            self.draw_indirect_count,
+        )
     }
 
     pub fn stage(&mut self, instance: Instance, ty: usize) {
         self.staging[ty].push(instance);
     }
 
-    pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, models: &Models) {
         let sum_length = self
             .staging
             .iter()
@@ -136,12 +150,41 @@ impl ShipBuffer {
 
         let mut offset = 0;
 
-        for buffer in &self.staging {
+        let mut draw_indirect_array = [DrawIndexedIndirect::default(); Models::COUNT];
+        let mut draw_indirect_offset = 0;
+        let mut instance_offset = 0;
+        let mut index_offset = 0;
+
+        for i in 0..Models::COUNT {
+            let buffer = &self.staging[i];
+
             if !buffer.is_empty() {
                 let bytes = bytemuck::cast_slice(buffer);
                 queue.write_buffer(&self.buffer, offset, bytes);
                 offset += bytes.len() as u64;
+
+                let instance_count = buffer.len() as u32;
+                let index_count = models.models[i].num_indices;
+
+                draw_indirect_array[draw_indirect_offset] = DrawIndexedIndirect {
+                    vertex_offset: 0,
+                    base_instance: instance_offset,
+                    instance_count,
+                    base_index: index_offset,
+                    index_count,
+                };
+
+                draw_indirect_offset += 1;
+                instance_offset += instance_count;
+                index_offset += index_count;
             }
         }
+
+        self.draw_indirect_count = draw_indirect_offset as u32;
+        queue.write_buffer(
+            &self.draw_indirect_buffer,
+            0,
+            bytemuck::cast_slice(&draw_indirect_array[..draw_indirect_offset]),
+        );
     }
 }

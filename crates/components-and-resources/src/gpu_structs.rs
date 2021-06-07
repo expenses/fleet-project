@@ -81,3 +81,13 @@ pub struct Vertex2D {
     pub pos: Vec2,
     pub colour: Vec3,
 }
+
+#[repr(C)]
+#[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct DrawIndexedIndirect {
+    pub index_count: u32,
+    pub instance_count: u32, // The number of instances to draw.
+    pub base_index: u32,     // The base index within the index buffer.
+    pub vertex_offset: i32, // The value added to the vertex index before indexing into the vertex buffer.
+    pub base_instance: u32, // The instance ID of the first instance to draw.
+}

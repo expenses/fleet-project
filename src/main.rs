@@ -37,7 +37,8 @@ fn main() -> anyhow::Result<()> {
             label: Some("device"),
             features: wgpu::Features::PUSH_CONSTANTS
                 | wgpu::Features::DEPTH_CLAMPING
-                | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY,
+                | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
+                | wgpu::Features::MULTI_DRAW_INDIRECT,
             limits: wgpu::Limits {
                 max_push_constant_size: std::mem::size_of::<[ultraviolet::Mat4; 2]>() as u32,
                 ..Default::default()
