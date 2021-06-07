@@ -1,5 +1,7 @@
 use crate::resources::BoundingBox;
+use crate::utils::uniform_sphere_distribution;
 use bevy_ecs::prelude::Entity;
+use rand::Rng;
 use std::collections::VecDeque;
 use ultraviolet::{Mat3, Rotor3, Vec3};
 
@@ -11,6 +13,21 @@ pub struct RotationMatrix {
     pub matrix: Mat3,
     pub reversed: Mat3,
     pub rotated_model_bounding_box: BoundingBox,
+}
+
+impl RotationMatrix {
+    pub fn random_for_rendering_only(rng: &mut rand::rngs::SmallRng) -> Self {
+        let rotor = Rotor3::from_angle_plane(
+            rng.gen_range(0.0..std::f32::consts::TAU),
+            ultraviolet::Bivec3::from_normalized_axis(uniform_sphere_distribution(rng)),
+        );
+
+        Self {
+            matrix: rotor.into_matrix(),
+            reversed: Default::default(),
+            rotated_model_bounding_box: Default::default(),
+        }
+    }
 }
 
 pub struct Selected;

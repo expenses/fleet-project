@@ -23,11 +23,11 @@ pub fn collide_projectiles<Side>(
     commands: Commands,
     health: Query<&mut Health>,
     task_pool: Res<bevy_tasks::TaskPool>,
+    rng: ResMut<SmallRng>,
 ) where
     Side: Send + Sync + 'static,
 {
-    let commands = parking_lot::Mutex::new(commands);
-    let health = parking_lot::Mutex::new(health);
+    let on_hit_resources = parking_lot::Mutex::new((commands, health, rng));
 
     projectiles.par_for_each(&task_pool, 16, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
@@ -53,13 +53,14 @@ pub fn collide_projectiles<Side>(
         if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
 
-            let mut commands = commands.lock();
+            let mut lock_guard = on_hit_resources.lock();
+            let (ref mut commands, ref mut health, ref mut rng) = &mut *lock_guard;
 
             commands.entity(entity).despawn();
-            if let Ok(mut health) = health.lock().get_mut(ship_entity) {
+            if let Ok(mut health) = health.get_mut(ship_entity) {
                 health.0 -= 10.0;
             }
-            spawn_explosion(position, total_time.0, &mut commands);
+            spawn_explosion(position, total_time.0, &mut *rng, commands);
         }
     });
 }

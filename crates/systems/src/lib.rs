@@ -398,15 +398,15 @@ pub fn handle_destruction(
                 }
             }
 
-            spawn_explosion(pos.0, total_time.0, &mut commands);
+            spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
         }
     })
 }
 
-fn spawn_explosion(pos: Vec3, total_time: f32, commands: &mut Commands) {
+fn spawn_explosion(pos: Vec3, total_time: f32, rng: &mut SmallRng, commands: &mut Commands) {
     commands.spawn_bundle((
         Position(pos),
-        RotationMatrix::default(),
+        RotationMatrix::random_for_rendering_only(rng),
         ModelId::Explosion,
         Scale(0.0),
         AliveUntil(total_time + 2.5),
