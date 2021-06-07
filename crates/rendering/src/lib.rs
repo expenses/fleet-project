@@ -1,7 +1,6 @@
 pub mod passes;
 
 use components_and_resources::gpu_structs::*;
-use components_and_resources::texture_manager::TextureManager;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -142,7 +141,7 @@ pub struct Resources {
 }
 
 impl Resources {
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: &wgpu::Device, num_merged_textures: u32) -> Self {
         let texture = |binding, shader_stage| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: shader_stage,
@@ -178,9 +177,7 @@ impl Resources {
                                 view_dimension: wgpu::TextureViewDimension::D2,
                                 multisampled: false,
                             },
-                            count: Some(
-                                std::num::NonZeroU32::new(TextureManager::COUNT as u32).unwrap(),
-                            ),
+                            count: Some(std::num::NonZeroU32::new(num_merged_textures).unwrap()),
                         },
                     ],
                 },
@@ -282,7 +279,7 @@ impl Pipelines {
         let instance_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Instance>() as u64,
             step_mode: wgpu::InputStepMode::Instance,
-            attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32, 9 => Float32, 10 => Uint32, 11 => Uint32],
+            attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32, 9 => Uint32, 10 => Uint32],
         };
 
         let vertex_2d_buffer_layout = wgpu::VertexBufferLayout {

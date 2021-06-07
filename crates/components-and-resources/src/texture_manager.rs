@@ -1,13 +1,9 @@
-use crate::resources::Models;
-
 #[derive(Default)]
 pub struct TextureManager {
     texture_views: Vec<wgpu::TextureView>,
 }
 
 impl TextureManager {
-    pub const COUNT: usize = Models::COUNT * 2;
-
     pub fn add(&mut self, texture: wgpu::TextureView) -> u32 {
         let index = self.texture_views.len() as u32;
         self.texture_views.push(texture);
@@ -36,5 +32,9 @@ impl TextureManager {
                 },
             ],
         })
+    }
+
+    pub fn count(&self) -> u32 {
+        self.texture_views.len() as u32
     }
 }

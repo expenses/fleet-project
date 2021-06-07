@@ -131,6 +131,14 @@ fn load_image(
     let image_end = image_start + image_view.length();
     let image_bytes = &buffer_blob[image_start..image_end];
 
+    load_image_from_bytes(image_bytes, &device, &queue)
+}
+
+pub fn load_image_from_bytes(
+    image_bytes: &[u8],
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+) -> anyhow::Result<wgpu::TextureView> {
     let image = image::load_from_memory_with_format(image_bytes, image::ImageFormat::Png)?;
 
     let image = match image {

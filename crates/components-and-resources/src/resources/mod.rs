@@ -14,6 +14,10 @@ use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu_glyph::ab_glyph::FontRef;
 
+pub struct MiscTextures {
+    pub mined_out_asteroid: u32,
+}
+
 #[derive(Default)]
 pub struct UnitButtons(pub Vec<(ModelId, UnitStatus)>);
 

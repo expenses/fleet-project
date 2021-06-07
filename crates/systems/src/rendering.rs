@@ -23,6 +23,7 @@ pub fn render_model_instances(
     ship_under_cursor: Res<ShipUnderCursor>,
     mut ship_buffer: ResMut<ShipBuffer>,
     models: Res<Models>,
+    misc_textures: Res<MiscTextures>,
 ) {
     query.for_each(
         |(
@@ -60,13 +61,11 @@ pub fn render_model_instances(
                     rotation: rotation_matrix.matrix,
                     colour,
                     scale: get_scale(scale),
-                    diffuse_multiplier: if *model_id == ModelId::Asteroid && can_be_mined.is_none()
-                    {
-                        1.0 / 2.5
+                    diffuse_texture: if *model_id == ModelId::Asteroid && can_be_mined.is_none() {
+                        misc_textures.mined_out_asteroid
                     } else {
-                        1.0
+                        model.diffuse_texture
                     },
-                    diffuse_texture: model.diffuse_texture,
                     emissive_texture: model.emissive_texture,
                 },
                 *model_id as usize,

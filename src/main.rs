@@ -9,7 +9,7 @@ mod background;
 
 use bevy_ecs::prelude::{IntoSystem, ParallelSystemDescriptorCoercion, Stage};
 use components_and_resources::gpu_structs::*;
-use components_and_resources::model::load_ship_model;
+use components_and_resources::model::{load_image_from_bytes, load_ship_model};
 use components_and_resources::{components, resources, texture_manager::TextureManager};
 
 fn main() -> anyhow::Result<()> {
@@ -50,9 +50,6 @@ fn main() -> anyhow::Result<()> {
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
 
-    let resources = rendering::Resources::new(&device);
-    let pipelines = rendering::Pipelines::new(&device, &resources, display_format);
-
     let draw_godrays = false;
 
     let tonemapper = colstodian::tonemapper::LottesTonemapper::new(
@@ -67,15 +64,6 @@ fn main() -> anyhow::Result<()> {
         width: window_size.width,
         height: window_size.height,
     };
-
-    let mut resizables = rendering::Resizables::new(
-        dimensions.width,
-        dimensions.height,
-        display_format,
-        &device,
-        &surface,
-        &resources,
-    );
 
     let mut rng = rand::thread_rng();
     let mut background = background::make_background(&mut rng);
@@ -243,7 +231,7 @@ fn main() -> anyhow::Result<()> {
             spawner.insert_bundle((
                 components::ModelId::Miner,
                 components::CanBeCarried,
-                components::MaxSpeed(5.0),
+                components::MaxSpeed(15.0),
                 components::Health(40.0),
                 components::MaxHealth(40.0),
                 components::CanMine,
@@ -310,58 +298,82 @@ fn main() -> anyhow::Result<()> {
         "lines 2d",
         wgpu::BufferUsage::VERTEX,
     ));
+
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
     let mut bounding_boxes = Vec::new();
     let mut texture_manager = TextureManager::default();
+
+    world.insert_resource(resources::MiscTextures {
+        mined_out_asteroid: texture_manager.add(load_image_from_bytes(
+            &include_bytes!("../textures/mined_out_asteroid.png")[..],
+            &device,
+            &queue,
+        )?),
+    });
+
+    let models = [
+        load_ship_model(
+            include_bytes!("../models/carrier.glb"),
+            &device,
+            &queue,
+            &mut vertices,
+            &mut indices,
+            &mut bounding_boxes,
+            &mut texture_manager,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/fighter.glb"),
+            &device,
+            &queue,
+            &mut vertices,
+            &mut indices,
+            &mut bounding_boxes,
+            &mut texture_manager,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/miner.glb"),
+            &device,
+            &queue,
+            &mut vertices,
+            &mut indices,
+            &mut bounding_boxes,
+            &mut texture_manager,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/explosion.glb"),
+            &device,
+            &queue,
+            &mut vertices,
+            &mut indices,
+            &mut bounding_boxes,
+            &mut texture_manager,
+        )?,
+        load_ship_model(
+            include_bytes!("../models/asteroid.glb"),
+            &device,
+            &queue,
+            &mut vertices,
+            &mut indices,
+            &mut bounding_boxes,
+            &mut texture_manager,
+        )?,
+    ];
+
+    let resources = rendering::Resources::new(&device, texture_manager.count());
+    let pipelines = rendering::Pipelines::new(&device, &resources, display_format);
+
+    let mut resizables = rendering::Resizables::new(
+        dimensions.width,
+        dimensions.height,
+        display_format,
+        &device,
+        &surface,
+        &resources,
+    );
+
     world.insert_resource(resources::Models {
-        models: [
-            load_ship_model(
-                include_bytes!("../models/carrier.glb"),
-                &device,
-                &queue,
-                &mut vertices,
-                &mut indices,
-                &mut bounding_boxes,
-                &mut texture_manager,
-            )?,
-            load_ship_model(
-                include_bytes!("../models/fighter.glb"),
-                &device,
-                &queue,
-                &mut vertices,
-                &mut indices,
-                &mut bounding_boxes,
-                &mut texture_manager,
-            )?,
-            load_ship_model(
-                include_bytes!("../models/miner.glb"),
-                &device,
-                &queue,
-                &mut vertices,
-                &mut indices,
-                &mut bounding_boxes,
-                &mut texture_manager,
-            )?,
-            load_ship_model(
-                include_bytes!("../models/explosion.glb"),
-                &device,
-                &queue,
-                &mut vertices,
-                &mut indices,
-                &mut bounding_boxes,
-                &mut texture_manager,
-            )?,
-            load_ship_model(
-                include_bytes!("../models/asteroid.glb"),
-                &device,
-                &queue,
-                &mut vertices,
-                &mut indices,
-                &mut bounding_boxes,
-                &mut texture_manager,
-            )?,
-        ],
+        models,
         vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("merged model vertices"),
             usage: wgpu::BufferUsage::VERTEX,
