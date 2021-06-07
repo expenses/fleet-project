@@ -694,9 +694,6 @@ pub fn create_bvh(
     bvh.clear();
 
     query.for_each(|(entity, bbox)| {
-        bvh.insert(
-            entity,
-            bbox.0,
-        );
+        bvh.insert(entity, bbox.0);
     });
 }

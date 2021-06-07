@@ -6,15 +6,7 @@ use components_and_resources::resources::*;
 #[profiling::function]
 pub fn collide_projectiles<Side>(
     projectiles: Query<(Entity, &Projectile), With<Side>>,
-    ships: Query<
-        (
-            &Position,
-            &RotationMatrix,
-            &ModelId,
-            Option<&Scale>,
-        ),
-        Without<Side>,
-    >,
+    ships: Query<(&Position, &RotationMatrix, &ModelId, Option<&Scale>), Without<Side>>,
     models: Res<Models>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
@@ -33,7 +25,12 @@ pub fn collide_projectiles<Side>(
 
         let first_hit = bvh
             .find(|ship_bounding_box| bounding_box.intersects(ship_bounding_box))
-            .filter_map(|entity| ships.get(*entity).ok().map(|components| (*entity, components)))
+            .filter_map(|entity| {
+                ships
+                    .get(*entity)
+                    .ok()
+                    .map(|components| (*entity, components))
+            })
             .flat_map(|(ship_entity, (position, rotation, model_id, scale))| {
                 let scale = get_scale(scale);
 

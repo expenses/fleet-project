@@ -147,20 +147,20 @@ pub fn run_avoidance(
         Option<&CommandQueue>,
         &mut StagingAvoidanceForce,
     )>,
-    boids: Query<(
-        Entity,
-        Option<&CommandQueue>,
-        &Position,
-        &Velocity,
-        &MaxSpeed,
-    )>,
+    boids: Query<(Option<&CommandQueue>, &Position, &Velocity, &MaxSpeed)>,
     task_pool: Res<bevy_tasks::TaskPool>,
+    bvh: Res<DynamicBvh<Entity>>,
 ) {
     query.par_for_each_mut(
         &task_pool,
         8,
         |(entity, pos, vel, max_speed, queue, mut steering_avoidance_force)| {
             let boid = to_boid(pos, vel, max_speed);
+
+            let max_radius = boid.radius_sq.sqrt().max(10.0);
+
+            let bbox =
+                BoundingBox::new(-Vec3::broadcast(max_radius), Vec3::broadcast(max_radius)) + pos.0;
 
             let get_be_carried_by_entity =
                 |queue: Option<&CommandQueue>| match queue.and_then(|queue| queue.0.front()) {
@@ -173,15 +173,21 @@ pub fn run_avoidance(
                 };
 
             let be_carried_by_entity = get_be_carried_by_entity(queue);
-            let iter = boids
-                .iter()
-                .filter(|&(avoid_entity, avoid_queue, ..)| {
+            let iter = bvh
+                .find(|bounding_box| bbox.intersects(bounding_box))
+                .filter_map(|&entity| {
+                    boids
+                        .get(entity)
+                        .ok()
+                        .map(|components| (entity, components))
+                })
+                .filter(|&(avoid_entity, (avoid_queue, ..))| {
                     let avoid_entity_carry_target = get_be_carried_by_entity(avoid_queue);
 
                     Some(avoid_entity) != be_carried_by_entity
                         && avoid_entity_carry_target != Some(entity)
                 })
-                .map(|(.., p, v, ms)| to_boid(p, v, ms));
+                .map(|(_, (.., p, v, ms))| to_boid(p, v, ms));
 
             steering_avoidance_force.0 = boid.avoidance(iter) * 0.1;
         },

@@ -236,11 +236,15 @@ impl<T> DynamicBvh<T> {
         }
     }
 
-    pub fn find<FN: Fn(BoundingBox) -> bool>(&self, predicate: FN) -> BvhIterator<T, FN>  {
+    pub fn find<FN: Fn(BoundingBox) -> bool>(&self, predicate: FN) -> BvhIterator<T, FN> {
         BvhIterator {
-            stack: vec![&self.nodes[self.root]],
+            stack: if let Some(node) = self.nodes.get(self.root) {
+                vec![node]
+            } else {
+                Vec::new()
+            },
             bvh: self,
-            predicate
+            predicate,
         }
     }
 
@@ -254,7 +258,7 @@ impl<T> DynamicBvh<T> {
 pub struct BvhIterator<'a, T, FN> {
     stack: Vec<&'a Node<T>>,
     bvh: &'a DynamicBvh<T>,
-    predicate: FN
+    predicate: FN,
 }
 
 impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {

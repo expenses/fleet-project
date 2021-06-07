@@ -495,9 +495,7 @@ fn main() -> anyhow::Result<()> {
                 .after("pos")
                 .after("rot_mat"),
         )
-        .with_system(
-            systems::create_bvh.system().after("bbox")
-        )
+        .with_system(systems::create_bvh.system().label("bvh").after("bbox"))
         // Dependent on model movement.
         .with_system(
             systems::move_camera_around_following
@@ -521,7 +519,7 @@ fn main() -> anyhow::Result<()> {
             systems::run_avoidance
                 .system()
                 .label("avoidance")
-                .after("pos"),
+                .after("bvh"),
         )
         .with_system(systems::run_persuit.system().after("avoidance"))
         .with_system(systems::run_evasion.system().after("pos"))
