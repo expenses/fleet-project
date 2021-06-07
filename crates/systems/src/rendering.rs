@@ -371,3 +371,30 @@ pub fn render_health(
         }
     })
 }
+
+pub fn debug_render_bvh(
+    bvh: Res<DynamicBvh<Entity>>,
+    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+) {
+    let bounding_box_indices = [
+        0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7,
+    ];
+
+    bvh.iter_bounding_boxes()
+        .for_each(|(bounding_box, is_root)| {
+            let colour = if is_root {
+                Vec3::unit_y()
+            } else {
+                Vec3::unit_z()
+            };
+
+            let corners = bounding_box.corners();
+
+            for i in bounding_box_indices.iter().cloned() {
+                lines_buffer.stage(&[BackgroundVertex {
+                    position: corners[i],
+                    colour,
+                }])
+            }
+        })
+}

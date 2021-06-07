@@ -429,6 +429,8 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::UnitButtons::default());
     world.insert_resource(resources::SelectedButton::default());
 
+    world.insert_resource(resources::DynamicBvh::<bevy_ecs::prelude::Entity>::default());
+
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
         .with_system(systems::spin.system())
@@ -566,7 +568,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
         .with_system(systems::render_health.system())
-        .with_system(systems::render_buttons.system());
+        .with_system(systems::render_buttons.system())
+        .with_system(systems::debug_render_bvh.system());
 
     let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::upload_buffer::<LaserVertex>.system())
@@ -581,6 +584,11 @@ fn main() -> anyhow::Result<()> {
         .with_stage_after("stage 2", "stage 3", stage_3)
         .with_stage_after("stage 3", "final stage", final_stage)
         .with_stage_after("final stage", "buffer upload stage", upload_buffer_stage);
+
+    let mut init_stage =
+        bevy_ecs::schedule::SystemStage::parallel().with_system(systems::create_bvh.system());
+
+    init_stage.run(&mut world);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {

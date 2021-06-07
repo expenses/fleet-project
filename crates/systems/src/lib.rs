@@ -685,3 +685,18 @@ pub fn set_selected_button(
         None
     };
 }
+
+pub fn create_bvh(
+    mut bvh: ResMut<DynamicBvh<Entity>>,
+    query: Query<(Entity, &Position, &ModelId)>,
+    models: Res<Models>,
+) {
+    query.for_each(|(entity, pos, model_id)| {
+        let model = models.get(*model_id);
+
+        bvh.insert(
+            entity,
+            (model.bounding_box + pos.0).expand(Vec3::broadcast(3.0)),
+        );
+    });
+}

@@ -1,5 +1,9 @@
 use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
 
+mod dynamic_bvh;
+
+pub use dynamic_bvh::DynamicBvh;
+
 #[derive(Debug, Default, Clone)]
 pub struct Ray {
     pub origin: Vec3,
@@ -236,7 +240,7 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct BoundingBox {
     min: Vec3,
     max: Vec3,
@@ -287,6 +291,25 @@ impl BoundingBox {
             Vec3::new(self.max.x, self.max.y, self.min.z),
             Vec3::new(self.max.x, self.max.y, self.max.z),
         ]
+    }
+
+    fn union_with(self, other: Self) -> Self {
+        Self {
+            min: self.min.min_by_component(other.min),
+            max: self.max.max_by_component(other.max),
+        }
+    }
+
+    fn surface_area(self) -> f32 {
+        let inner = self.max - self.min;
+        2.0 * (inner.x * inner.y + inner.y * inner.z + inner.z * inner.x)
+    }
+
+    pub fn expand(self, by: Vec3) -> Self {
+        Self {
+            min: self.min - by,
+            max: self.max + by,
+        }
     }
 }
 

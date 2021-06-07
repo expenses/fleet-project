@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 rstar = { git = "https://github.com/expenses/rstar", branch = "selection-function-with-data" }
+slab = "0.4.3"
 ultraviolet = "0.8.1"

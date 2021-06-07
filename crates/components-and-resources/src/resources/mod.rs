@@ -6,7 +6,7 @@ pub use gpu_buffer::{GpuBuffer, ShipBuffer};
 pub use keyboard::KeyboardState;
 pub use mouse::{MouseButtonState, MouseState};
 pub use rand::rngs::SmallRng;
-pub use ray_collisions::{BoundingBox, Projectile, Ray, SelectionFrustum};
+pub use ray_collisions::{BoundingBox, DynamicBvh, Projectile, Ray, SelectionFrustum};
 
 use crate::components::{ModelId, MoveType};
 use crate::model::Model;

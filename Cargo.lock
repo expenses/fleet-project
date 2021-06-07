@@ -2260,6 +2260,7 @@ name = "ray-collisions"
 version = "0.1.0"
 dependencies = [
  "rstar",
+ "slab",
  "ultraviolet",
 ]
 
