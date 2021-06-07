@@ -569,8 +569,8 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
         .with_system(systems::render_health.system())
-        .with_system(systems::render_buttons.system())
-        .with_system(systems::debug_render_bvh.system());
+        //.with_system(systems::debug_render_bvh.system())
+        .with_system(systems::render_buttons.system());
 
     let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::upload_buffer::<LaserVertex>.system())
