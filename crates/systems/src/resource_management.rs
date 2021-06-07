@@ -22,32 +22,30 @@ pub fn mine(
                 queue.0.pop_front();
                 find_next_carrier(pos.0, &mut queue, &carriers);
                 find_next_asteroid(pos.0, &mut queue, &new_targets);
+            } else if let Ok((target_pos, mut can_be_mined)) = targets.get_mut(*target) {
+                let max_force = max_speed.max_force();
+                let within_range = (pos.0 - target_pos.0).mag_sq() < range_sq + max_force;
+
+                if within_range {
+                    let to_mine = delta_time.0;
+                    let to_mine = to_mine
+                        .min(can_be_mined.minerals)
+                        .min(stored_minerals.capacity - stored_minerals.stored);
+                    can_be_mined.minerals -= to_mine;
+
+                    stored_minerals.stored += to_mine;
+
+                    if to_mine == 0.0 {
+                        commands.entity(*target).remove::<CanBeMined>();
+                    }
+                }
             } else {
-                if let Ok((target_pos, mut can_be_mined)) = targets.get_mut(*target) {
-                    let max_force = max_speed.max_force();
-                    let within_range = (pos.0 - target_pos.0).mag_sq() < range_sq + max_force;
+                queue.0.pop_front();
 
-                    if within_range {
-                        let to_mine = delta_time.0;
-                        let to_mine = to_mine
-                            .min(can_be_mined.minerals)
-                            .min(stored_minerals.capacity - stored_minerals.stored);
-                        can_be_mined.minerals -= to_mine;
-
-                        stored_minerals.stored += to_mine;
-
-                        if to_mine == 0.0 {
-                            commands.entity(*target).remove::<CanBeMined>();
-                        }
-                    }
+                if new_targets.iter().next().is_none() {
+                    find_next_carrier(pos.0, &mut queue, &carriers);
                 } else {
-                    queue.0.pop_front();
-
-                    if new_targets.iter().next().is_none() {
-                        find_next_carrier(pos.0, &mut queue, &carriers);
-                    } else {
-                        find_next_asteroid(pos.0, &mut queue, &new_targets);
-                    }
+                    find_next_asteroid(pos.0, &mut queue, &new_targets);
                 }
             }
         }

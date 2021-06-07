@@ -389,7 +389,7 @@ fn main() -> anyhow::Result<()> {
             usage: wgpu::BufferUsage::VERTEX,
             contents: bytemuck::cast_slice(&bounding_boxes),
         }),
-        bind_group: texture_manager.to_bind_group(
+        bind_group: texture_manager.into_bind_group(
             &device,
             &resources.nearest_sampler,
             &resources.merged_textures_bgl,

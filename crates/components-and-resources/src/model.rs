@@ -109,10 +109,10 @@ pub fn load_ship_model(
 
     Ok(Model {
         num_indices,
-        diffuse_texture,
-        emissive_texture,
         acceleration_tree,
         bounding_box,
+        diffuse_texture,
+        emissive_texture,
     })
 }
 

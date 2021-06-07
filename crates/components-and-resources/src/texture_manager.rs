@@ -10,7 +10,7 @@ impl TextureManager {
         index
     }
 
-    pub fn to_bind_group(
+    pub fn into_bind_group(
         self,
         device: &wgpu::Device,
         sampler: &wgpu::Sampler,
