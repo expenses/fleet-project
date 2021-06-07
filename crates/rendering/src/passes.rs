@@ -93,6 +93,7 @@ pub fn run_render_passes(
     render_pass.set_vertex_buffer(0, models.vertices.slice(..));
     render_pass.set_vertex_buffer(1, instance_buffer);
     render_pass.set_index_buffer(models.indices.slice(..), wgpu::IndexFormat::Uint16);
+    render_pass.set_bind_group(0, &models.bind_group, &[]);
 
     let mut offset = 0;
     let mut index_offset = 0;
@@ -103,7 +104,6 @@ pub fn run_render_passes(
         let model = &models.models[i];
 
         if num_instances > 0 {
-            render_pass.set_bind_group(0, &model.bind_group, &[]);
             render_pass.draw_indexed(
                 index_offset..index_offset + model.num_indices,
                 0,

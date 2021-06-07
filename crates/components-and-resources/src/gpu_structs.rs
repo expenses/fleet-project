@@ -15,6 +15,8 @@ pub struct Instance {
     pub colour: Vec3,
     pub scale: f32,
     pub diffuse_multiplier: f32,
+    pub diffuse_texture: u32,
+    pub emissive_texture: u32,
 }
 
 #[repr(C)]

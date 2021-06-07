@@ -10,7 +10,7 @@ mod background;
 use bevy_ecs::prelude::{IntoSystem, ParallelSystemDescriptorCoercion, Stage};
 use components_and_resources::gpu_structs::*;
 use components_and_resources::model::load_ship_model;
-use components_and_resources::{components, resources};
+use components_and_resources::{components, resources, texture_manager::TextureManager};
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -35,7 +35,9 @@ fn main() -> anyhow::Result<()> {
     let (device, queue) = pollster::block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
             label: Some("device"),
-            features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::DEPTH_CLAMPING,
+            features: wgpu::Features::PUSH_CONSTANTS
+                | wgpu::Features::DEPTH_CLAMPING
+                | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY,
             limits: wgpu::Limits {
                 max_push_constant_size: std::mem::size_of::<[ultraviolet::Mat4; 2]>() as u32,
                 ..Default::default()
@@ -314,74 +316,75 @@ fn main() -> anyhow::Result<()> {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
     let mut bounding_boxes = Vec::new();
+    let mut texture_manager = TextureManager::default();
     world.insert_resource(resources::Models {
         models: [
             load_ship_model(
                 include_bytes!("../models/carrier.glb"),
                 &device,
                 &queue,
-                &resources.ship_bgl,
-                &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
                 &mut bounding_boxes,
+                &mut texture_manager,
             )?,
             load_ship_model(
                 include_bytes!("../models/fighter.glb"),
                 &device,
                 &queue,
-                &resources.ship_bgl,
-                &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
                 &mut bounding_boxes,
+                &mut texture_manager,
             )?,
             load_ship_model(
                 include_bytes!("../models/miner.glb"),
                 &device,
                 &queue,
-                &resources.ship_bgl,
-                &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
                 &mut bounding_boxes,
+                &mut texture_manager,
             )?,
             load_ship_model(
                 include_bytes!("../models/explosion.glb"),
                 &device,
                 &queue,
-                &resources.ship_bgl,
-                &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
                 &mut bounding_boxes,
+                &mut texture_manager,
             )?,
             load_ship_model(
                 include_bytes!("../models/asteroid.glb"),
                 &device,
                 &queue,
-                &resources.ship_bgl,
-                &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
                 &mut bounding_boxes,
+                &mut texture_manager,
             )?,
         ],
         vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("merged model vertices"),
             usage: wgpu::BufferUsage::VERTEX,
             contents: bytemuck::cast_slice(&vertices),
         }),
         indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("merged model indices"),
             usage: wgpu::BufferUsage::INDEX,
             contents: bytemuck::cast_slice(&indices),
         }),
         bounding_boxes: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("merged model bounding box vertices"),
             usage: wgpu::BufferUsage::VERTEX,
             contents: bytemuck::cast_slice(&bounding_boxes),
         }),
+        bind_group: texture_manager.to_bind_group(
+            &device,
+            &resources.nearest_sampler,
+            &resources.merged_textures_bgl,
+        ),
     });
 
     let glyph_brush: resources::GlyphBrush = wgpu_glyph::GlyphBrushBuilder::using_font(

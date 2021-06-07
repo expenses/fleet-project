@@ -1,24 +1,25 @@
 use crate::gpu_structs::ModelVertex;
+use crate::texture_manager::TextureManager;
 use ray_collisions::{BoundingBox, Triangle};
 use ultraviolet::Vec3;
 use wgpu::util::DeviceExt;
 
 pub struct Model {
     pub num_indices: u32,
-    pub bind_group: wgpu::BindGroup,
     pub acceleration_tree: rstar::RTree<Triangle>,
     pub bounding_box: BoundingBox,
+    pub diffuse_texture: u32,
+    pub emissive_texture: u32,
 }
 
 pub fn load_ship_model(
     bytes: &[u8],
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    bgl: &wgpu::BindGroupLayout,
-    sampler: &wgpu::Sampler,
     merged_vertices: &mut Vec<ModelVertex>,
     merged_indices: &mut Vec<u16>,
     merged_bounding_boxes: &mut Vec<Vec3>,
+    texture_manager: &mut TextureManager,
 ) -> anyhow::Result<Model> {
     let gltf = gltf::Gltf::from_slice(bytes)?;
 
@@ -97,24 +98,8 @@ pub fn load_ship_model(
     let emissive_texture = material.emissive_texture().unwrap().texture();
     let emissive_texture = load_image(&emissive_texture.source(), buffer_blob, device, queue)?;
 
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: bgl,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Sampler(sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&diffuse_texture),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&emissive_texture),
-            },
-        ],
-    });
+    let diffuse_texture = texture_manager.add(diffuse_texture);
+    let emissive_texture = texture_manager.add(emissive_texture);
 
     let min: Vec3 = bounding_box.min.into();
     let max: Vec3 = bounding_box.max.into();
@@ -124,7 +109,8 @@ pub fn load_ship_model(
 
     Ok(Model {
         num_indices,
-        bind_group,
+        diffuse_texture,
+        emissive_texture,
         acceleration_tree,
         bounding_box,
     })

@@ -22,6 +22,7 @@ pub fn render_model_instances(
     )>,
     ship_under_cursor: Res<ShipUnderCursor>,
     mut ship_buffer: ResMut<ShipBuffer>,
+    models: Res<Models>,
 ) {
     query.for_each(
         |(
@@ -51,6 +52,8 @@ pub fn render_model_instances(
                 Vec3::zero()
             };
 
+            let model = models.get(*model_id);
+
             ship_buffer.stage(
                 Instance {
                     translation: position.0,
@@ -63,6 +66,8 @@ pub fn render_model_instances(
                     } else {
                         1.0
                     },
+                    diffuse_texture: model.diffuse_texture,
+                    emissive_texture: model.emissive_texture,
                 },
                 *model_id as usize,
             );

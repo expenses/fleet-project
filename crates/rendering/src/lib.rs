@@ -1,6 +1,7 @@
 pub mod passes;
 
 use components_and_resources::gpu_structs::*;
+use components_and_resources::texture_manager::TextureManager;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -134,7 +135,7 @@ fn make_effect_bind_group(
 }
 
 pub struct Resources {
-    pub ship_bgl: wgpu::BindGroupLayout,
+    pub merged_textures_bgl: wgpu::BindGroupLayout,
     effect_bgl: wgpu::BindGroupLayout,
     pub nearest_sampler: wgpu::Sampler,
     linear_sampler: wgpu::Sampler,
@@ -164,14 +165,26 @@ impl Resources {
         };
 
         Self {
-            ship_bgl: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("ship bind group layout"),
-                entries: &[
-                    sampler(0, wgpu::ShaderStage::FRAGMENT, false),
-                    texture(1, wgpu::ShaderStage::FRAGMENT),
-                    texture(2, wgpu::ShaderStage::FRAGMENT),
-                ],
-            }),
+            merged_textures_bgl: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("merged textures bind group layout"),
+                    entries: &[
+                        sampler(0, wgpu::ShaderStage::FRAGMENT, false),
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: Some(
+                                std::num::NonZeroU32::new(TextureManager::COUNT as u32).unwrap(),
+                            ),
+                        },
+                    ],
+                },
+            ),
             effect_bgl: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("effect bind group layout"),
                 entries: &[
@@ -246,7 +259,7 @@ impl Pipelines {
         let ship_bgl_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("ship bgl pipeline layout"),
-                bind_group_layouts: &[&resources.ship_bgl],
+                bind_group_layouts: &[&resources.merged_textures_bgl],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                     range: 0..std::mem::size_of::<PushConstants>() as u32,
@@ -269,7 +282,7 @@ impl Pipelines {
         let instance_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Instance>() as u64,
             step_mode: wgpu::InputStepMode::Instance,
-            attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32, 9 => Float32],
+            attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32, 9 => Float32, 10 => Uint32, 11 => Uint32],
         };
 
         let vertex_2d_buffer_layout = wgpu::VertexBufferLayout {
@@ -421,9 +434,10 @@ impl Pipelines {
                     "../shaders/compiled/ship.vert.spv"
                 ));
 
-                let fs_ship = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/ship.frag.spv"
-                ));
+                let mut fs_ship_desc = wgpu::include_spirv!("../shaders/compiled/ship.frag.spv");
+                // Needed for WGSL reasons
+                fs_ship_desc.flags = Default::default();
+                let fs_ship = device.create_shader_module(&fs_ship_desc);
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("ship pipeline"),

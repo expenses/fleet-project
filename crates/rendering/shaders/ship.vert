@@ -11,6 +11,8 @@ layout(location = 6) in vec3 translation;
 layout(location = 7) in vec3 colour;
 layout(location = 8) in float scale;
 layout(location = 9) in float diffuse_multiplier;
+layout(location = 10) in uint diffuse_texture;
+layout(location = 11) in uint emissive_texture;
 
 layout(push_constant) uniform PushConstants {
     mat4 perspective_view;
@@ -20,6 +22,9 @@ layout(push_constant) uniform PushConstants {
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec2 out_uv;
 layout(location = 2) out float out_diffuse_multiplier;
+layout(location = 3) out uint out_diffuse_texture;
+layout(location = 4) out uint out_emissive_texture;
+
 
 void main() {
     mat3 rotation = mat3(rotation_1, rotation_2, rotation_3);
@@ -30,4 +35,6 @@ void main() {
     out_normal = rotation * normal;
     out_uv = uv;
     out_diffuse_multiplier = diffuse_multiplier;
+    out_diffuse_texture = diffuse_texture;
+    out_emissive_texture = emissive_texture;
 }

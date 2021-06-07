@@ -81,6 +81,7 @@ pub struct Models {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
     pub bounding_boxes: wgpu::Buffer,
+    pub bind_group: wgpu::BindGroup,
     pub models: [Model; Self::COUNT],
 }
 
