@@ -131,10 +131,10 @@ pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
         {
             ray_cooldown.0 = 1.0;
 
-            let ray = Ray::new(pos.0, vel.0);
+            let ray = Ray::new(pos.0, vel.0.normalized());
 
             commands.spawn_bundle((
-                Projectile::new(&ray, 100.0),
+                Projectile::new(&ray, 200.0),
                 AliveUntil(total_time.0 + 10.0),
                 Side::default(),
             ));
