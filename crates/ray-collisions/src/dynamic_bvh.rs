@@ -15,35 +15,35 @@ impl<T> Node<T> {
     }
 }
 
-struct MinValue<T> {
-    cost: f32,
+struct MinHeapItem<T> {
+    priority: f32,
     data: T,
 }
 
-impl<T> MinValue<T> {
-    fn new(cost: f32, data: T) -> Self {
-        Self { cost, data }
+impl<T> MinHeapItem<T> {
+    fn new(priority: f32, data: T) -> Self {
+        Self { priority, data }
     }
 }
 
-impl<T> PartialEq for MinValue<T> {
+impl<T> PartialEq for MinHeapItem<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.cost == other.cost
+        self.priority == other.priority
     }
 }
 
-impl<T> Eq for MinValue<T> {}
+impl<T> Eq for MinHeapItem<T> {}
 
-impl<T> std::cmp::Ord for MinValue<T> {
+impl<T> std::cmp::Ord for MinHeapItem<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other
-            .cost
-            .partial_cmp(&self.cost)
+            .priority
+            .partial_cmp(&self.priority)
             .unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
-impl<T> std::cmp::PartialOrd for MinValue<T> {
+impl<T> std::cmp::PartialOrd for MinHeapItem<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -65,7 +65,7 @@ impl<T> Default for DynamicBvh<T> {
 
 impl<T> DynamicBvh<T> {
     pub fn insert(&mut self, data: T, bounding_box: BoundingBox) {
-        let leaf_index = self.push(Node {
+        let leaf_index = self.nodes.insert(Node {
             bounding_box,
             data: Some(data),
             parent_index: None,
@@ -84,7 +84,7 @@ impl<T> DynamicBvh<T> {
 
         let old_parent = self.nodes[sibling].parent_index;
 
-        let new_parent = self.push(Node {
+        let new_parent = self.nodes.insert(Node {
             bounding_box: bounding_box.union_with(self.nodes[sibling].bounding_box),
             parent_index: old_parent,
             left_child: leaf_index,
@@ -111,6 +111,10 @@ impl<T> DynamicBvh<T> {
         self.refit(leaf_index);
     }
 
+    pub fn clear(&mut self) {
+        self.nodes.clear();
+    }
+
     fn find_best_sibling(&self, bounding_box: BoundingBox) -> usize {
         let mut lowest_cost = self.nodes[self.root]
             .bounding_box
@@ -120,9 +124,9 @@ impl<T> DynamicBvh<T> {
 
         let mut priority_queue = std::collections::BinaryHeap::new();
 
-        priority_queue.push(MinValue::new(lowest_cost, (self.root, 0.0)));
+        priority_queue.push(MinHeapItem::new(lowest_cost, (self.root, 0.0)));
 
-        while let Some(MinValue {
+        while let Some(MinHeapItem {
             data: (index, parent_delta_surface_area),
             ..
         }) = priority_queue.pop()
@@ -144,11 +148,11 @@ impl<T> DynamicBvh<T> {
                 let lower_bound = bounding_box.surface_area() + delta_surface_area;
 
                 if lower_bound < lowest_cost {
-                    priority_queue.push(MinValue::new(
+                    priority_queue.push(MinHeapItem::new(
                         lower_bound,
                         (node.left_child, delta_surface_area),
                     ));
-                    priority_queue.push(MinValue::new(
+                    priority_queue.push(MinHeapItem::new(
                         lower_bound,
                         (node.right_child, delta_surface_area),
                     ));
@@ -232,32 +236,44 @@ impl<T> DynamicBvh<T> {
         }
     }
 
-    fn push(&mut self, node: Node<T>) -> usize {
-        self.nodes.insert(node)
-    }
-
-    pub fn find(&self, test: impl Fn(BoundingBox) -> bool) -> Option<&T> {
-        let mut stack = vec![&self.nodes[self.root]];
-
-        while let Some(node) = stack.pop() {
-            if test(node.bounding_box) {
-                match &node.data {
-                    Some(data) => return Some(data),
-                    None => {
-                        stack.push(&self.nodes[node.left_child]);
-                        stack.push(&self.nodes[node.right_child]);
-                    }
-                }
-            }
+    pub fn find<FN: Fn(BoundingBox) -> bool>(&self, predicate: FN) -> BvhIterator<T, FN>  {
+        BvhIterator {
+            stack: vec![&self.nodes[self.root]],
+            bvh: self,
+            predicate
         }
-
-        return None;
     }
 
     pub fn iter_bounding_boxes(&self) -> impl Iterator<Item = (BoundingBox, bool)> + '_ {
         self.nodes
             .iter()
             .map(|(_, node)| (node.bounding_box, node.data.is_some()))
+    }
+}
+
+pub struct BvhIterator<'a, T, FN> {
+    stack: Vec<&'a Node<T>>,
+    bvh: &'a DynamicBvh<T>,
+    predicate: FN
+}
+
+impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(node) = self.stack.pop() {
+            if (self.predicate)(node.bounding_box) {
+                match &node.data {
+                    Some(data) => return Some(data),
+                    None => {
+                        self.stack.push(&self.bvh.nodes[node.left_child]);
+                        self.stack.push(&self.bvh.nodes[node.right_child]);
+                    }
+                }
+            }
+        }
+
+        None
     }
 }
 

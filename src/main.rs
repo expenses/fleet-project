@@ -495,6 +495,9 @@ fn main() -> anyhow::Result<()> {
                 .after("pos")
                 .after("rot_mat"),
         )
+        .with_system(
+            systems::create_bvh.system().after("bbox")
+        )
         // Dependent on model movement.
         .with_system(
             systems::move_camera_around_following
@@ -585,10 +588,12 @@ fn main() -> anyhow::Result<()> {
         .with_stage_after("stage 3", "final stage", final_stage)
         .with_stage_after("final stage", "buffer upload stage", upload_buffer_stage);
 
+    /*
     let mut init_stage =
         bevy_ecs::schedule::SystemStage::parallel().with_system(systems::create_bvh.system());
 
     init_stage.run(&mut world);
+    */
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { ref event, .. } => match event {

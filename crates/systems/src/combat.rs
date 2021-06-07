@@ -8,8 +8,6 @@ pub fn collide_projectiles<Side>(
     projectiles: Query<(Entity, &Projectile), With<Side>>,
     ships: Query<
         (
-            Entity,
-            &WorldSpaceBoundingBox,
             &Position,
             &RotationMatrix,
             &ModelId,
@@ -24,6 +22,7 @@ pub fn collide_projectiles<Side>(
     health: Query<&mut Health>,
     task_pool: Res<bevy_tasks::TaskPool>,
     rng: ResMut<SmallRng>,
+    bvh: Res<DynamicBvh<Entity>>,
 ) where
     Side: Send + Sync + 'static,
 {
@@ -32,10 +31,10 @@ pub fn collide_projectiles<Side>(
     projectiles.par_for_each(&task_pool, 16, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
-        let first_hit = ships
-            .iter()
-            .filter(|(_, ship_bounding_box, ..)| bounding_box.intersects(ship_bounding_box.0))
-            .flat_map(|(ship_entity, _, position, rotation, model_id, scale)| {
+        let first_hit = bvh
+            .find(|ship_bounding_box| bounding_box.intersects(ship_bounding_box))
+            .filter_map(|entity| ships.get(*entity).ok().map(|components| (*entity, components)))
+            .flat_map(|(ship_entity, (position, rotation, model_id, scale))| {
                 let scale = get_scale(scale);
 
                 let ray = projectile

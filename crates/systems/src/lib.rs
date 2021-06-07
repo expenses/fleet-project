@@ -686,17 +686,17 @@ pub fn set_selected_button(
     };
 }
 
+#[profiling::function]
 pub fn create_bvh(
     mut bvh: ResMut<DynamicBvh<Entity>>,
-    query: Query<(Entity, &Position, &ModelId)>,
-    models: Res<Models>,
+    query: Query<(Entity, &WorldSpaceBoundingBox)>,
 ) {
-    query.for_each(|(entity, pos, model_id)| {
-        let model = models.get(*model_id);
+    bvh.clear();
 
+    query.for_each(|(entity, bbox)| {
         bvh.insert(
             entity,
-            (model.bounding_box + pos.0).expand(Vec3::broadcast(3.0)),
+            bbox.0,
         );
     });
 }
