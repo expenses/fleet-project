@@ -14,6 +14,8 @@ use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu_glyph::ab_glyph::FontRef;
 
+pub type TopLevelAccelerationStructure = DynamicBvh<Entity>;
+
 pub struct MiscTextures {
     pub mined_out_asteroid: u32,
 }

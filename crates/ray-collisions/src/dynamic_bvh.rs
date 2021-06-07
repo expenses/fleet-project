@@ -52,6 +52,7 @@ impl<T> std::cmp::PartialOrd for MinHeapItem<T> {
 pub struct DynamicBvh<T> {
     nodes: slab::Slab<Node<T>>,
     root: usize,
+    insertion_priority_queue: std::collections::BinaryHeap<MinHeapItem<(usize, f32)>>,
 }
 
 impl<T> Default for DynamicBvh<T> {
@@ -59,12 +60,13 @@ impl<T> Default for DynamicBvh<T> {
         Self {
             nodes: Default::default(),
             root: 0,
+            insertion_priority_queue: Default::default(),
         }
     }
 }
 
 impl<T> DynamicBvh<T> {
-    pub fn insert(&mut self, data: T, bounding_box: BoundingBox) {
+    pub fn insert(&mut self, data: T, bounding_box: BoundingBox) -> usize {
         let leaf_index = self.nodes.insert(Node {
             bounding_box,
             data: Some(data),
@@ -74,8 +76,8 @@ impl<T> DynamicBvh<T> {
         });
 
         if self.nodes.len() == 1 {
-            self.root = 0;
-            return;
+            self.root = leaf_index;
+            return leaf_index;
         }
 
         let sibling = self.find_best_sibling(bounding_box);
@@ -109,27 +111,30 @@ impl<T> DynamicBvh<T> {
 
         // Stage 3: walk back up the tree refitting AABBs
         self.refit(leaf_index);
+
+        leaf_index
     }
 
     pub fn clear(&mut self) {
         self.nodes.clear();
     }
 
-    fn find_best_sibling(&self, bounding_box: BoundingBox) -> usize {
+    fn find_best_sibling(&mut self, bounding_box: BoundingBox) -> usize {
         let mut lowest_cost = self.nodes[self.root]
             .bounding_box
             .union_with(bounding_box)
             .surface_area();
         let mut best_sibling = self.root;
 
-        let mut priority_queue = std::collections::BinaryHeap::new();
+        self.insertion_priority_queue.clear();
 
-        priority_queue.push(MinHeapItem::new(lowest_cost, (self.root, 0.0)));
+        self.insertion_priority_queue
+            .push(MinHeapItem::new(lowest_cost, (self.root, 0.0)));
 
         while let Some(MinHeapItem {
             data: (index, parent_delta_surface_area),
             ..
-        }) = priority_queue.pop()
+        }) = self.insertion_priority_queue.pop()
         {
             let node = &self.nodes[index];
 
@@ -148,11 +153,11 @@ impl<T> DynamicBvh<T> {
                 let lower_bound = bounding_box.surface_area() + delta_surface_area;
 
                 if lower_bound < lowest_cost {
-                    priority_queue.push(MinHeapItem::new(
+                    self.insertion_priority_queue.push(MinHeapItem::new(
                         lower_bound,
                         (node.left_child, delta_surface_area),
                     ));
-                    priority_queue.push(MinHeapItem::new(
+                    self.insertion_priority_queue.push(MinHeapItem::new(
                         lower_bound,
                         (node.right_child, delta_surface_area),
                     ));
@@ -178,28 +183,11 @@ impl<T> DynamicBvh<T> {
         }
     }
 
-    fn find_index(&self, selection_fn: impl Fn(&T) -> bool) -> Option<usize> {
-        for i in 0..self.nodes.len() {
-            let node = &self.nodes[i];
-
-            if let Some(data) = &node.data {
-                if selection_fn(data) {
-                    return Some(i);
-                }
-            }
-        }
-
-        None
+    pub fn get_mut(&mut self, index: usize) -> &mut T {
+        self.nodes[index].data.as_mut().unwrap()
     }
 
-    pub fn remove(&mut self, selection_fn: impl Fn(&T) -> bool) -> Option<T> {
-        let index = self.find_index(selection_fn);
-
-        let index = match index {
-            Some(index) => index,
-            None => return None,
-        };
-
+    pub fn remove(&mut self, index: usize) -> Option<T> {
         if let Some(parent) = self.nodes[index].parent_index {
             let grandparent = self.nodes[parent].parent_index;
 

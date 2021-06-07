@@ -149,7 +149,7 @@ pub fn run_avoidance(
     )>,
     boids: Query<(Option<&CommandQueue>, &Position, &Velocity, &MaxSpeed)>,
     task_pool: Res<bevy_tasks::TaskPool>,
-    bvh: Res<DynamicBvh<Entity>>,
+    bvh: Res<TopLevelAccelerationStructure>,
 ) {
     query.par_for_each_mut(
         &task_pool,

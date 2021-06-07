@@ -429,7 +429,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::UnitButtons::default());
     world.insert_resource(resources::SelectedButton::default());
 
-    world.insert_resource(resources::DynamicBvh::<bevy_ecs::prelude::Entity>::default());
+    world.insert_resource(resources::TopLevelAccelerationStructure::default());
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.

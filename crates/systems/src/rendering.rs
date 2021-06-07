@@ -344,6 +344,7 @@ pub fn render_buttons(
     }
 }
 
+#[profiling::function]
 pub fn render_health(
     query: Query<(&Position, &Health), With<Selected>>,
     mut glyph_brush: ResMut<GlyphBrush>,
@@ -372,8 +373,9 @@ pub fn render_health(
     })
 }
 
+#[profiling::function]
 pub fn debug_render_bvh(
-    bvh: Res<DynamicBvh<Entity>>,
+    bvh: Res<TopLevelAccelerationStructure>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
 ) {
     let bounding_box_indices = [
