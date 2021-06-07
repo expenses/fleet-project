@@ -273,8 +273,10 @@ pub fn run_render_passes(
         for i in 0..resources::Models::COUNT {
             let num_instances = num_instances[i];
 
-            if num_instances > 0 && i != ModelId::Explosion as usize {
-                render_pass.draw_indexed(0..24, vertex_offset, offset..offset + num_instances);
+            if num_instances > 0 {
+                if i != ModelId::Explosion as usize {
+                    render_pass.draw_indexed(0..24, vertex_offset, offset..offset + num_instances);
+                }
 
                 offset += num_instances;
             }

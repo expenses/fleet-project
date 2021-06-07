@@ -158,13 +158,14 @@ impl ShipBuffer {
         for i in 0..Models::COUNT {
             let buffer = &self.staging[i];
 
+            let index_count = models.models[i].num_indices;
+
             if !buffer.is_empty() {
                 let bytes = bytemuck::cast_slice(buffer);
                 queue.write_buffer(&self.buffer, offset, bytes);
                 offset += bytes.len() as u64;
 
                 let instance_count = buffer.len() as u32;
-                let index_count = models.models[i].num_indices;
 
                 draw_indirect_array[draw_indirect_offset] = DrawIndexedIndirect {
                     vertex_offset: 0,
@@ -176,8 +177,9 @@ impl ShipBuffer {
 
                 draw_indirect_offset += 1;
                 instance_offset += instance_count;
-                index_offset += index_count;
             }
+
+            index_offset += index_count;
         }
 
         self.draw_indirect_count = draw_indirect_offset as u32;
