@@ -287,19 +287,22 @@ pub fn run_render_passes(
             constants.bounding_box_indices.slice(..),
             wgpu::IndexFormat::Uint16,
         );
+        render_pass.set_vertex_buffer(0, models.bounding_boxes.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer);
 
         let mut offset = 0;
+        let mut vertex_offset = 0;
 
         for i in 0..resources::Models::COUNT {
             let num_instances = num_instances[i];
 
             if num_instances > 0 && i != ModelId::Explosion as usize {
-                render_pass.set_vertex_buffer(0, models.models[i].bounding_box_buffer.slice(..));
-                render_pass.draw_indexed(0..24, 0, offset..offset + num_instances);
+                render_pass.draw_indexed(0..24, vertex_offset, offset..offset + num_instances);
 
                 offset += num_instances;
             }
+
+            vertex_offset += 8;
         }
     }
 

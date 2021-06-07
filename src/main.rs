@@ -313,6 +313,7 @@ fn main() -> anyhow::Result<()> {
     ));
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
+    let mut bounding_boxes = Vec::new();
     world.insert_resource(resources::Models {
         models: [
             load_ship_model(
@@ -323,6 +324,7 @@ fn main() -> anyhow::Result<()> {
                 &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
+                &mut bounding_boxes,
             )?,
             load_ship_model(
                 include_bytes!("../models/fighter.glb"),
@@ -332,6 +334,7 @@ fn main() -> anyhow::Result<()> {
                 &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
+                &mut bounding_boxes,
             )?,
             load_ship_model(
                 include_bytes!("../models/miner.glb"),
@@ -341,6 +344,7 @@ fn main() -> anyhow::Result<()> {
                 &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
+                &mut bounding_boxes,
             )?,
             load_ship_model(
                 include_bytes!("../models/explosion.glb"),
@@ -350,6 +354,7 @@ fn main() -> anyhow::Result<()> {
                 &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
+                &mut bounding_boxes,
             )?,
             load_ship_model(
                 include_bytes!("../models/asteroid.glb"),
@@ -359,6 +364,7 @@ fn main() -> anyhow::Result<()> {
                 &resources.nearest_sampler,
                 &mut vertices,
                 &mut indices,
+                &mut bounding_boxes,
             )?,
         ],
         vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -370,6 +376,11 @@ fn main() -> anyhow::Result<()> {
             label: None,
             usage: wgpu::BufferUsage::INDEX,
             contents: bytemuck::cast_slice(&indices),
+        }),
+        bounding_boxes: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsage::VERTEX,
+            contents: bytemuck::cast_slice(&bounding_boxes),
         }),
     });
 

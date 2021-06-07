@@ -6,7 +6,6 @@ use wgpu::util::DeviceExt;
 pub struct Model {
     pub num_indices: u32,
     pub bind_group: wgpu::BindGroup,
-    pub bounding_box_buffer: wgpu::Buffer,
     pub acceleration_tree: rstar::RTree<Triangle>,
     pub bounding_box: BoundingBox,
 }
@@ -19,6 +18,7 @@ pub fn load_ship_model(
     sampler: &wgpu::Sampler,
     merged_vertices: &mut Vec<ModelVertex>,
     merged_indices: &mut Vec<u16>,
+    merged_bounding_boxes: &mut Vec<Vec3>,
 ) -> anyhow::Result<Model> {
     let gltf = gltf::Gltf::from_slice(bytes)?;
 
@@ -120,16 +120,13 @@ pub fn load_ship_model(
     let max: Vec3 = bounding_box.max.into();
     let bounding_box = BoundingBox::new(min, max);
 
+    merged_bounding_boxes.extend_from_slice(&bounding_box.corners());
+
     Ok(Model {
         num_indices,
         bind_group,
         acceleration_tree,
         bounding_box,
-        bounding_box_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            usage: wgpu::BufferUsage::VERTEX,
-            contents: bytemuck::cast_slice(&bounding_box.corners()),
-        }),
     })
 }
 

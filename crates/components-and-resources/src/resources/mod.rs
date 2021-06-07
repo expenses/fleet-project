@@ -80,6 +80,7 @@ pub struct ShipUnderCursor(pub Option<Entity>);
 pub struct Models {
     pub vertices: wgpu::Buffer,
     pub indices: wgpu::Buffer,
+    pub bounding_boxes: wgpu::Buffer,
     pub models: [Model; Self::COUNT],
 }
 
