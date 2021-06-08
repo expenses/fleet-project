@@ -47,7 +47,7 @@ impl ModelId {
             Self::Carrier => 30.0,
             Self::Fighter => 5.0,
             Self::Miner => 7.5,
-            _ => 0.0
+            _ => 0.0,
         }
     }
 }
@@ -197,7 +197,6 @@ impl BuildQueue {
     pub fn advance(&mut self, total_time: f32) -> Option<ModelId> {
         if let Some(building) = self.building.front().cloned() {
             if total_time > self.time_of_next_pop {
-
                 self.building.pop_front();
 
                 if let Some(next) = self.building.front().cloned() {
@@ -227,6 +226,22 @@ impl BuildQueue {
 
         self.building.push_back(to_build);
     }
+
+    pub fn queue_length(&self, total_time: f32) -> f32 {
+        let mut sum = self
+            .building
+            .iter()
+            .skip(1)
+            .map(|model_id| model_id.build_time())
+            .sum();
+
+        if !self.building.is_empty() {
+            let remaining = self.time_of_next_pop - total_time;
+            sum += remaining;
+        }
+
+        sum
+    }
 }
 
 #[test]
@@ -236,4 +251,6 @@ fn test_build_queue() {
     assert_eq!(build_queue.progress_time(0.0), Some(0.0));
     assert_eq!(build_queue.progress_time(2.5), Some(0.5));
     assert_eq!(build_queue.progress_time(5.0), Some(1.0));
+    build_queue.push(ModelId::Fighter, 0.0);
+    assert_eq!(build_queue.queue_length(2.5), 7.5);
 }
