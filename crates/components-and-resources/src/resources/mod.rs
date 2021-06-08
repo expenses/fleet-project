@@ -14,6 +14,9 @@ use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu_glyph::ab_glyph::FontRef;
 
+#[derive(Default)]
+pub struct GlobalMinerals(pub f32);
+
 pub type TopLevelAccelerationStructure = DynamicBvh<Entity>;
 
 pub struct MiscTextures {
@@ -26,6 +29,7 @@ pub struct UnitButtons(pub Vec<(ModelId, UnitStatus)>);
 impl UnitButtons {
     pub const LINE_HEIGHT: f32 = 18.0;
     pub const BUTTON_WIDTH: f32 = 130.0;
+    pub const UI_LINES: isize = 1;
 }
 
 #[derive(Default)]
