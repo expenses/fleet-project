@@ -41,6 +41,17 @@ pub enum ModelId {
     Asteroid = 4,
 }
 
+impl ModelId {
+    pub fn build_time(self) -> f32 {
+        match self {
+            Self::Carrier => 30.0,
+            Self::Fighter => 5.0,
+            Self::Miner => 7.5,
+            _ => 0.0
+        }
+    }
+}
+
 pub struct Scale(pub f32);
 
 impl Scale {
@@ -174,4 +185,55 @@ impl Unloading {
             until: total_time + 0.5,
         }
     }
+}
+
+#[derive(Default)]
+pub struct BuildQueue {
+    building: VecDeque<ModelId>,
+    time_of_next_pop: f32,
+}
+
+impl BuildQueue {
+    pub fn advance(&mut self, total_time: f32) -> Option<ModelId> {
+        if let Some(building) = self.building.front().cloned() {
+            if total_time > self.time_of_next_pop {
+
+                self.building.pop_front();
+
+                if let Some(next) = self.building.front().cloned() {
+                    self.time_of_next_pop = total_time + next.build_time();
+                }
+
+                return Some(building);
+            }
+        }
+
+        None
+    }
+
+    fn progress_time(&self, total_time: f32) -> Option<f32> {
+        if let Some(building) = self.building.front().cloned() {
+            let remaining = self.time_of_next_pop - total_time;
+            Some(1.0 - (remaining / building.build_time()))
+        } else {
+            None
+        }
+    }
+
+    pub fn push(&mut self, to_build: ModelId, total_time: f32) {
+        if self.building.is_empty() {
+            self.time_of_next_pop = total_time + to_build.build_time();
+        }
+
+        self.building.push_back(to_build);
+    }
+}
+
+#[test]
+fn test_build_queue() {
+    let mut build_queue = BuildQueue::default();
+    build_queue.push(ModelId::Fighter, 0.0);
+    assert_eq!(build_queue.progress_time(0.0), Some(0.0));
+    assert_eq!(build_queue.progress_time(2.5), Some(0.5));
+    assert_eq!(build_queue.progress_time(5.0), Some(1.0));
 }
