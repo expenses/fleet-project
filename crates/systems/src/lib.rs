@@ -336,6 +336,7 @@ pub fn handle_keys(
     mut rng: ResMut<SmallRng>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
+    total_time: Res<TotalTime>,
 ) {
     if keyboard_state.stop.0 {
         selected_moving.for_each_mut(|mut queue| {
@@ -349,7 +350,7 @@ pub fn handle_keys(
 
     if keyboard_state.unload.0 {
         carrying.for_each_mut(|(pos, mut carrying)| {
-            unload(pos.0, &mut carrying, &mut *rng, &mut commands);
+            unload(pos.0, &mut carrying, &mut *rng, total_time.0, &mut commands);
         })
     }
 
@@ -387,7 +388,7 @@ pub fn handle_destruction(
     query.for_each_mut(|(entity, pos, health, carrying, on_board)| {
         if health.0 <= 0.0 {
             if let Some(mut carrying) = carrying {
-                unload(pos.0, &mut carrying, &mut *rng, &mut commands);
+                unload(pos.0, &mut carrying, &mut *rng, total_time.0, &mut commands);
             }
 
             commands.entity(entity).despawn();
@@ -414,11 +415,18 @@ fn spawn_explosion(pos: Vec3, total_time: f32, rng: &mut SmallRng, commands: &mu
     ));
 }
 
-fn unload(pos: Vec3, carrying: &mut Carrying, rng: &mut SmallRng, commands: &mut Commands) {
+fn unload(
+    pos: Vec3,
+    carrying: &mut Carrying,
+    rng: &mut SmallRng,
+    total_time: f32,
+    commands: &mut Commands,
+) {
     carrying.0.drain(..).for_each(|entity| {
         commands
             .entity(entity)
             .insert(Position(pos))
+            .insert(Unloading::new(total_time))
             .insert(Command::MoveTo {
                 point: pos + uniform_sphere_distribution(rng) * 5.0,
                 ty: MoveType::Attack,
@@ -696,4 +704,16 @@ pub fn create_bvh(
     query.for_each(|(entity, bbox)| {
         bvh.insert(entity, bbox.0);
     });
+}
+
+pub fn remove_unloading(
+    query: Query<(Entity, &Unloading)>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
+) {
+    query.for_each(|(entity, unloading)| {
+        if unloading.until <= total_time.0 {
+            commands.entity(entity).remove::<Unloading>();
+        }
+    })
 }

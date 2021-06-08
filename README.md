@@ -9,5 +9,3 @@
 * what does fuel do?
 * health bars?
 * resize ships
-* stop carriers from avoiding unloading ships
- - Use Unloading { until: f32 } struct for this.

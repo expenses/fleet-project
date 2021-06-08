@@ -164,3 +164,15 @@ pub struct StoredMinerals {
     pub capacity: f32,
 }
 pub struct StoredFuel(pub f32);
+
+pub struct Unloading {
+    pub until: f32,
+}
+
+impl Unloading {
+    pub fn new(total_time: f32) -> Self {
+        Self {
+            until: total_time + 0.5,
+        }
+    }
+}

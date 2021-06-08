@@ -19,6 +19,7 @@ pub fn run_persuit(
     boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
     mut commands: Commands,
     mut carrying: Query<&mut Carrying>,
+    total_time: Res<TotalTime>,
 ) {
     query.for_each_mut(|(entity, pos, vel, max_speed, queue, mut staging_persuit_force)| {
         let boid = to_boid(pos, vel, max_speed);
@@ -44,10 +45,16 @@ pub fn run_persuit(
                                     match carrying.get_mut(target) {
                                         Ok(mut carrying) => {
                                             carrying.0.push(entity);
+
+                                            let mut entity_commands = commands.entity(entity);
+
                                             if queue.0.len() == 1 {
-                                                commands.entity(entity)
+                                                entity_commands
                                                     .remove::<Position>();
+                                            } else {
+                                                entity_commands.insert(Unloading::new(total_time.0));
                                             }
+
                                             queue.0.pop_front();
 
                                             let ship_to_transfer = unsafe {
@@ -146,15 +153,22 @@ pub fn run_avoidance(
         &MaxSpeed,
         Option<&CommandQueue>,
         &mut StagingAvoidanceForce,
+        Option<&Carrying>,
     )>,
-    boids: Query<(Option<&CommandQueue>, &Position, &Velocity, &MaxSpeed)>,
+    boids: Query<(
+        Option<&CommandQueue>,
+        Option<&Unloading>,
+        &Position,
+        &Velocity,
+        &MaxSpeed,
+    )>,
     task_pool: Res<bevy_tasks::TaskPool>,
     bvh: Res<TopLevelAccelerationStructure>,
 ) {
     query.par_for_each_mut(
         &task_pool,
         8,
-        |(entity, pos, vel, max_speed, queue, mut steering_avoidance_force)| {
+        |(entity, pos, vel, max_speed, queue, mut steering_avoidance_force, carrying)| {
             let boid = to_boid(pos, vel, max_speed);
 
             let max_radius = boid.radius_sq.sqrt().max(10.0);
@@ -173,6 +187,9 @@ pub fn run_avoidance(
                 };
 
             let be_carried_by_entity = get_be_carried_by_entity(queue);
+
+            let is_carrier = carrying.is_some();
+
             let iter = bvh
                 .find(|bounding_box| bbox.intersects(bounding_box))
                 .filter_map(|&entity| {
@@ -181,11 +198,13 @@ pub fn run_avoidance(
                         .ok()
                         .map(|components| (entity, components))
                 })
-                .filter(|&(avoid_entity, (avoid_queue, ..))| {
+                .filter(|&(avoid_entity, (avoid_queue, unloading, ..))| {
                     let avoid_entity_carry_target = get_be_carried_by_entity(avoid_queue);
+                    let boid_is_unloading = unloading.is_some();
 
                     Some(avoid_entity) != be_carried_by_entity
                         && avoid_entity_carry_target != Some(entity)
+                        && !(is_carrier && boid_is_unloading)
                 })
                 .map(|(_, (.., p, v, ms))| to_boid(p, v, ms));
 

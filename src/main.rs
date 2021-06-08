@@ -441,6 +441,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::move_camera.system())
         .with_system(systems::set_camera_following.system())
         .with_system(systems::handle_keys.system())
+        .with_system(systems::remove_unloading.system())
         .with_system(
             systems::apply_staging_velocity
                 .system()
