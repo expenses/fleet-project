@@ -351,77 +351,100 @@ pub fn render_health(
     query: Query<
         (
             &Position,
-            &Health,
+            Option<&Health>,
+            Option<&MaxHealth>,
+            Option<&Selected>,
             Option<&StoredMinerals>,
             Option<&CanBeMined>,
             Option<&BuildQueue>,
         ),
-        (With<Selected>, Without<Enemy>),
+        Without<Enemy>,
     >,
     mut glyph_brush: ResMut<GlyphBrush>,
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
     total_time: Res<TotalTime>,
 ) {
-    query.for_each(|(pos, health, minerals, can_be_mined, build_queue)| {
-        let projected =
-            perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
+    query.for_each(
+        |(pos, health, max_health, selected, minerals, can_be_mined, build_queue)| {
+            let projected =
+                perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
-        if projected.z > 0.0 {
-            let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
+            if projected.z > 0.0 {
+                let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
 
-            let uv_space_pos = Vec2::new(
-                (screen_space_pos.x + 1.0) / 2.0,
-                (1.0 - screen_space_pos.y) / 2.0,
-            );
-            let unnormalised_pos = uv_space_pos * dimensions.to_vec();
-
-            let mut section = glyph_brush::OwnedSection::default()
-                .with_screen_position(unnormalised_pos)
-                .add_text(
-                    glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.0))
-                        .with_color([1.0; 4]),
+                let uv_space_pos = Vec2::new(
+                    (screen_space_pos.x + 1.0) / 2.0,
+                    (1.0 - screen_space_pos.y) / 2.0,
                 );
+                let unnormalised_pos = uv_space_pos * dimensions.to_vec();
 
-            if let Some(minerals) = minerals {
-                section = section.add_text(
-                    glyph_brush::OwnedText::new(format!(
-                        "Minerals: {:.2}/{}",
-                        minerals.stored, minerals.capacity
-                    ))
-                    .with_color([1.0; 4]),
-                );
-            }
+                let selected = selected.is_some();
 
-            if let Some(can_be_mined) = can_be_mined {
-                section = section.add_text(
-                    glyph_brush::OwnedText::new(format!(
-                        "Remaining Minerals: {:.2}",
-                        can_be_mined.minerals
-                    ))
-                    .with_color([1.0; 4]),
-                );
-            }
+                let mut section =
+                    glyph_brush::OwnedSection::default().with_screen_position(unnormalised_pos);
 
-            if let Some(build_queue) = build_queue {
-                section = section.add_text(
-                    glyph_brush::OwnedText::new(format!(
-                        "Building Ships: {}\n",
-                        build_queue.num_in_queue(),
-                    ))
-                    .with_color([1.0; 4]),
-                );
-                if let Some(progress) = build_queue.progress_time(total_time.0) {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!("Progress: {:.2}%", progress * 100.0))
-                            .with_color([1.0; 4]),
-                    );
+                if let (Some(health), Some(max_health)) = (health, max_health) {
+                    if selected || health.0 < max_health.0 {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.0))
+                                .with_color([1.0; 4]),
+                        );
+                    }
                 }
-            }
 
-            glyph_brush.queue(&section);
-        }
-    })
+                if let Some(minerals) = minerals {
+                    if selected || minerals.stored > 0.0 {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!(
+                                "Minerals: {:.2}/{:.2}\n",
+                                minerals.stored, minerals.capacity
+                            ))
+                            .with_color([1.0; 4]),
+                        );
+                    }
+                }
+
+                if let Some(can_be_mined) = can_be_mined {
+                    if selected || can_be_mined.minerals < can_be_mined.total {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!(
+                                "Remaining Minerals: {:.2}/{:.2}\n",
+                                can_be_mined.minerals, can_be_mined.total
+                            ))
+                            .with_color([1.0; 4]),
+                        );
+                    }
+                }
+
+                if let Some(build_queue) = build_queue {
+                    let progress = build_queue.progress_time(total_time.0);
+
+                    if selected || progress.is_some() {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!(
+                                "Building Ships: {}\n",
+                                build_queue.num_in_queue()
+                            ))
+                            .with_color([1.0; 4]),
+                        );
+                    }
+
+                    if let Some(progress) = progress {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!(
+                                "Progress: {:.2}%\n",
+                                progress * 100.0
+                            ))
+                            .with_color([1.0; 4]),
+                        );
+                    }
+                }
+
+                glyph_brush.queue(&section);
+            }
+        },
+    )
 }
 
 #[profiling::function]

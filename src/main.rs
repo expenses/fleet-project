@@ -196,7 +196,7 @@ fn main() -> anyhow::Result<()> {
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health(1000.0),
             components::Selectable,
-            components::CanBeMined { minerals: 100.0 },
+            components::CanBeMined::new(100.0),
         ));
     }
 

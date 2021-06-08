@@ -236,7 +236,17 @@ pub enum PersonType {
 
 pub struct CanMine;
 pub struct CanBeMined {
+    pub total: f32,
     pub minerals: f32,
+}
+
+impl CanBeMined {
+    pub fn new(minerals: f32) -> Self {
+        Self {
+            total: minerals,
+            minerals,
+        }
+    }
 }
 
 pub struct StoredMinerals {
