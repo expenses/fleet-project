@@ -348,12 +348,20 @@ pub fn render_buttons(
 
 #[profiling::function]
 pub fn render_health(
-    query: Query<(&Position, &Health), With<Selected>>,
+    query: Query<
+        (
+            &Position,
+            &Health,
+            Option<&StoredMinerals>,
+            Option<&CanBeMined>,
+        ),
+        With<Selected>,
+    >,
     mut glyph_brush: ResMut<GlyphBrush>,
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
 ) {
-    query.for_each(|(pos, health)| {
+    query.for_each(|(pos, health, minerals, can_be_mined)| {
         let projected =
             perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
@@ -366,10 +374,33 @@ pub fn render_health(
             );
             let unnormalised_pos = uv_space_pos * dimensions.to_vec();
 
-            let section = glyph_brush::OwnedSection::default()
+            let mut section = glyph_brush::OwnedSection::default()
                 .with_screen_position(unnormalised_pos)
-                .add_text(glyph_brush::OwnedText::new(format!("{}", health.0)).with_color([1.0; 4]))
-                .with_layout(glyph_brush::Layout::default_single_line());
+                .add_text(
+                    glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.0))
+                        .with_color([1.0; 4]),
+                );
+
+            if let Some(minerals) = minerals {
+                section = section.add_text(
+                    glyph_brush::OwnedText::new(format!(
+                        "Minerals: {:.2}/{}",
+                        minerals.stored, minerals.capacity
+                    ))
+                    .with_color([1.0; 4]),
+                );
+            }
+
+            if let Some(can_be_mined) = can_be_mined {
+                section = section.add_text(
+                    glyph_brush::OwnedText::new(format!(
+                        "Remaining Minerals: {:.2}",
+                        can_be_mined.minerals
+                    ))
+                    .with_color([1.0; 4]),
+                );
+            }
+
             glyph_brush.queue(&section);
         }
     })
