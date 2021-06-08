@@ -1,5 +1,6 @@
 use rand::Rng;
 use rand::SeedableRng;
+use structopt::StructOpt;
 use ultraviolet::{Rotor3, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 use winit::event::*;
@@ -12,8 +13,16 @@ use components_and_resources::gpu_structs::*;
 use components_and_resources::model::{load_image_from_bytes, load_ship_model};
 use components_and_resources::{components, resources, texture_manager::TextureManager};
 
+#[derive(StructOpt)]
+struct Opt {
+    #[structopt(long)]
+    draw_godrays: bool,
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+
+    let opt = Opt::from_args();
 
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
@@ -49,8 +58,6 @@ fn main() -> anyhow::Result<()> {
 
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
-
-    let draw_godrays = false;
 
     let tonemapper = colstodian::tonemapper::LottesTonemapper::new(
         colstodian::tonemapper::LottesTonemapperParams {
@@ -703,7 +710,7 @@ fn main() -> anyhow::Result<()> {
                     &star_system,
                     &tonemapper,
                     &constants,
-                    draw_godrays,
+                    opt.draw_godrays,
                 );
 
                 gpu_interface.queue.submit(Some(encoder.finish()));
