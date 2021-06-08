@@ -6,6 +6,5 @@
 
 * proper ui
 * allow for ship construction from minerals
-* what does fuel do?
 * health bars?
 * resize ships
