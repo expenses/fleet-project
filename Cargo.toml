@@ -28,6 +28,7 @@ systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
 wgpu_glyph = "0.12.0"
+structopt = { version = "0.3.21", default-features = false }
 
 [features]
 default = []
@@ -51,8 +52,9 @@ opt-level = 3
 [profile.release]
 #debug = true
 
-#lto = 'fat'
-#codegen-units = 1
+# lto = 'fat'
+# codegen-units = 1
+# panic = 'abort'
 
 [patch.crates-io]
 bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
