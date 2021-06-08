@@ -595,9 +595,15 @@ pub fn count_selected(
     friendly_carrying: Query<&Carrying, (SelectedUncarried, With<Friendly>)>,
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
+    global_minerals: Res<GlobalMinerals>,
 ) {
     let mut section = glyph_brush::OwnedSection::default();
     buttons.0.clear();
+
+    section = section.add_text(
+        glyph_brush::OwnedText::new(&format!("Global Minerals: {}\n", global_minerals.0))
+            .with_color([1.0; 4]),
+    );
 
     let mut print = |mut section: glyph_brush::OwnedSection,
                      status: UnitStatus,
@@ -677,10 +683,10 @@ pub fn set_selected_button(
 
     let index = mouse_state.position.y / UnitButtons::LINE_HEIGHT;
 
-    let index = index as usize;
+    let index = index as isize - UnitButtons::UI_LINES;
 
-    selected_button.0 = if index < buttons.0.len() {
-        Some(index)
+    selected_button.0 = if index < buttons.0.len() as isize && index >= 0 {
+        Some(index as usize)
     } else {
         None
     };

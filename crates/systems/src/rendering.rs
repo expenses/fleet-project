@@ -322,10 +322,12 @@ pub fn render_buttons(
     if let Some(i) = selected_button.0 {
         let colour = Vec3::one();
 
+        let offset = i + 1 + UnitButtons::UI_LINES as usize;
+
         lines_2d.stage(&[
             Vertex2D {
                 pos: to_wgpu(
-                    Vec2::new(0.0, (i + 1) as f32 * UnitButtons::LINE_HEIGHT),
+                    Vec2::new(0.0, offset as f32 * UnitButtons::LINE_HEIGHT),
                     &dimensions,
                 ),
                 colour,
@@ -334,7 +336,7 @@ pub fn render_buttons(
                 pos: to_wgpu(
                     Vec2::new(
                         UnitButtons::BUTTON_WIDTH,
-                        (i + 1) as f32 * UnitButtons::LINE_HEIGHT,
+                        offset as f32 * UnitButtons::LINE_HEIGHT,
                     ),
                     &dimensions,
                 ),

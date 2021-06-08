@@ -228,11 +228,6 @@ fn main() -> anyhow::Result<()> {
                 components::MaxSpeed(5.0),
                 components::Health(125.0),
                 components::MaxHealth(250.0),
-                components::StoredMinerals {
-                    stored: 0.0,
-                    capacity: f32::INFINITY,
-                },
-                components::StoredFuel(0.0),
             ));
         } else {
             spawner.insert_bundle((
@@ -435,6 +430,11 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::SmallRng::from_entropy());
     world.insert_resource(resources::UnitButtons::default());
     world.insert_resource(resources::SelectedButton::default());
+<<<<<<< Updated upstream
+=======
+    world.insert_resource(resources::TopLevelAccelerationStructure::default());
+    world.insert_resource(resources::GlobalMinerals::default());
+>>>>>>> Stashed changes
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
@@ -463,7 +463,6 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::set_selected_button.system())
         .with_system(systems::repair_ships.system())
         .with_system(systems::mine.system().label("mine").after("vel"))
-        .with_system(systems::convert_minerals_to_fuel.system().after("mine"))
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())

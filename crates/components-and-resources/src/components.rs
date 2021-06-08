@@ -163,4 +163,19 @@ pub struct StoredMinerals {
     pub stored: f32,
     pub capacity: f32,
 }
+<<<<<<< Updated upstream
 pub struct StoredFuel(pub f32);
+=======
+
+pub struct Unloading {
+    pub until: f32,
+}
+
+impl Unloading {
+    pub fn new(total_time: f32) -> Self {
+        Self {
+            until: total_time + 0.5,
+        }
+    }
+}
+>>>>>>> Stashed changes
