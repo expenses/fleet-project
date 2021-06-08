@@ -1,14 +1,16 @@
 use crate::resources::BoundingBox;
 use crate::utils::uniform_sphere_distribution;
+use bevy_ecs::prelude::Bundle;
 use bevy_ecs::prelude::Entity;
 use rand::Rng;
 use std::collections::VecDeque;
 use ultraviolet::{Mat3, Rotor3, Vec3};
 
+#[derive(Debug)]
 pub struct Position(pub Vec3);
 pub struct Rotation(pub Rotor3);
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RotationMatrix {
     pub matrix: Mat3,
     pub reversed: Mat3,
@@ -32,6 +34,31 @@ impl RotationMatrix {
 
 pub struct Selected;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ShipType {
+    Carrier,
+    Fighter,
+    Miner,
+}
+
+impl ShipType {
+    pub fn build_time(self) -> f32 {
+        match self {
+            Self::Carrier => 30.0,
+            Self::Fighter => 5.0,
+            Self::Miner => 7.5,
+        }
+    }
+
+    pub fn model_id(self) -> ModelId {
+        match self {
+            Self::Carrier => ModelId::Carrier,
+            Self::Fighter => ModelId::Fighter,
+            Self::Miner => ModelId::Miner,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ModelId {
     Carrier = 0,
@@ -39,17 +66,6 @@ pub enum ModelId {
     Miner = 2,
     Explosion = 3,
     Asteroid = 4,
-}
-
-impl ModelId {
-    pub fn build_time(self) -> f32 {
-        match self {
-            Self::Carrier => 30.0,
-            Self::Fighter => 5.0,
-            Self::Miner => 7.5,
-            _ => 0.0,
-        }
-    }
 }
 
 pub struct Scale(pub f32);
@@ -99,7 +115,60 @@ impl Spin {
     }
 }
 
-pub struct FollowsCommands;
+pub fn base_ship_components(position: Vec3, crew: Vec<Entity>) -> impl Bundle {
+    (
+        Position(position),
+        OnBoard(crew),
+        Rotation(Default::default()),
+        RotationMatrix::default(),
+        WorldSpaceBoundingBox::default(),
+        Velocity(Vec3::zero()),
+        StagingPersuitForce(Vec3::zero()),
+        StagingEvasionForce(Vec3::zero()),
+        StagingAvoidanceForce(Vec3::zero()),
+        CommandQueue::default(),
+        Selectable,
+    )
+}
+
+pub fn fighter_components(ray_cooldown: f32) -> impl Bundle {
+    (
+        ModelId::Fighter,
+        CanAttack,
+        CanBeCarried,
+        MaxSpeed(10.0),
+        Health(50.0),
+        MaxHealth(50.0),
+        RayCooldown(ray_cooldown),
+        AgroRange(200.0),
+    )
+}
+
+pub fn miner_components() -> impl Bundle {
+    (
+        ModelId::Miner,
+        CanBeCarried,
+        MaxSpeed(15.0),
+        Health(40.0),
+        MaxHealth(40.0),
+        CanMine,
+        StoredMinerals {
+            stored: 0.0,
+            capacity: 10.0,
+        },
+    )
+}
+
+pub fn carrier_components(queue: BuildQueue) -> impl Bundle {
+    (
+        ModelId::Carrier,
+        Carrying::default(),
+        MaxSpeed(5.0),
+        Health(125.0),
+        MaxHealth(250.0),
+        queue,
+    )
+}
 
 pub struct CameraFollowing;
 
@@ -189,12 +258,12 @@ impl Unloading {
 
 #[derive(Default)]
 pub struct BuildQueue {
-    building: VecDeque<ModelId>,
+    building: VecDeque<ShipType>,
     time_of_next_pop: f32,
 }
 
 impl BuildQueue {
-    pub fn advance(&mut self, total_time: f32) -> Option<ModelId> {
+    pub fn advance(&mut self, total_time: f32) -> Option<ShipType> {
         if let Some(building) = self.building.front().cloned() {
             if total_time > self.time_of_next_pop {
                 self.building.pop_front();
@@ -210,7 +279,7 @@ impl BuildQueue {
         None
     }
 
-    fn progress_time(&self, total_time: f32) -> Option<f32> {
+    pub fn progress_time(&self, total_time: f32) -> Option<f32> {
         if let Some(building) = self.building.front().cloned() {
             let remaining = self.time_of_next_pop - total_time;
             Some(1.0 - (remaining / building.build_time()))
@@ -219,7 +288,7 @@ impl BuildQueue {
         }
     }
 
-    pub fn push(&mut self, to_build: ModelId, total_time: f32) {
+    pub fn push(&mut self, to_build: ShipType, total_time: f32) {
         if self.building.is_empty() {
             self.time_of_next_pop = total_time + to_build.build_time();
         }
@@ -242,6 +311,10 @@ impl BuildQueue {
 
         sum
     }
+
+    pub fn num_in_queue(&self) -> usize {
+        self.building.len()
+    }
 }
 
 #[test]
@@ -254,3 +327,5 @@ fn test_build_queue() {
     build_queue.push(ModelId::Fighter, 0.0);
     assert_eq!(build_queue.queue_length(2.5), 7.5);
 }
+
+pub struct DebugWatch;

@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
+use std::ops::{Deref, DerefMut};
 use ultraviolet::Vec3;
 
 mod combat;
@@ -328,7 +329,10 @@ pub fn move_camera(
 }
 
 pub fn handle_keys(
-    mut selected_moving: Query<&mut CommandQueue, With<Selected>>,
+    mut query_set: QuerySet<(
+        Query<&mut CommandQueue, With<Selected>>,
+        Query<(&mut Velocity, &mut CommandQueue)>,
+    )>,
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
     mut paused: ResMut<Paused>,
@@ -339,7 +343,7 @@ pub fn handle_keys(
     total_time: Res<TotalTime>,
 ) {
     if keyboard_state.stop.0 {
-        selected_moving.for_each_mut(|mut queue| {
+        query_set.q0_mut().for_each_mut(|mut queue| {
             queue.0.clear();
         });
     }
@@ -350,7 +354,14 @@ pub fn handle_keys(
 
     if keyboard_state.unload.0 {
         carrying.for_each_mut(|(pos, mut carrying)| {
-            unload(pos.0, &mut carrying, &mut *rng, total_time.0, &mut commands);
+            unload(
+                pos.0,
+                &mut carrying,
+                &mut *rng,
+                total_time.0,
+                &mut commands,
+                &mut query_set.q1_mut(),
+            );
         })
     }
 
@@ -384,11 +395,19 @@ pub fn handle_destruction(
     mut rng: ResMut<SmallRng>,
     mut commands: Commands,
     total_time: Res<TotalTime>,
+    mut movement: Query<(&mut Velocity, &mut CommandQueue)>,
 ) {
     query.for_each_mut(|(entity, pos, health, carrying, on_board)| {
         if health.0 <= 0.0 {
             if let Some(mut carrying) = carrying {
-                unload(pos.0, &mut carrying, &mut *rng, total_time.0, &mut commands);
+                unload(
+                    pos.0,
+                    &mut carrying,
+                    &mut *rng,
+                    total_time.0,
+                    &mut commands,
+                    &mut movement,
+                );
             }
 
             commands.entity(entity).despawn();
@@ -421,17 +440,44 @@ fn unload(
     rng: &mut SmallRng,
     total_time: f32,
     commands: &mut Commands,
+    movement: &mut Query<(&mut Velocity, &mut CommandQueue)>,
 ) {
     carrying.0.drain(..).for_each(|entity| {
-        commands
-            .entity(entity)
-            .insert(Position(pos))
-            .insert(Unloading::new(total_time))
-            .insert(Command::MoveTo {
-                point: pos + uniform_sphere_distribution(rng) * 5.0,
-                ty: MoveType::Attack,
-            });
+        unload_single(
+            pos,
+            entity,
+            rng,
+            total_time,
+            movement.get_mut(entity).ok(),
+            commands,
+        );
     })
+}
+
+fn unload_single<V, M>(
+    pos: Vec3,
+    entity: Entity,
+    rng: &mut SmallRng,
+    total_time: f32,
+    movement: Option<(V, M)>,
+    commands: &mut Commands,
+) where
+    V: Deref<Target = Velocity> + DerefMut,
+    M: Deref<Target = CommandQueue> + DerefMut,
+{
+    commands
+        .entity(entity)
+        .insert(Position(pos))
+        .insert(Unloading::new(total_time));
+
+    if let Some((mut velocity, mut queue)) = movement {
+        velocity.0 = Vec3::zero();
+
+        queue.0.push_front(Command::MoveTo {
+            point: pos + uniform_sphere_distribution(rng) * 5.0,
+            ty: MoveType::Attack,
+        })
+    }
 }
 
 pub fn update_keyboard_state(mut keyboard_state: ResMut<KeyboardState>) {
@@ -721,5 +767,13 @@ pub fn remove_unloading(
         if unloading.until <= total_time.0 {
             commands.entity(entity).remove::<Unloading>();
         }
+    })
+}
+
+pub fn debug_watch(
+    query: Query<(Option<&Position>, Option<&RotationMatrix>, Option<&ModelId>), With<DebugWatch>>,
+) {
+    query.for_each(|(pos, matrix, model_id)| {
+        dbg!(pos, matrix, model_id);
     })
 }

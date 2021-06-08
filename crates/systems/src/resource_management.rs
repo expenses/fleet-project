@@ -95,3 +95,49 @@ fn find_next_asteroid(
         });
     }
 }
+
+pub fn build_ships<Side: Default + Send + Sync + 'static>(
+    mut query: Query<(&Position, &mut BuildQueue), With<Side>>,
+    total_time: Res<TotalTime>,
+    mut commands: Commands,
+    mut rng: ResMut<SmallRng>,
+) {
+    query.for_each_mut(|(pos, mut build_queue)| {
+        if let Some(built_ship) = build_queue.advance(total_time.0) {
+            let mut spawner = commands.spawn();
+
+            spawner
+                .insert_bundle(base_ship_components(pos.0, Vec::new()))
+                .insert(Side::default());
+
+            match built_ship {
+                ShipType::Fighter => {
+                    spawner.insert_bundle(fighter_components(0.0));
+                }
+                ShipType::Miner => {
+                    spawner.insert_bundle(miner_components());
+                }
+                ShipType::Carrier => {
+                    spawner.insert_bundle(carrier_components(BuildQueue::default()));
+                }
+            }
+
+            let entity = spawner.id();
+            let mut velocity = Velocity(Vec3::zero());
+            let mut command_queue = CommandQueue::default();
+
+            crate::unload_single(
+                pos.0,
+                entity,
+                &mut rng,
+                total_time.0,
+                Some((&mut velocity, &mut command_queue)),
+                &mut commands,
+            );
+
+            commands
+                .entity(entity)
+                .insert_bundle((velocity, command_queue));
+        }
+    })
+}

@@ -354,14 +354,16 @@ pub fn render_health(
             &Health,
             Option<&StoredMinerals>,
             Option<&CanBeMined>,
+            Option<&BuildQueue>,
         ),
-        With<Selected>,
+        (With<Selected>, Without<Enemy>),
     >,
     mut glyph_brush: ResMut<GlyphBrush>,
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
+    total_time: Res<TotalTime>,
 ) {
-    query.for_each(|(pos, health, minerals, can_be_mined)| {
+    query.for_each(|(pos, health, minerals, can_be_mined, build_queue)| {
         let projected =
             perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
@@ -399,6 +401,22 @@ pub fn render_health(
                     ))
                     .with_color([1.0; 4]),
                 );
+            }
+
+            if let Some(build_queue) = build_queue {
+                section = section.add_text(
+                    glyph_brush::OwnedText::new(format!(
+                        "Building Ships: {}\n",
+                        build_queue.num_in_queue(),
+                    ))
+                    .with_color([1.0; 4]),
+                );
+                if let Some(progress) = build_queue.progress_time(total_time.0) {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!("Progress: {:.2}%", progress * 100.0))
+                            .with_color([1.0; 4]),
+                    );
+                }
             }
 
             glyph_brush.queue(&section);

@@ -135,46 +135,6 @@ fn main() -> anyhow::Result<()> {
     // ecs
     let mut world = bevy_ecs::world::World::default();
 
-    /*for _ in 0..100 {
-        let position = Vec3::new(
-            rng.gen_range(-40.0..40.0),
-            rng.gen_range(-5.0..=1.0),
-            rng.gen_range(-40.0..40.0),
-        );
-        let rotation = Rotor3::from_rotation_xz(rng.gen_range(0.0..=360.0_f32).to_radians());
-
-        let (model, max_speed) = if rng.gen_range(0.0..1.0) > 0.5 {
-            (components::ModelId::Fighter, components::MaxSpeed(10.0))
-        } else {
-            (components::ModelId::Carrier, components::MaxSpeed(1.0))
-        };
-
-        if rng.gen() {
-            world.spawn().insert_bundle((
-                components::Position(position),
-                components::Rotation(rotation),
-                components::RotationMatrix::default(),
-                model,
-                max_speed,
-                components::WorldSpaceBoundingBox::default(),
-                components::FollowsCommands,
-                components::Friendly,
-                components::Velocity(Vec3::zero()),
-            ));
-        } else {
-            world.spawn().insert_bundle((
-                components::Position(position),
-                components::Rotation(rotation),
-                components::RotationMatrix::default(),
-                model,
-                max_speed,
-                components::WorldSpaceBoundingBox::default(),
-                components::Enemy,
-                components::Velocity(Vec3::zero()),
-            ));
-        }
-    }*/
-
     for _ in 0..500 {
         let side = rng.gen_range(0.0..1.0) > 0.5;
 
@@ -195,53 +155,19 @@ fn main() -> anyhow::Result<()> {
 
         let mut spawner = world.spawn();
 
-        spawner.insert_bundle((
-            components::Position(position),
-            components::Rotation(Default::default()),
-            components::RotationMatrix::default(),
-            components::WorldSpaceBoundingBox::default(),
-            components::FollowsCommands,
-            components::Velocity(Vec3::zero()),
-            components::RayCooldown(rng.gen_range(0.0..1.0)),
-            components::StagingPersuitForce(Vec3::zero()),
-            components::StagingEvasionForce(Vec3::zero()),
-            components::StagingAvoidanceForce(Vec3::zero()),
-            components::AgroRange(200.0),
-            components::CommandQueue::default(),
-            components::Selectable,
-            components::OnBoard(crew.map(|crew| vec![crew]).unwrap_or_default()),
+        spawner.insert_bundle(components::base_ship_components(
+            position,
+            crew.map(|crew| vec![crew]).unwrap_or_default(),
         ));
 
         if is_fighter {
-            spawner.insert_bundle((
-                components::ModelId::Fighter,
-                components::CanAttack,
-                components::CanBeCarried,
-                components::MaxSpeed(10.0),
-                components::Health(50.0),
-                components::MaxHealth(50.0),
-            ));
+            spawner.insert_bundle(components::fighter_components(rng.gen_range(0.0..1.0)));
         } else if model_rng < 0.95 {
-            spawner.insert_bundle((
-                components::ModelId::Carrier,
-                components::Carrying::default(),
-                components::MaxSpeed(5.0),
-                components::Health(125.0),
-                components::MaxHealth(250.0),
-            ));
+            let mut queue = components::BuildQueue::default();
+            queue.push(components::ShipType::Fighter, 0.0);
+            spawner.insert_bundle(components::carrier_components(queue));
         } else {
-            spawner.insert_bundle((
-                components::ModelId::Miner,
-                components::CanBeCarried,
-                components::MaxSpeed(15.0),
-                components::Health(40.0),
-                components::MaxHealth(40.0),
-                components::CanMine,
-                components::StoredMinerals {
-                    stored: 0.0,
-                    capacity: 10.0,
-                },
-            ));
+            spawner.insert_bundle(components::miner_components());
         };
 
         if !side {
@@ -444,6 +370,9 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::set_camera_following.system())
         .with_system(systems::handle_keys.system())
         .with_system(systems::remove_unloading.system())
+        .with_system(systems::build_ships::<components::Friendly>.system())
+        .with_system(systems::build_ships::<components::Enemy>.system())
+        .with_system(systems::debug_watch.system())
         .with_system(
             systems::apply_staging_velocity
                 .system()
