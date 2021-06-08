@@ -163,7 +163,6 @@ pub struct StoredMinerals {
     pub stored: f32,
     pub capacity: f32,
 }
-pub struct StoredFuel(pub f32);
 
 pub struct Unloading {
     pub until: f32,

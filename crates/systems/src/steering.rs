@@ -13,15 +13,17 @@ pub fn run_persuit(
         &Velocity,
         &MaxSpeed,
         Option<&mut CommandQueue>,
+        Option<&mut StoredMinerals>,
         &mut StagingPersuitForce,
     )>,
-    to_transfer: Query<(&mut OnBoard, Option<&mut StoredMinerals>)>,
+    to_transfer: Query<&mut OnBoard>,
     boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
     mut commands: Commands,
     mut carrying: Query<&mut Carrying>,
     total_time: Res<TotalTime>,
+    mut global_minerals: ResMut<GlobalMinerals>,
 ) {
-    query.for_each_mut(|(entity, pos, vel, max_speed, queue, mut staging_persuit_force)| {
+    query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force)| {
         let boid = to_boid(pos, vel, max_speed);
         let max_force = max_speed.max_force();
 
@@ -65,13 +67,13 @@ pub fn run_persuit(
                                                 to_transfer.get_unchecked(target)
                                             };
 
-                                            if let (Ok((mut ship_people, ship_minerals)), Ok((mut carrier_people, carrier_minerals))) = (ship_to_transfer, carrier_to_transfer) {
+                                            if let (Ok(mut ship_people), Ok(mut carrier_people)) = (ship_to_transfer, carrier_to_transfer) {
                                                 carrier_people.0.append(&mut ship_people.0);
+                                            }
 
-                                                if let (Some(mut ship_minerals), Some(mut carrier_minerals)) = (ship_minerals, carrier_minerals) {
-                                                    carrier_minerals.stored += ship_minerals.stored;
-                                                    ship_minerals.stored = 0.0;
-                                                }
+                                            if let Some(mut stored_minerals) = stored_minerals {
+                                                global_minerals.0 += stored_minerals.stored;
+                                                stored_minerals.stored = 0.0;
                                             }
                                         },
                                         Err(err) => {
