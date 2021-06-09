@@ -410,7 +410,7 @@ pub fn render_health(
                 }
 
                 if let Some(on_board) = on_board {
-                    if selected && !on_board.0.is_empty() {
+                    if selected {
                         section = section.add_text(
                             glyph_brush::OwnedText::new(format!(
                                 "On Board: {}\n",

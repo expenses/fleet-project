@@ -132,26 +132,28 @@ fn main() -> anyhow::Result<()> {
 
         let model_rng = rng.gen_range(0.0..1.0);
         let is_fighter = model_rng < 0.8;
+        let is_carrier = !is_fighter && model_rng < 0.95;
 
-        let crew = if !is_fighter {
-            Some(world.spawn().insert(components::PersonType::Engineer).id())
+        let carrier_crew = if is_carrier {
+            Some(vec![
+                world.spawn().insert(components::PersonType::Engineer).id(),
+                world.spawn().insert(components::PersonType::Engineer).id(),
+                world.spawn().insert(components::PersonType::Civilian).id(),
+            ])
         } else {
             None
         };
 
         let mut spawner = world.spawn();
 
-        spawner.insert_bundle(components::base_ship_components(
-            position,
-            crew.map(|crew| vec![crew]).unwrap_or_default(),
-        ));
+        spawner.insert_bundle(components::base_ship_components(position));
 
         if is_fighter {
             spawner.insert_bundle(components::fighter_components(rng.gen_range(0.0..1.0)));
-        } else if model_rng < 0.95 {
+        } else if let Some(carrier_crew) = carrier_crew {
             let mut queue = components::BuildQueue::default();
             queue.push(components::ShipType::Fighter, 0.0);
-            spawner.insert_bundle(components::carrier_components(queue));
+            spawner.insert_bundle(components::carrier_components(queue, carrier_crew));
         } else {
             spawner.insert_bundle(components::miner_components());
         };

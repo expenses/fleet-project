@@ -1,9 +1,8 @@
 use super::*;
 
-pub fn base_ship_components(position: Vec3, crew: Vec<Entity>) -> impl Bundle {
+pub fn base_ship_components(position: Vec3) -> impl Bundle {
     (
         Position(position),
-        OnBoard(crew),
         Rotation(Default::default()),
         RotationMatrix::default(),
         WorldSpaceBoundingBox::default(),
@@ -42,9 +41,10 @@ pub fn miner_components() -> impl Bundle {
     )
 }
 
-pub fn carrier_components(queue: BuildQueue) -> impl Bundle {
+pub fn carrier_components(queue: BuildQueue, crew: Vec<Entity>) -> impl Bundle {
     (
         ModelId::Carrier,
+        OnBoard(crew),
         Carrying::default(),
         MaxSpeed(5.0),
         Health {

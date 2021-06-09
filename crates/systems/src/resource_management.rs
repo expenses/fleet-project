@@ -131,7 +131,7 @@ fn spawn_ship<Side: Default + Send + Sync + 'static>(
     let mut spawner = commands.spawn();
 
     spawner
-        .insert_bundle(base_ship_components(pos, Vec::new()))
+        .insert_bundle(base_ship_components(pos))
         .insert(Side::default());
 
     match ship {
@@ -142,7 +142,7 @@ fn spawn_ship<Side: Default + Send + Sync + 'static>(
             spawner.insert_bundle(miner_components());
         }
         ShipType::Carrier => {
-            spawner.insert_bundle(carrier_components(BuildQueue::default()));
+            spawner.insert_bundle(carrier_components(BuildQueue::default(), Vec::new()));
         }
     }
 
