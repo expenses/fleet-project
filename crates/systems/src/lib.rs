@@ -759,19 +759,15 @@ pub fn update_tlas(
     mut commands: Commands,
 ) {
     query.for_each_mut(|(entity, bbox, tlas_index)| {
-        let padded_bounding_box = bbox.0.expand(1.0);
+        let padded_bounding_box = bbox.0.expand(0.5);
 
         match tlas_index {
             Some(mut tlas_index) => {
                 if !tlas_index.padded_bounding_box.contains(bbox.0) {
-                    tlas.remove(tlas_index.index);
-
-                    *tlas_index = TlasIndex {
-                        index: tlas.insert(entity, padded_bounding_box),
-                        padded_bounding_box
-                    };
+                    tlas.modify_bounding_box_and_refit(tlas_index.index, padded_bounding_box);
+                    tlas_index.padded_bounding_box = padded_bounding_box;
                 }
-            },
+            }
             None => {
                 let index = tlas.insert(entity, padded_bounding_box);
                 commands.entity(entity).insert(TlasIndex {

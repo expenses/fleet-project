@@ -311,8 +311,9 @@ impl<T> DynamicBvh<T> {
         (node.left_child, node.right_child)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> &mut T {
-        self.nodes[index].data.as_mut().unwrap()
+    pub fn modify_bounding_box_and_refit(&mut self, index: usize, bounding_box: BoundingBox) {
+        self.nodes[index].bounding_box = bounding_box;
+        self.refit(index);
     }
 
     pub fn remove(&mut self, index: usize) -> Option<T> {

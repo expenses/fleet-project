@@ -331,7 +331,10 @@ impl BoundingBox {
 
     #[inline]
     pub fn expand(self, by: f32) -> Self {
-        Self::new(self.min - Vec3::broadcast(by), self.max + Vec3::broadcast(by))
+        Self::new(
+            self.min - Vec3::broadcast(by),
+            self.max + Vec3::broadcast(by),
+        )
     }
 
     #[inline]
