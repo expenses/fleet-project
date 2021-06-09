@@ -56,6 +56,10 @@ impl ShipType {
         }
     }
 
+    pub fn build_cost(self) -> f32 {
+        self.build_time() * 5.0
+    }
+
     pub fn model_id(self) -> ModelId {
         match self {
             Self::Carrier => ModelId::Carrier,

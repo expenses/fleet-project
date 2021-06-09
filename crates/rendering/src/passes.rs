@@ -29,11 +29,11 @@ pub fn run_render_passes(
     star_system: &StarSystem,
     tonemapper: &colstodian::tonemapper::LottesTonemapper,
     constants: &Constants,
-    draw_godrays: bool,
 ) {
     let ship_buffer = world.get_resource::<resources::ShipBuffer>().unwrap();
     let models = world.get_resource::<resources::Models>().unwrap();
     let perspective_view = world.get_resource::<resources::PerspectiveView>().unwrap();
+    let settings = world.get_resource::<resources::Settings>().unwrap();
 
     let laser_buffer = world
         .get_resource::<resources::GpuBuffer<LaserVertex>>()
@@ -174,7 +174,7 @@ pub fn run_render_passes(
     );
     render_pass.draw(0..3, 0..1);
 
-    if draw_godrays {
+    if settings.draw_godrays {
         let uv_space_light_pos = uv_space_light_pos(&perspective_view, star_system.sun_dir);
 
         render_pass.set_pipeline(&pipelines.godray_blur);

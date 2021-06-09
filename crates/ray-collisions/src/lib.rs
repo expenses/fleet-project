@@ -251,6 +251,10 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    pub const INDICES: [u16; 24] = [
+        0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7,
+    ];
+
     #[inline]
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
@@ -302,12 +306,21 @@ impl BoundingBox {
         ]
     }
 
+    pub fn line_points(self) -> [Vec3; 24] {
+        let corners = self.corners();
+        let mut line_points = [Vec3::zero(); 24];
+        for i in 0..24 {
+            line_points[i] = corners[Self::INDICES[i] as usize];
+        }
+        line_points
+    }
+
     #[inline]
     fn union_with(self, other: Self) -> Self {
-        Self {
-            min: self.min.min_by_component(other.min),
-            max: self.max.max_by_component(other.max),
-        }
+        Self::new(
+            self.min.min_by_component(other.min),
+            self.max.max_by_component(other.max),
+        )
     }
 
     #[inline]
@@ -318,16 +331,14 @@ impl BoundingBox {
 
     #[inline]
     pub fn expand(self, by: Vec3) -> Self {
-        Self {
-            min: self.min - by,
-            max: self.max + by,
-        }
+        Self::new(self.min - by, self.max + by)
     }
 }
 
 impl std::ops::Add<Vec3> for BoundingBox {
     type Output = Self;
 
+    #[inline]
     fn add(self, adjustment: Vec3) -> Self {
         Self::new(self.min + adjustment, self.max + adjustment)
     }
@@ -336,6 +347,7 @@ impl std::ops::Add<Vec3> for BoundingBox {
 impl std::ops::Mul<f32> for BoundingBox {
     type Output = Self;
 
+    #[inline]
     fn mul(self, scale: f32) -> Self {
         Self::new(self.min * scale, self.max * scale)
     }

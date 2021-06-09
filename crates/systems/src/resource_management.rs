@@ -104,25 +104,8 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
 ) {
     query.for_each_mut(|(pos, mut build_queue)| {
         if let Some(built_ship) = build_queue.advance(total_time.0) {
-            let mut spawner = commands.spawn();
+            let entity = spawn_ship::<Side>(built_ship, pos.0, &mut commands);
 
-            spawner
-                .insert_bundle(base_ship_components(pos.0, Vec::new()))
-                .insert(Side::default());
-
-            match built_ship {
-                ShipType::Fighter => {
-                    spawner.insert_bundle(fighter_components(0.0));
-                }
-                ShipType::Miner => {
-                    spawner.insert_bundle(miner_components());
-                }
-                ShipType::Carrier => {
-                    spawner.insert_bundle(carrier_components(BuildQueue::default()));
-                }
-            }
-
-            let entity = spawner.id();
             let mut velocity = Velocity(Vec3::zero());
             let mut command_queue = CommandQueue::default();
 
@@ -140,4 +123,30 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
                 .insert_bundle((velocity, command_queue));
         }
     })
+}
+
+fn spawn_ship<Side: Default + Send + Sync + 'static>(
+    ship: ShipType,
+    pos: Vec3,
+    commands: &mut Commands,
+) -> Entity {
+    let mut spawner = commands.spawn();
+
+    spawner
+        .insert_bundle(base_ship_components(pos, Vec::new()))
+        .insert(Side::default());
+
+    match ship {
+        ShipType::Fighter => {
+            spawner.insert_bundle(fighter_components(0.0));
+        }
+        ShipType::Miner => {
+            spawner.insert_bundle(miner_components());
+        }
+        ShipType::Carrier => {
+            spawner.insert_bundle(carrier_components(BuildQueue::default()));
+        }
+    }
+
+    spawner.id()
 }

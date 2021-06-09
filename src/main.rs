@@ -1,6 +1,5 @@
 use rand::Rng;
 use rand::SeedableRng;
-use structopt::StructOpt;
 use ultraviolet::{Rotor3, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 use winit::event::*;
@@ -11,18 +10,16 @@ mod background;
 use bevy_ecs::prelude::{IntoSystem, ParallelSystemDescriptorCoercion, Stage};
 use components_and_resources::gpu_structs::*;
 use components_and_resources::model::{load_image_from_bytes, load_ship_model};
-use components_and_resources::{components, resources, texture_manager::TextureManager};
-
-#[derive(StructOpt)]
-struct Opt {
-    #[structopt(long)]
-    draw_godrays: bool,
-}
+use components_and_resources::{
+    components,
+    resources::{self, StructOpt},
+    texture_manager::TextureManager,
+};
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let opt = Opt::from_args();
+    let settings = resources::Settings::from_args();
 
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
@@ -98,21 +95,10 @@ fn main() -> anyhow::Result<()> {
         }),
     };
 
-    let bounding_box_indices_for_model_id = |id: u16| {
-        let mut bounding_box_indices: [u16; 24] = [
-            0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7,
-        ];
-        let offset = id * 24;
-        for index in &mut bounding_box_indices {
-            *index += offset;
-        }
-        bounding_box_indices
-    };
-
     let constants = rendering::passes::Constants {
         bounding_box_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("bounding box vertices"),
-            contents: bytemuck::cast_slice(&bounding_box_indices_for_model_id(0)),
+            contents: bytemuck::cast_slice(&resources::BoundingBox::INDICES),
             usage: wgpu::BufferUsage::INDEX,
         }),
         circle_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -358,6 +344,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::SelectedButton::default());
     world.insert_resource(resources::TopLevelAccelerationStructure::default());
     world.insert_resource(resources::GlobalMinerals::default());
+    world.insert_resource(settings);
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
@@ -500,7 +487,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
         .with_system(systems::render_health.system())
-        //.with_system(systems::debug_render_bvh.system())
+        .with_system(systems::debug_render_bvh.system())
         .with_system(systems::render_buttons.system());
 
     let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()
@@ -645,7 +632,6 @@ fn main() -> anyhow::Result<()> {
                     &star_system,
                     &tonemapper,
                     &constants,
-                    opt.draw_godrays,
                 );
 
                 gpu_interface.queue.submit(Some(encoder.finish()));

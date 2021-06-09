@@ -7,12 +7,21 @@ pub use keyboard::KeyboardState;
 pub use mouse::{MouseButtonState, MouseState};
 pub use rand::rngs::SmallRng;
 pub use ray_collisions::{BoundingBox, DynamicBvh, Projectile, Ray, SelectionFrustum};
+pub use structopt::StructOpt;
 
 use crate::components::{ModelId, MoveType};
 use crate::model::Model;
 use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
 use wgpu_glyph::ab_glyph::FontRef;
+
+#[derive(StructOpt)]
+pub struct Settings {
+    #[structopt(long)]
+    pub draw_godrays: bool,
+    #[structopt(long)]
+    pub debug_render_tlas: bool,
+}
 
 #[derive(Default)]
 pub struct GlobalMinerals(pub f32);
