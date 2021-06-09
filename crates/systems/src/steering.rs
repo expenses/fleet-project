@@ -59,7 +59,7 @@ pub fn run_persuit(
                                                 let mut entity_commands = commands.entity(entity);
 
                                                 if queue.0.is_empty() {
-                                                    carrying.0.push(entity);
+                                                    let _ = carrying.0.try_push(entity);
 
                                                     tlas.remove(tlas_index.index);
 
