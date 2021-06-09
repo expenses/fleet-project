@@ -407,12 +407,16 @@ impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
         while let Some((index, depth)) = queue.pop() {
             let node = &self.nodes[index];
 
+            let bbox: ((f32, f32, f32), (f32, f32, f32)) = (node.bounding_box.min.into(), node.bounding_box.max.into());
+
             write!(
                 &mut string,
-                "\n{} {}{}",
+                "\n{} {}{}{}{:?}",
                 " ".repeat(depth * 4),
                 index,
-                if node.data.is_some() { "*" } else { "" }
+                if node.data.is_some() { "*" } else { "" },
+                " ".repeat(32),
+                bbox,
             )?;
 
             if node.data.is_none() {
@@ -435,9 +439,9 @@ fn test() {
 
     let mut bvh = DynamicBvh::default();
     bvh.insert((), bbox(Vec3::zero()));
-    for i in 0..100 {
+    for i in 0..20 {
         bvh.insert((), bbox(Vec3::new(i as f32 * 100.0, 0.0, 0.0)));
     }
     dbg!(bvh);
-    //panic!("Panicking in order to debug the tree")
+    panic!("Panicking in order to debug the tree")
 }
