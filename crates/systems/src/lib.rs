@@ -7,7 +7,7 @@ use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
 use std::ops::{Deref, DerefMut};
-use ultraviolet::Vec3;
+use ultraviolet::{Rotor3, Vec2, Vec3};
 
 mod combat;
 mod people;
@@ -284,14 +284,18 @@ pub fn handle_right_clicks(
     }
 }
 
+fn rotation_from_facing(facing: Vec3) -> Rotor3 {
+    let xz_movement = Vec2::new(facing.x, facing.z).mag();
+
+    ultraviolet::Rotor3::from_rotation_xz(-facing.x.atan2(facing.z))
+        * ultraviolet::Rotor3::from_rotation_yz(-facing.y.atan2(xz_movement))
+}
+
 #[profiling::function]
 pub fn set_rotation_from_velocity(mut query: Query<(&Velocity, &mut Rotation), Changed<Velocity>>) {
     query.for_each_mut(|(velocity, mut rotation)| {
         if velocity.0 != Vec3::zero() {
-            let xz_movement = ultraviolet::Vec2::new(velocity.0.x, velocity.0.z).mag();
-
-            rotation.0 = ultraviolet::Rotor3::from_rotation_xz(-velocity.0.x.atan2(velocity.0.z))
-                * ultraviolet::Rotor3::from_rotation_yz(-velocity.0.y.atan2(xz_movement));
+            rotation.0 = rotation_from_facing(velocity.0);
         }
     })
 }
