@@ -768,7 +768,9 @@ pub fn set_selected_button(
 #[profiling::function]
 pub fn update_tlas(
     mut tlas: ResMut<DynamicBvh<Entity>>,
-    mut query: Query<(Entity, &WorldSpaceBoundingBox, Option<&mut TlasIndex>)>,
+    // We need to filter to ships that have a `Position` here to prevent carried ships being re-added to
+    // the TLAS.
+    mut query: Query<(Entity, &WorldSpaceBoundingBox, Option<&mut TlasIndex>), With<Position>>,
     mut commands: Commands,
 ) {
     query.for_each_mut(|(entity, bbox, tlas_index)| {

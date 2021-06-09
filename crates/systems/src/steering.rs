@@ -15,6 +15,7 @@ pub fn run_persuit(
         Option<&mut CommandQueue>,
         Option<&mut StoredMinerals>,
         &mut StagingPersuitForce,
+        &TlasIndex,
     )>,
     to_transfer: Query<&mut OnBoard>,
     boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
@@ -22,8 +23,9 @@ pub fn run_persuit(
     mut carrying: Query<&mut Carrying>,
     total_time: Res<TotalTime>,
     mut global_minerals: ResMut<GlobalMinerals>,
+    mut tlas: ResMut<TopLevelAccelerationStructure>,
 ) {
-    query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force)| {
+    query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force, tlas_index)| {
         let boid = to_boid(pos, vel, max_speed);
         let max_force = max_speed.max_force();
 
@@ -51,7 +53,10 @@ pub fn run_persuit(
                                             let mut entity_commands = commands.entity(entity);
 
                                             if queue.0.len() == 1 {
+                                                tlas.remove(tlas_index.index);
+
                                                 entity_commands
+                                                    .remove::<TlasIndex>()
                                                     .remove::<Position>();
                                             } else {
                                                 entity_commands.insert(Unloading::new(total_time.0));
