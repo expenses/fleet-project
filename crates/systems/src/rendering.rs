@@ -355,6 +355,7 @@ pub fn render_health(
             Option<&MaxHealth>,
             Option<&Selected>,
             Option<&Carrying>,
+            Option<&OnBoard>,
             Option<&StoredMinerals>,
             Option<&CanBeMined>,
             Option<&BuildQueue>,
@@ -367,7 +368,17 @@ pub fn render_health(
     total_time: Res<TotalTime>,
 ) {
     query.for_each(
-        |(pos, health, max_health, selected, carrying, minerals, can_be_mined, build_queue)| {
+        |(
+            pos,
+            health,
+            max_health,
+            selected,
+            carrying,
+            on_board,
+            minerals,
+            can_be_mined,
+            build_queue,
+        )| {
             let projected =
                 perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
@@ -401,6 +412,18 @@ pub fn render_health(
                                 "Carrying: {}/{}\n",
                                 carrying.0.len(),
                                 carrying.0.capacity()
+                            ))
+                            .with_color([1.0; 4]),
+                        );
+                    }
+                }
+
+                if let Some(on_board) = on_board {
+                    if selected && !on_board.0.is_empty() {
+                        section = section.add_text(
+                            glyph_brush::OwnedText::new(format!(
+                                "On Board: {}\n",
+                                on_board.0.len()
                             ))
                             .with_color([1.0; 4]),
                         );
