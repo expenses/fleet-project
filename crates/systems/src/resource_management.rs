@@ -94,6 +94,35 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
     })
 }
 
+pub fn redirect_ships_from_full_carriers(
+    mut query: Query<&mut CommandQueue>,
+    full_carriers: Query<&Position, With<CarrierFull>>,
+    carriers_with_room: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
+) {
+    query.for_each_mut(|mut queue| {
+        let is_targetting_full_carrier_and_its_position = queue
+            .0
+            .front()
+            .and_then(|command| match command {
+                Command::Interact {
+                    target,
+                    ty: InteractionType::BeCarriedBy,
+                    ..
+                } => Some(target),
+                _ => None,
+            })
+            .and_then(|&target| full_carriers.get(target).ok());
+
+        // Note: we redirect to the closest carrier _to the carrier being targetted_,
+        // not the ship we're redirecting. This is so the ships go to carriers in the same
+        // region of space as opposed to being scattered all over the place.
+        if let Some(target_pos) = is_targetting_full_carrier_and_its_position {
+            queue.0.pop_front();
+            find_next_carrier(target_pos.0, &mut queue, carriers_with_room.iter())
+        }
+    })
+}
+
 fn spawn_ship<Side: Default + Send + Sync + 'static>(
     ship: ShipType,
     pos: Vec3,

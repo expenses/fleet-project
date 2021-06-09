@@ -91,7 +91,8 @@ pub fn run_persuit(
                                                     stored_minerals.stored = 0.0;
                                                 }
                                             } else {
-                                                // todo: ships should try find a new carrier before checking the old one.
+                                                // Note: `redirect_ships_from_full_carriers` should redirect the ship
+                                                // before it comes to this, but this is just to make sure.
                                                 find_next_carrier(pos.0, &mut queue, carriers.iter());
                                             }
                                         },

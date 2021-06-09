@@ -15,7 +15,7 @@ pub fn find_next_carrier<'a>(
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     if let Some((entity, _)) = carrier {
-        queue.0.push_back(Command::Interact {
+        queue.0.push_front(Command::Interact {
             target: entity,
             ty: InteractionType::BeCarriedBy,
             range_sq: 0.0,

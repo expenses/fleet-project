@@ -359,6 +359,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::remove_unloading.system())
         .with_system(systems::build_ships::<components::Friendly>.system())
         .with_system(systems::build_ships::<components::Enemy>.system())
+        .with_system(systems::redirect_ships_from_full_carriers.system())
         .with_system(systems::debug_watch.system())
         .with_system(
             systems::apply_staging_velocity
