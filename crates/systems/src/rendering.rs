@@ -363,6 +363,7 @@ pub fn render_health(
         Without<Enemy>,
     >,
     people: Query<&PersonType>,
+    carried_ships: Query<(&ModelId, &Health)>,
     mut glyph_brush: ResMut<GlyphBrush>,
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
@@ -406,6 +407,40 @@ pub fn render_health(
                             ))
                             .with_color([1.0; 4]),
                         );
+
+                        let mut counts_and_damaged = [(0, 0); Models::COUNT];
+
+                        carrying.0.iter().for_each(|&entity| {
+                            if let Ok((model_id, health)) = carried_ships.get(entity) {
+                                counts_and_damaged[*model_id as usize].0 += 1;
+                                counts_and_damaged[*model_id as usize].1 +=
+                                    (health.current < health.max) as u32;
+                            }
+                        });
+
+                        for model_id in IntoIter::new(Models::ARRAY) {
+                            let (count, damaged) = counts_and_damaged[model_id as usize];
+
+                            if count > 0 {
+                                section = section.add_text(
+                                    glyph_brush::OwnedText::new(format!(
+                                        "  - {:?}s: {}\n",
+                                        model_id, count
+                                    ))
+                                    .with_color([1.0; 4]),
+                                );
+                            }
+
+                            if damaged > 0 {
+                                section = section.add_text(
+                                    glyph_brush::OwnedText::new(format!(
+                                        "    - Num. Damaged: {}\n",
+                                        damaged
+                                    ))
+                                    .with_color([1.0; 4]),
+                                );
+                            }
+                        }
                     }
                 }
 

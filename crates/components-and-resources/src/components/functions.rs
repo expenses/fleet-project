@@ -21,7 +21,10 @@ pub fn fighter_components(ray_cooldown: f32) -> impl Bundle {
         CanAttack,
         CanBeCarried,
         MaxSpeed(10.0),
-        Health::new(50.0),
+        Health {
+            current: 26.0,
+            max: 50.0,
+        },
         RayCooldown(ray_cooldown),
         AgroRange(200.0),
     )
