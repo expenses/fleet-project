@@ -59,7 +59,9 @@ pub fn run_persuit(
                                                 let mut entity_commands = commands.entity(entity);
 
                                                 if queue.0.is_empty() {
-                                                    let _ = carrying.0.try_push(entity);
+                                                    if let Err(err) = carrying.0.try_push(entity) {
+                                                        log::error!("Failed to push to {:?}s carrying queue: {}", target, err);
+                                                    }
 
                                                     tlas.remove(tlas_index.index);
 
