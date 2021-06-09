@@ -176,8 +176,17 @@ pub struct CanAttack;
 #[derive(Default)]
 pub struct Carrying(pub arrayvec::ArrayVec<Entity, 100>);
 pub struct CanBeCarried;
-pub struct Health(pub f32);
-pub struct MaxHealth(pub f32);
+
+pub struct Health {
+    pub current: f32,
+    pub max: f32,
+}
+
+impl Health {
+    pub fn new(max: f32) -> Self {
+        Self { max, current: max }
+    }
+}
 
 pub struct Selectable;
 

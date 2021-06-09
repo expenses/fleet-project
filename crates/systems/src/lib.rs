@@ -101,7 +101,7 @@ pub fn handle_destruction(
 ) {
     query.for_each_mut(
         |(entity, pos, health, carrying, on_board, tlas_index, selected)| {
-            if health.0 <= 0.0 {
+            if health.current <= 0.0 {
                 if let Some(mut carrying) = carrying {
                     unload(
                         entity,

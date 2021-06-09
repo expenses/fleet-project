@@ -22,8 +22,7 @@ pub fn fighter_components(ray_cooldown: f32) -> impl Bundle {
         CanAttack,
         CanBeCarried,
         MaxSpeed(10.0),
-        Health(50.0),
-        MaxHealth(50.0),
+        Health::new(50.0),
         RayCooldown(ray_cooldown),
         AgroRange(200.0),
     )
@@ -34,8 +33,7 @@ pub fn miner_components() -> impl Bundle {
         ModelId::Miner,
         CanBeCarried,
         MaxSpeed(15.0),
-        Health(40.0),
-        MaxHealth(40.0),
+        Health::new(40.0),
         CanMine,
         StoredMinerals {
             stored: 0.0,
@@ -49,8 +47,10 @@ pub fn carrier_components(queue: BuildQueue) -> impl Bundle {
         ModelId::Carrier,
         Carrying::default(),
         MaxSpeed(5.0),
-        Health(247.5),
-        MaxHealth(250.0),
+        Health {
+            current: 247.5,
+            max: 250.0,
+        },
         queue,
     )
 }
