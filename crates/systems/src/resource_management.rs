@@ -1,3 +1,4 @@
+use crate::find_functions::*;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
@@ -27,7 +28,7 @@ pub fn mine(
             {
                 if stored_minerals.stored >= stored_minerals.capacity {
                     queue.0.pop_front();
-                    find_next_carrier(pos.0, &mut queue, &carriers);
+                    find_next_carrier(pos.0, &mut queue, carriers.iter());
                     find_next_asteroid(pos.0, &mut queue, &new_targets);
                 } else if let Ok((target_pos, mut can_be_mined)) = targets.get_mut(*target) {
                     let max_force = max_speed.max_force();
@@ -53,7 +54,7 @@ pub fn mine(
                     queue.0.pop_front();
 
                     if new_targets.iter().next().is_none() {
-                        find_next_carrier(pos.0, &mut queue, &carriers);
+                        find_next_carrier(pos.0, &mut queue, carriers.iter());
                     } else {
                         find_next_asteroid(pos.0, &mut queue, &new_targets);
                     }
@@ -61,50 +62,6 @@ pub fn mine(
             }
         },
     )
-}
-
-fn find_next_carrier(
-    pos: Vec3,
-    queue: &mut CommandQueue,
-    carriers: &Query<(Entity, &Position), With<Carrying>>,
-) {
-    let carrier = carriers
-        .iter()
-        .map(|(entity, new_pos)| {
-            let dist_sq = (pos - new_pos.0).mag_sq();
-            (entity, dist_sq)
-        })
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-    if let Some((entity, _)) = carrier {
-        queue.0.push_back(Command::Interact {
-            target: entity,
-            ty: InteractionType::BeCarriedBy,
-            range_sq: 0.0,
-        });
-    }
-}
-
-fn find_next_asteroid(
-    pos: Vec3,
-    queue: &mut CommandQueue,
-    new_targets: &Query<(Entity, &Position, &Scale), With<CanBeMined>>,
-) {
-    let new_target = new_targets
-        .iter()
-        .map(|(entity, new_pos, scale)| {
-            let dist_sq = (pos - new_pos.0).mag_sq();
-            (entity, dist_sq, scale)
-        })
-        .min_by(|(_, a, _), (_, b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-    if let Some((entity, _, scale)) = new_target {
-        queue.0.push_back(Command::Interact {
-            target: entity,
-            ty: InteractionType::Mine,
-            range_sq: scale.range_sq(),
-        });
-    }
 }
 
 pub fn build_ships<Side: Default + Send + Sync + 'static>(

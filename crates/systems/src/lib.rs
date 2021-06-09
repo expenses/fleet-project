@@ -10,6 +10,7 @@ use std::ops::{Deref, DerefMut};
 use ultraviolet::{Rotor3, Vec2, Vec3};
 
 mod combat;
+mod find_functions;
 mod people;
 mod rendering;
 mod resource_management;
@@ -340,7 +341,7 @@ pub fn handle_keys(
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
     mut paused: ResMut<Paused>,
-    mut carrying: Query<(&Position, &mut Carrying), SelectedFriendly>,
+    mut carrying: Query<(Entity, &Position, &mut Carrying), SelectedFriendly>,
     mut rng: ResMut<SmallRng>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
@@ -357,8 +358,9 @@ pub fn handle_keys(
     }
 
     if keyboard_state.unload.0 {
-        carrying.for_each_mut(|(pos, mut carrying)| {
+        carrying.for_each_mut(|(entity, pos, mut carrying)| {
             unload(
+                entity,
                 pos.0,
                 &mut carrying,
                 &mut *rng,
@@ -410,6 +412,7 @@ pub fn handle_destruction(
             if health.0 <= 0.0 {
                 if let Some(mut carrying) = carrying {
                     unload(
+                        entity,
                         pos.0,
                         &mut carrying,
                         &mut *rng,
@@ -450,6 +453,7 @@ fn spawn_explosion(pos: Vec3, total_time: f32, rng: &mut SmallRng, commands: &mu
 }
 
 fn unload(
+    entity: Entity,
     pos: Vec3,
     carrying: &mut Carrying,
     rng: &mut SmallRng,
@@ -458,6 +462,8 @@ fn unload(
     movement: &mut Query<(&mut Velocity, &mut CommandQueue)>,
     selected: bool,
 ) {
+    commands.entity(entity).remove::<CarrierFull>();
+
     carrying.0.drain(..).for_each(|entity| {
         unload_single(
             pos,

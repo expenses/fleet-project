@@ -1,3 +1,4 @@
+use crate::find_functions::*;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
@@ -24,6 +25,7 @@ pub fn run_persuit(
     total_time: Res<TotalTime>,
     mut global_minerals: ResMut<GlobalMinerals>,
     mut tlas: ResMut<TopLevelAccelerationStructure>,
+    carriers: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
 ) {
     query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force, tlas_index)| {
         let boid = to_boid(pos, vel, max_speed);
@@ -46,39 +48,51 @@ pub fn run_persuit(
                         } else {
                             match ty {
                                 InteractionType::BeCarriedBy => {
+                                    queue.0.pop_front();
+
                                     match carrying.get_mut(target) {
                                         Ok(mut carrying) => {
-                                            carrying.0.push(entity);
+                                            // If the carrier is full, the ship can't load into it
+                                            // and should look for another (non-full) one. If it's
+                                            // just docking to drop somethings off then that's fine though.
+                                            if !carrying.0.is_full() || !queue.0.is_empty() {
+                                                let mut entity_commands = commands.entity(entity);
 
-                                            let mut entity_commands = commands.entity(entity);
+                                                if queue.0.is_empty() {
+                                                    carrying.0.push(entity);
 
-                                            if queue.0.len() == 1 {
-                                                tlas.remove(tlas_index.index);
+                                                    tlas.remove(tlas_index.index);
 
-                                                entity_commands
-                                                    .remove::<TlasIndex>()
-                                                    .remove::<Position>();
+                                                    entity_commands
+                                                        .remove::<TlasIndex>()
+                                                        .remove::<Position>();
+                                                } else {
+                                                    entity_commands.insert(Unloading::new(total_time.0));
+                                                }
+
+                                                if carrying.0.is_full() {
+                                                    commands.entity(target).insert(CarrierFull);
+                                                }
+
+                                                let ship_to_transfer = unsafe {
+                                                    to_transfer.get_unchecked(entity)
+                                                };
+
+                                                let carrier_to_transfer = unsafe {
+                                                    to_transfer.get_unchecked(target)
+                                                };
+
+                                                if let (Ok(mut ship_people), Ok(mut carrier_people)) = (ship_to_transfer, carrier_to_transfer) {
+                                                    carrier_people.0.append(&mut ship_people.0);
+                                                }
+
+                                                if let Some(mut stored_minerals) = stored_minerals {
+                                                    global_minerals.0 += stored_minerals.stored;
+                                                    stored_minerals.stored = 0.0;
+                                                }
                                             } else {
-                                                entity_commands.insert(Unloading::new(total_time.0));
-                                            }
-
-                                            queue.0.pop_front();
-
-                                            let ship_to_transfer = unsafe {
-                                                to_transfer.get_unchecked(entity)
-                                            };
-
-                                            let carrier_to_transfer = unsafe {
-                                                to_transfer.get_unchecked(target)
-                                            };
-
-                                            if let (Ok(mut ship_people), Ok(mut carrier_people)) = (ship_to_transfer, carrier_to_transfer) {
-                                                carrier_people.0.append(&mut ship_people.0);
-                                            }
-
-                                            if let Some(mut stored_minerals) = stored_minerals {
-                                                global_minerals.0 += stored_minerals.stored;
-                                                stored_minerals.stored = 0.0;
+                                                // todo: ships should try find a new carrier before checking the old one.
+                                                find_next_carrier(pos.0, &mut queue, carriers.iter());
                                             }
                                         },
                                         Err(err) => {
@@ -86,7 +100,6 @@ pub fn run_persuit(
                                                 "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships: {}",
                                                 entity, target, target, err
                                             );
-                                            queue.0.pop_front();
                                         }
                                     }
                                 },

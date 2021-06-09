@@ -174,7 +174,7 @@ pub enum InteractionType {
 
 pub struct CanAttack;
 #[derive(Default)]
-pub struct Carrying(pub Vec<Entity>);
+pub struct Carrying(pub arrayvec::ArrayVec<Entity, 100>);
 pub struct CanBeCarried;
 pub struct Health(pub f32);
 pub struct MaxHealth(pub f32);
@@ -227,3 +227,5 @@ pub struct TlasIndex {
     pub index: usize,
     pub padded_bounding_box: BoundingBox,
 }
+
+pub struct CarrierFull;

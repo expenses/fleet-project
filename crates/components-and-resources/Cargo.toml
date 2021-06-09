@@ -18,3 +18,4 @@ wgpu = "0.8.1"
 wgpu_glyph = "0.12.0"
 winit = "0.25"
 structopt = { version = "0.3.21", default-features = false }
+arrayvec = "0.7.1"
