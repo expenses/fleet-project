@@ -97,12 +97,12 @@ fn find_next_asteroid(
 }
 
 pub fn build_ships<Side: Default + Send + Sync + 'static>(
-    mut query: Query<(&Position, &mut BuildQueue), With<Side>>,
+    mut query: Query<(&Position, &mut BuildQueue, Option<&Selected>), With<Side>>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
     mut rng: ResMut<SmallRng>,
 ) {
-    query.for_each_mut(|(pos, mut build_queue)| {
+    query.for_each_mut(|(pos, mut build_queue, selected)| {
         if let Some(built_ship) = build_queue.advance(total_time.0) {
             let entity = spawn_ship::<Side>(built_ship, pos.0, &mut commands);
 
@@ -116,6 +116,7 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
                 total_time.0,
                 Some((&mut velocity, &mut command_queue)),
                 &mut commands,
+                selected.is_some(),
             );
 
             commands

@@ -361,6 +361,7 @@ pub fn handle_keys(
                 total_time.0,
                 &mut commands,
                 &mut query_set.q1_mut(),
+                true,
             );
         })
     }
@@ -392,6 +393,7 @@ pub fn handle_destruction(
         Option<&mut Carrying>,
         Option<&OnBoard>,
         Option<&TlasIndex>,
+        Option<&Selected>,
     )>,
     mut rng: ResMut<SmallRng>,
     mut commands: Commands,
@@ -399,34 +401,37 @@ pub fn handle_destruction(
     mut movement: Query<(&mut Velocity, &mut CommandQueue)>,
     mut tlas: ResMut<TopLevelAccelerationStructure>,
 ) {
-    query.for_each_mut(|(entity, pos, health, carrying, on_board, tlas_index)| {
-        if health.0 <= 0.0 {
-            if let Some(mut carrying) = carrying {
-                unload(
-                    pos.0,
-                    &mut carrying,
-                    &mut *rng,
-                    total_time.0,
-                    &mut commands,
-                    &mut movement,
-                );
-            }
-
-            commands.entity(entity).despawn();
-
-            if let Some(on_board) = on_board {
-                for &entity in on_board.0.iter() {
-                    commands.entity(entity).despawn();
+    query.for_each_mut(
+        |(entity, pos, health, carrying, on_board, tlas_index, selected)| {
+            if health.0 <= 0.0 {
+                if let Some(mut carrying) = carrying {
+                    unload(
+                        pos.0,
+                        &mut carrying,
+                        &mut *rng,
+                        total_time.0,
+                        &mut commands,
+                        &mut movement,
+                        selected.is_some(),
+                    );
                 }
-            }
 
-            if let Some(tlas_index) = tlas_index {
-                tlas.remove(tlas_index.index);
-            }
+                commands.entity(entity).despawn();
 
-            spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
-        }
-    })
+                if let Some(on_board) = on_board {
+                    for &entity in on_board.0.iter() {
+                        commands.entity(entity).despawn();
+                    }
+                }
+
+                if let Some(tlas_index) = tlas_index {
+                    tlas.remove(tlas_index.index);
+                }
+
+                spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
+            }
+        },
+    )
 }
 
 fn spawn_explosion(pos: Vec3, total_time: f32, rng: &mut SmallRng, commands: &mut Commands) {
@@ -447,6 +452,7 @@ fn unload(
     total_time: f32,
     commands: &mut Commands,
     movement: &mut Query<(&mut Velocity, &mut CommandQueue)>,
+    selected: bool,
 ) {
     carrying.0.drain(..).for_each(|entity| {
         unload_single(
@@ -456,6 +462,7 @@ fn unload(
             total_time,
             movement.get_mut(entity).ok(),
             commands,
+            selected,
         );
     })
 }
@@ -467,14 +474,20 @@ fn unload_single<V, M>(
     total_time: f32,
     movement: Option<(V, M)>,
     commands: &mut Commands,
+    select: bool,
 ) where
     V: Deref<Target = Velocity> + DerefMut,
     M: Deref<Target = CommandQueue> + DerefMut,
 {
-    commands
-        .entity(entity)
+    let mut entity_commands = commands.entity(entity);
+
+    entity_commands
         .insert(Position(pos))
         .insert(Unloading::new(total_time));
+
+    if select {
+        entity_commands.insert(Selected);
+    }
 
     if let Some((mut velocity, mut queue)) = movement {
         velocity.0 = Vec3::zero();
