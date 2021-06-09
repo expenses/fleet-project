@@ -301,7 +301,9 @@ impl<T> DynamicBvh<T> {
     }
 
     fn union_of(&self, a: usize, b: usize) -> BoundingBox {
-        self.nodes[a].bounding_box.union_with(self.nodes[b].bounding_box)
+        self.nodes[a]
+            .bounding_box
+            .union_with(self.nodes[b].bounding_box)
     }
 
     fn children(&self, parent: usize) -> (usize, usize) {
@@ -343,10 +345,12 @@ impl<T> DynamicBvh<T> {
     }
 
     fn sibling_of(&mut self, parent: usize, child: usize) -> usize {
-        if self.nodes[parent].left_child == child {
-            self.nodes[parent].right_child
+        let (left_child, right_child) = self.children(parent);
+
+        if child == left_child {
+            right_child
         } else {
-            self.nodes[parent].left_child
+            left_child
         }
     }
 
@@ -399,12 +403,16 @@ impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut queue = vec![(self.root, 0)];
+        let mut stack = if !self.nodes.is_empty() {
+            vec![(self.root, 0)]
+        } else {
+            Vec::new()
+        };
         let mut string = String::new();
 
         use std::fmt::Write;
 
-        while let Some((index, depth)) = queue.pop() {
+        while let Some((index, depth)) = stack.pop() {
             let node = &self.nodes[index];
 
             write!(
@@ -416,13 +424,16 @@ impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
             )?;
 
             if node.data.is_none() {
-                queue.push((node.left_child, depth + 1));
-                queue.push((node.right_child, depth + 1));
+                stack.push((node.left_child, depth + 1));
+                stack.push((node.right_child, depth + 1));
             }
         }
 
         f.debug_struct("DynamicBvh")
-            .field("nodes", &format_args!("{}", string))
+            .field(
+                "nodes",
+                &format_args!("{}{}", string, if string.is_empty() { "[]" } else { "" }),
+            )
             .finish()
     }
 }
@@ -431,10 +442,9 @@ impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
 fn test() {
     use ultraviolet::Vec3;
 
-    let bbox = |pos| BoundingBox::new(pos - Vec3::broadcast(0.1), pos + Vec3::broadcast(0.1));
+    let bbox = |pos: Vec3| BoundingBox::new(pos - Vec3::broadcast(0.1), pos + Vec3::broadcast(0.1));
 
-    let mut bvh = DynamicBvh::default();
-    bvh.insert((), bbox(Vec3::zero()));
+    let mut bvh = DynamicBvh::<()>::default();
     for i in 0..100 {
         bvh.insert((), bbox(Vec3::new(i as f32 * 100.0, 0.0, 0.0)));
     }
