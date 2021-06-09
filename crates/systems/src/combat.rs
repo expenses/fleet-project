@@ -109,31 +109,49 @@ pub fn choose_enemy_target<SideA, SideB>(
 }
 
 pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
-    mut query: Query<(&Position, &Velocity, &mut RayCooldown, &CommandQueue), With<Side>>,
+    mut query: Query<
+        (
+            &Position,
+            &Velocity,
+            &mut RayCooldown,
+            &CommandQueue,
+            &AgroRange,
+        ),
+        With<Side>,
+    >,
+    positions: Query<&Position>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
     mut commands: Commands,
 ) {
-    query.for_each_mut(|(pos, vel, mut ray_cooldown, queue)| {
+    query.for_each_mut(|(pos, vel, mut ray_cooldown, queue, agro_range)| {
         ray_cooldown.0 = (ray_cooldown.0 - delta_time.0).max(0.0);
 
-        if matches!(
-            queue.0.front(),
-            Some(Command::Interact {
-                ty: InteractionType::Attack,
-                ..
-            })
-        ) && ray_cooldown.0 == 0.0
+        if let Some(Command::Interact {
+            ty: InteractionType::Attack,
+            target,
+            ..
+        }) = queue.0.front()
         {
-            ray_cooldown.0 = 1.0;
+            let agro_range_sq = agro_range.0 * agro_range.0;
 
-            let ray = Ray::new(pos.0, vel.0.normalized());
+            let in_range = positions
+                .get(*target)
+                .ok()
+                .filter(|target_pos| (pos.0 - target_pos.0).mag_sq() < agro_range_sq)
+                .is_some();
 
-            commands.spawn_bundle((
-                Projectile::new(&ray, 200.0),
-                AliveUntil(total_time.0 + 10.0),
-                Side::default(),
-            ));
+            if ray_cooldown.0 == 0.0 && in_range {
+                ray_cooldown.0 = 1.0;
+
+                let ray = Ray::new(pos.0, vel.0.normalized());
+
+                commands.spawn_bundle((
+                    Projectile::new(&ray, 200.0),
+                    AliveUntil(total_time.0 + 10.0),
+                    Side::default(),
+                ));
+            }
         }
     })
 }
