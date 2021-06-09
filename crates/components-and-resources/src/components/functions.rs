@@ -49,7 +49,7 @@ pub fn carrier_components(queue: BuildQueue) -> impl Bundle {
         ModelId::Carrier,
         Carrying::default(),
         MaxSpeed(5.0),
-        Health(125.0),
+        Health(247.5),
         MaxHealth(250.0),
         queue,
     )

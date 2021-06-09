@@ -494,7 +494,7 @@ pub fn render_health(
                     if let Some(progress) = progress {
                         section = section.add_text(
                             glyph_brush::OwnedText::new(format!(
-                                "Progress: {:.2}%\n",
+                                "  - Progress: {:.2}%\n",
                                 progress * 100.0
                             ))
                             .with_color([1.0; 4]),
