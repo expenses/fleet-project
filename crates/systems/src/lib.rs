@@ -391,13 +391,15 @@ pub fn handle_destruction(
         &Health,
         Option<&mut Carrying>,
         Option<&OnBoard>,
+        Option<&TlasIndex>,
     )>,
     mut rng: ResMut<SmallRng>,
     mut commands: Commands,
     total_time: Res<TotalTime>,
     mut movement: Query<(&mut Velocity, &mut CommandQueue)>,
+    mut tlas: ResMut<TopLevelAccelerationStructure>,
 ) {
-    query.for_each_mut(|(entity, pos, health, carrying, on_board)| {
+    query.for_each_mut(|(entity, pos, health, carrying, on_board, tlas_index)| {
         if health.0 <= 0.0 {
             if let Some(mut carrying) = carrying {
                 unload(
@@ -416,6 +418,10 @@ pub fn handle_destruction(
                 for &entity in on_board.0.iter() {
                     commands.entity(entity).despawn();
                 }
+            }
+
+            if let Some(tlas_index) = tlas_index {
+                tlas.remove(tlas_index.index);
             }
 
             spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
@@ -747,14 +753,33 @@ pub fn set_selected_button(
 }
 
 #[profiling::function]
-pub fn create_bvh(
-    mut bvh: ResMut<DynamicBvh<Entity>>,
-    query: Query<(Entity, &WorldSpaceBoundingBox)>,
+pub fn update_tlas(
+    mut tlas: ResMut<DynamicBvh<Entity>>,
+    mut query: Query<(Entity, &WorldSpaceBoundingBox, Option<&mut TlasIndex>)>,
+    mut commands: Commands,
 ) {
-    bvh.clear();
+    query.for_each_mut(|(entity, bbox, tlas_index)| {
+        let padded_bounding_box = bbox.0.expand(1.0);
 
-    query.for_each(|(entity, bbox)| {
-        bvh.insert(entity, bbox.0);
+        match tlas_index {
+            Some(mut tlas_index) => {
+                if !tlas_index.padded_bounding_box.contains(bbox.0) {
+                    tlas.remove(tlas_index.index);
+
+                    *tlas_index = TlasIndex {
+                        index: tlas.insert(entity, padded_bounding_box),
+                        padded_bounding_box
+                    };
+                }
+            },
+            None => {
+                let index = tlas.insert(entity, padded_bounding_box);
+                commands.entity(entity).insert(TlasIndex {
+                    index,
+                    padded_bounding_box,
+                });
+            }
+        }
     });
 }
 

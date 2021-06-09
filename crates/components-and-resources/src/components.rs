@@ -222,3 +222,8 @@ impl Unloading {
 }
 
 pub struct DebugWatch;
+
+pub struct TlasIndex {
+    pub index: usize,
+    pub padded_bounding_box: BoundingBox,
+}

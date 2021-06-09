@@ -244,7 +244,7 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct BoundingBox {
     min: Vec3,
     max: Vec3,
@@ -330,8 +330,13 @@ impl BoundingBox {
     }
 
     #[inline]
-    pub fn expand(self, by: Vec3) -> Self {
-        Self::new(self.min - by, self.max + by)
+    pub fn expand(self, by: f32) -> Self {
+        Self::new(self.min - Vec3::broadcast(by), self.max + Vec3::broadcast(by))
+    }
+
+    #[inline]
+    pub fn contains(self, inner: BoundingBox) -> bool {
+        self.union_with(inner) == self
     }
 }
 
