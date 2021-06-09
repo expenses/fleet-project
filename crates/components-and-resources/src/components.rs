@@ -184,9 +184,15 @@ pub struct Selectable;
 #[derive(Debug)]
 pub struct OnBoard(pub Vec<Entity>);
 
+#[derive(Clone, Copy, Debug)]
 pub enum PersonType {
-    Civilian,
-    Engineer,
+    Civilian = 0,
+    Engineer = 1,
+}
+
+impl PersonType {
+    pub const COUNT: usize = 2;
+    pub const ARRAY: [Self; Self::COUNT] = [Self::Civilian, Self::Engineer];
 }
 
 pub struct CanMine;

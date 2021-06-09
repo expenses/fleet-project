@@ -5,6 +5,7 @@ use components_and_resources::gpu_structs::{
     BackgroundVertex, CircleInstance, Instance, LaserVertex, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
+use std::array::IntoIter;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
 #[profiling::function]
@@ -362,6 +363,7 @@ pub fn render_health(
         ),
         Without<Enemy>,
     >,
+    people: Query<&PersonType>,
     mut glyph_brush: ResMut<GlyphBrush>,
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
@@ -427,6 +429,28 @@ pub fn render_health(
                             ))
                             .with_color([1.0; 4]),
                         );
+
+                        let mut counts = [0; PersonType::COUNT];
+
+                        on_board.0.iter().for_each(|&entity| {
+                            if let Ok(person_ty) = people.get(entity) {
+                                counts[*person_ty as usize] += 1;
+                            }
+                        });
+
+                        for person_ty in IntoIter::new(PersonType::ARRAY) {
+                            let count = counts[person_ty as usize];
+
+                            if count > 0 {
+                                section = section.add_text(
+                                    glyph_brush::OwnedText::new(format!(
+                                        "  - {:?}s: {}\n",
+                                        person_ty, count
+                                    ))
+                                    .with_color([1.0; 4]),
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -502,7 +526,7 @@ pub fn debug_render_tlas(
                 Vec3::unit_z()
             };
 
-            for point in bounding_box.line_points().iter().cloned() {
+            for point in IntoIter::new(bounding_box.line_points()) {
                 lines_buffer.stage(&[BackgroundVertex {
                     position: point,
                     colour,

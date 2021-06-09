@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
+use std::array::IntoIter;
 use std::ops::{Deref, DerefMut};
 use ultraviolet::{Rotor3, Vec2, Vec3};
 
@@ -320,7 +321,7 @@ pub fn count_selected(
                      status: UnitStatus,
                      colour,
                      counts: [u32; Models::COUNT]| {
-        for model_id in Models::ARRAY.iter().cloned() {
+        for model_id in IntoIter::new(Models::ARRAY) {
             let i = model_id as usize;
             let count = counts[i];
 
