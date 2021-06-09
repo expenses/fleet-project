@@ -64,10 +64,10 @@ impl BuildQueue {
 #[test]
 fn test_build_queue() {
     let mut build_queue = BuildQueue::default();
-    build_queue.push(ModelId::Fighter, 0.0);
+    build_queue.push(ShipType::Fighter, 0.0);
     assert_eq!(build_queue.progress_time(0.0), Some(0.0));
     assert_eq!(build_queue.progress_time(2.5), Some(0.5));
     assert_eq!(build_queue.progress_time(5.0), Some(1.0));
-    build_queue.push(ModelId::Fighter, 0.0);
+    build_queue.push(ShipType::Fighter, 0.0);
     assert_eq!(build_queue.queue_length(2.5), 7.5);
 }

@@ -172,15 +172,141 @@ impl<T> DynamicBvh<T> {
         let mut parent_index = self.nodes[index].parent_index;
 
         while let Some(index) = parent_index {
-            let left_child = self.nodes[index].left_child;
-            let right_child = self.nodes[index].right_child;
+            let (left_child, right_child) = self.children(index);
 
-            self.nodes[index].bounding_box = self.nodes[left_child]
-                .bounding_box
-                .union_with(self.nodes[right_child].bounding_box);
+            self.nodes[index].bounding_box = self.union_of(left_child, right_child);
+
+            self.rotate(index);
 
             parent_index = self.nodes[index].parent_index;
         }
+    }
+
+    // Perform tree rotations from https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf.
+    fn rotate(&mut self, index: usize) {
+        debug_assert!(self.nodes[index].data.is_none());
+
+        let (left_child, right_child) = self.children(index);
+
+        let left_grandchildren = if self.nodes[left_child].data.is_none() {
+            Some(self.children(left_child))
+        } else {
+            None
+        };
+
+        let right_grandchildren = if self.nodes[right_child].data.is_none() {
+            Some(self.children(right_child))
+        } else {
+            None
+        };
+
+        let left_child_sa = self.nodes[left_child].bounding_box.surface_area();
+        let right_child_sa = self.nodes[right_child].bounding_box.surface_area();
+
+        match (left_grandchildren, right_grandchildren) {
+            (
+                Some((left_left_grandchild, left_right_grandchild)),
+                Some((right_left_grandchild, right_right_grandchild)),
+            ) => {
+                // We have 4 possible rotations to choose from, or no rotation
+                // if they don't decrease the surface area.
+
+                let l_to_rl = self.union_of(left_child, right_right_grandchild);
+                let l_to_rr = self.union_of(left_child, right_left_grandchild);
+
+                let r_to_ll = self.union_of(right_child, left_right_grandchild);
+                let r_to_lr = self.union_of(right_child, left_left_grandchild);
+
+                let l_to_rl_sa_delta = l_to_rl.surface_area() - right_child_sa;
+                let l_to_rr_sa_delta = l_to_rr.surface_area() - right_child_sa;
+                let r_to_ll_sa_delta = r_to_ll.surface_area() - left_child_sa;
+                let r_to_lr_sa_delta = r_to_lr.surface_area() - left_child_sa;
+
+                let min_l_to_r_delta = l_to_rl_sa_delta.min(l_to_rr_sa_delta);
+
+                let min_r_to_l_delta = r_to_ll_sa_delta.min(r_to_lr_sa_delta);
+
+                if min_l_to_r_delta < min_r_to_l_delta && min_l_to_r_delta < 0.0 {
+                    if min_l_to_r_delta == l_to_rl_sa_delta {
+                        self.nodes[right_child].bounding_box = l_to_rl;
+                        self.set_left_child(right_child, left_child);
+                        self.set_left_child(index, right_left_grandchild);
+                    } else {
+                        self.nodes[left_child].bounding_box = l_to_rr;
+                        self.set_right_child(right_child, left_child);
+                        self.set_left_child(index, right_right_grandchild);
+                    }
+                } else if min_r_to_l_delta < 0.0 {
+                    if min_r_to_l_delta == r_to_ll_sa_delta {
+                        self.nodes[left_child].bounding_box = r_to_ll;
+                        self.set_left_child(left_child, right_child);
+                        self.set_right_child(index, left_left_grandchild);
+                    } else {
+                        self.nodes[left_child].bounding_box = r_to_lr;
+                        self.set_right_child(left_child, right_child);
+                        self.set_right_child(index, left_right_grandchild);
+                    }
+                }
+            }
+            (Some((left_left_grandchild, left_right_grandchild)), None) => {
+                // We have 2 possible rotaions to choose from, or no rotation.
+
+                let to_right = self.union_of(right_child, left_left_grandchild);
+                let to_right_sa = to_right.surface_area();
+
+                let to_left = self.union_of(right_child, left_right_grandchild);
+                let to_left_sa = to_left.surface_area();
+
+                if to_left_sa < to_right_sa && to_left_sa < left_child_sa {
+                    self.nodes[left_child].bounding_box = to_left;
+                    self.set_left_child(left_child, right_child);
+                    self.set_right_child(index, left_left_grandchild);
+                } else if to_right_sa < left_child_sa {
+                    self.nodes[left_child].bounding_box = to_right;
+                    self.set_right_child(left_child, right_child);
+                    self.set_right_child(index, left_right_grandchild);
+                }
+            }
+            (None, Some((right_left_grandchild, right_right_grandchild))) => {
+                // We have 2 possible rotaions to choose from, or no rotation.
+
+                let to_right = self.union_of(left_child, right_left_grandchild);
+                let to_right_sa = to_right.surface_area();
+
+                let to_left = self.union_of(left_child, right_right_grandchild);
+                let to_left_sa = to_left.surface_area();
+
+                if to_left_sa < to_right_sa && to_left_sa < right_child_sa {
+                    self.nodes[right_child].bounding_box = to_left;
+                    self.set_left_child(right_child, left_child);
+                    self.set_left_child(index, right_left_grandchild);
+                } else if to_right_sa < right_child_sa {
+                    self.nodes[right_child].bounding_box = to_right;
+                    self.set_right_child(right_child, left_child);
+                    self.set_left_child(index, right_right_grandchild);
+                }
+            }
+            (None, None) => {}
+        }
+    }
+
+    fn set_left_child(&mut self, parent: usize, child: usize) {
+        self.nodes[parent].left_child = child;
+        self.nodes[child].parent_index = Some(parent);
+    }
+
+    fn set_right_child(&mut self, parent: usize, child: usize) {
+        self.nodes[parent].right_child = child;
+        self.nodes[child].parent_index = Some(parent);
+    }
+
+    fn union_of(&self, a: usize, b: usize) -> BoundingBox {
+        self.nodes[a].bounding_box.union_with(self.nodes[b].bounding_box)
+    }
+
+    fn children(&self, parent: usize) -> (usize, usize) {
+        let node = &self.nodes[parent];
+        (node.left_child, node.right_child)
     }
 
     pub fn get_mut(&mut self, index: usize) -> &mut T {
@@ -271,19 +397,32 @@ impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {
     }
 }
 
-struct DebugNodes<'a, T>(&'a slab::Slab<Node<T>>);
-
-impl<'a, T: std::fmt::Debug> std::fmt::Debug for DebugNodes<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_map().entries(self.0.iter()).finish()
-    }
-}
-
 impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut queue = vec![(self.root, 0)];
+        let mut string = String::new();
+
+        use std::fmt::Write;
+
+        while let Some((index, depth)) = queue.pop() {
+            let node = &self.nodes[index];
+
+            write!(
+                &mut string,
+                "\n{} {}{}",
+                " ".repeat(depth * 4),
+                index,
+                if node.data.is_some() { "*" } else { "" }
+            )?;
+
+            if node.data.is_none() {
+                queue.push((node.left_child, depth + 1));
+                queue.push((node.right_child, depth + 1));
+            }
+        }
+
         f.debug_struct("DynamicBvh")
-            .field("nodes", &format_args!("{:?}", DebugNodes(&self.nodes)))
-            .field("root", &self.root)
+            .field("nodes", &format_args!("{}", string))
             .finish()
     }
 }
@@ -292,13 +431,13 @@ impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
 fn test() {
     use ultraviolet::Vec3;
 
+    let bbox = |pos| BoundingBox::new(pos - Vec3::broadcast(0.1), pos + Vec3::broadcast(0.1));
+
     let mut bvh = DynamicBvh::default();
-    bvh.insert((), BoundingBox::new(-Vec3::one(), Vec3::one()));
-    bvh.insert(
-        (),
-        BoundingBox::new(-Vec3::one(), Vec3::one()) + Vec3::one(),
-    );
-    //bvh.remove(|_| true);
-    dbg!(&bvh);
-    panic!();
+    bvh.insert((), bbox(Vec3::zero()));
+    for i in 0..100 {
+        bvh.insert((), bbox(Vec3::new(i as f32 * 100.0, 0.0, 0.0)));
+    }
+    dbg!(bvh);
+    //panic!("Panicking in order to debug the tree")
 }

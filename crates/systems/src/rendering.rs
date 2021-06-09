@@ -448,8 +448,8 @@ pub fn render_health(
 }
 
 #[profiling::function]
-pub fn debug_render_bvh(
-    bvh: Res<TopLevelAccelerationStructure>,
+pub fn debug_render_tlas(
+    tlas: Res<TopLevelAccelerationStructure>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
     settings: Res<Settings>,
 ) {
@@ -457,7 +457,7 @@ pub fn debug_render_bvh(
         return;
     }
 
-    bvh.iter_bounding_boxes()
+    tlas.iter_bounding_boxes()
         .for_each(|(bounding_box, is_root)| {
             let colour = if is_root {
                 Vec3::unit_y()
