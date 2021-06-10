@@ -259,9 +259,9 @@ pub fn move_camera(
 
 pub fn handle_keys(
     mut query_set: QuerySet<(
-        Query<&mut CommandQueue, With<Selected>>,
+        Query<&mut CommandQueue, SelectedFriendly>,
         Query<(&mut Velocity, &mut CommandQueue)>,
-        Query<(&Position, &mut CommandQueue), (With<Selected>, With<CanBeCarried>)>,
+        Query<(&Position, &mut CommandQueue), (SelectedFriendly, With<CanBeCarried>)>,
     )>,
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,

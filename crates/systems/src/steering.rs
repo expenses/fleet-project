@@ -31,104 +31,120 @@ pub fn run_persuit(
         let boid = to_boid(pos, vel, max_speed);
         let max_force = max_speed.max_force();
 
-        if let Some(mut queue) = queue {
-            match queue.0.front().cloned() {
-                Some(Command::Interact { target, ty, range_sq }) => {
-                    if let Ok(target_boid) = boids.get(target).map(|(p, v, ms)| to_boid(p, &v.cloned().unwrap_or_default(), &ms.cloned().unwrap_or_default())) {
-                        // Because ships are constantly turning, the predicted
-                        // point of contact for a ship far away varies a lot, resulting
-                        // in an annoying visual wobble. So we disable leading here.
-                        // We should fix this someother how though.
-                        let lead_factor = 0.0;
+        let mut queue = match queue {
+            Some(queue) => queue,
+            None => {
+                staging_persuit_force.0 = Vec3::zero();
+                return;
+            }
+        };
 
-                        let within_range = (boid.pos - target_boid.pos).mag_sq() < range_sq + max_force;
+        let command = match queue.0.front().cloned() {
+            Some(command) => command,
+            None => {
+                staging_persuit_force.0 = Vec3::zero();
+                return;
+            }
+        };
 
-                        staging_persuit_force.0 = if !within_range {
-                            boid.persue(target_boid, lead_factor)
-                        } else {
-                            match ty {
-                                InteractionType::BeCarriedBy => {
-                                    queue.0.pop_front();
+        match command {
+            Command::Interact { target, ty, range_sq } => {
+                let target_boid = match boids.get(target) {
+                    Ok((p, v, ms)) => {
+                        to_boid(p, &v.cloned().unwrap_or_default(), &ms.cloned().unwrap_or_default())
+                    },
+                    _ => {
+                        queue.0.pop_front();
+                        return;
+                    }
+                };
 
-                                    match carrying.get_mut(target) {
-                                        Ok(mut carrying) => {
-                                            // If the carrier is full, the ship can't load into it
-                                            // and should look for another (non-full) one. If it's
-                                            // just docking to drop somethings off then that's fine though.
-                                            if !carrying.0.is_full() || !queue.0.is_empty() {
-                                                let mut entity_commands = commands.entity(entity);
+                // Because ships are constantly turning, the predicted
+                // point of contact for a ship far away varies a lot, resulting
+                // in an annoying visual wobble. So we disable leading here.
+                // We should fix this someother how though.
+                let lead_factor = 0.0;
 
-                                                if queue.0.is_empty() {
-                                                    if let Err(err) = carrying.0.try_push(entity) {
-                                                        log::error!("Failed to push to {:?}s carrying queue: {}", target, err);
-                                                    }
+                let within_range = (boid.pos - target_boid.pos).mag_sq() < range_sq + max_force;
 
-                                                    tlas.remove(tlas_index.index);
+                if !within_range {
+                    staging_persuit_force.0 = boid.persue(target_boid, lead_factor);
+                    return;
+                }
 
-                                                    entity_commands
-                                                        .remove::<TlasIndex>()
-                                                        .remove::<Position>();
-                                                } else {
-                                                    entity_commands.insert(Unloading::new(total_time.0));
-                                                }
+                match ty {
+                    InteractionType::BeCarriedBy => {
+                        queue.0.pop_front();
 
-                                                if carrying.0.is_full() {
-                                                    commands.entity(target).insert(CarrierFull);
-                                                }
+                        let mut carrying = match carrying.get_mut(target) {
+                            Ok(carrying) => carrying,
+                            Err(err) => {
+                                log::error!(
+                                    "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships: {}",
+                                    entity, target, target, err
+                                );
+                                return;
+                            }
+                        };
 
-                                                let ship_to_transfer = unsafe {
-                                                    to_transfer.get_unchecked(entity)
-                                                };
+                        // If the carrier is full, the ship can't load into it
+                        // and should look for another (non-full) one. If it's
+                        // just docking to drop somethings off then that's fine though.
+                        if carrying.0.is_full() && queue.0.is_empty() {
+                            // Note: `redirect_ships_from_full_carriers` should redirect the ship
+                            // before it comes to this, but this is just to make sure.
+                            find_next_carrier(pos.0, &mut queue, carriers.iter());
+                            return;
+                        }
 
-                                                let carrier_to_transfer = unsafe {
-                                                    to_transfer.get_unchecked(target)
-                                                };
+                        let mut entity_commands = commands.entity(entity);
 
-                                                if let (Ok(mut ship_people), Ok(mut carrier_people)) = (ship_to_transfer, carrier_to_transfer) {
-                                                    carrier_people.0.append(&mut ship_people.0);
-                                                }
-
-                                                if let Some(mut stored_minerals) = stored_minerals {
-                                                    global_minerals.0 += stored_minerals.stored;
-                                                    stored_minerals.stored = 0.0;
-                                                }
-                                            } else {
-                                                // Note: `redirect_ships_from_full_carriers` should redirect the ship
-                                                // before it comes to this, but this is just to make sure.
-                                                find_next_carrier(pos.0, &mut queue, carriers.iter());
-                                            }
-                                        },
-                                        Err(err) => {
-                                            log::error!(
-                                                "Entity {:?} tried to be carried by {:?} but {:?} cannot carry ships: {}",
-                                                entity, target, target, err
-                                            );
-                                        }
-                                    }
-                                },
-                                InteractionType::Mine => {}
-                                InteractionType::Attack => {}
+                        if queue.0.is_empty() {
+                            if let Err(err) = carrying.0.try_push(entity) {
+                                log::error!("Failed to push to {:?}s carrying queue: {}", target, err);
                             }
 
-                            Vec3::zero()
-                        }
-                    } else {
-                        queue.0.pop_front();
-                    }
-                }
-                Some(Command::MoveTo { point, .. }) => {
-                    staging_persuit_force.0 = boid.seek(point);
+                            tlas.remove(tlas_index.index);
 
-                    if (boid.pos - point).mag_sq() < max_force {
-                        queue.0.pop_front();
-                    }
-                }
-                None => {
-                    staging_persuit_force.0 = Vec3::zero();
+                            entity_commands
+                                .remove::<TlasIndex>()
+                                .remove::<Position>();
+                        } else {
+                            entity_commands.insert(Unloading::new(total_time.0));
+                        }
+
+                        if carrying.0.is_full() {
+                            commands.entity(target).insert(CarrierFull);
+                        }
+
+                        let ship_to_transfer = unsafe {
+                            to_transfer.get_unchecked(entity)
+                        };
+
+                        let carrier_to_transfer = unsafe {
+                            to_transfer.get_unchecked(target)
+                        };
+
+                        if let (Ok(mut ship_people), Ok(mut carrier_people)) = (ship_to_transfer, carrier_to_transfer) {
+                            carrier_people.0.append(&mut ship_people.0);
+                        }
+
+                        if let Some(mut stored_minerals) = stored_minerals {
+                            global_minerals.0 += stored_minerals.stored;
+                            stored_minerals.stored = 0.0;
+                        }
+                    },
+                    InteractionType::Mine => {}
+                    InteractionType::Attack => {}
                 }
             }
-        } else {
-            staging_persuit_force.0 = Vec3::zero();
+            Command::MoveTo { point, .. } => {
+                staging_persuit_force.0 = boid.seek(point);
+
+                if (boid.pos - point).mag_sq() < max_force {
+                    queue.0.pop_front();
+                }
+            }
         }
     })
 }
