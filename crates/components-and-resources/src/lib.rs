@@ -4,3 +4,4 @@ pub mod model;
 pub mod resources;
 pub mod texture_manager;
 pub mod utils;
+pub mod formations;
