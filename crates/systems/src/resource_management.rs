@@ -22,60 +22,65 @@ pub fn mine(
 ) {
     query.for_each_mut(
         |(pos, max_speed, mut queue, mut stored_minerals, mut rotation)| {
-            if let Some(Command::Interact {
-                target,
-                ty: InteractionType::Mine,
-                range_sq,
-            }) = queue.0.front()
-            {
-                if stored_minerals.stored >= stored_minerals.capacity {
-                    queue.0.pop_front();
+            let (target, range_sq) = match queue.0.front() {
+                Some(Command::Interact {
+                    target,
+                    ty: InteractionType::Mine,
+                    range_sq,
+                }) => (target, range_sq),
+                _ => return,
+            };
+
+            if stored_minerals.stored >= stored_minerals.capacity {
+                queue.0.pop_front();
+                find_next_carrier(pos.0, &mut queue, carriers.iter());
+                find_next_asteroid(pos.0, &mut queue, &new_targets);
+                return;
+            }
+
+            if let Ok((target_pos, mut can_be_mined)) = targets.get_mut(*target) {
+                let max_force = max_speed.max_force();
+                let vector = target_pos.0 - pos.0;
+                let within_range = vector.mag_sq() < range_sq + max_force;
+
+                if within_range {
+                    rotation.0 = crate::rotation_from_facing(vector);
+
+                    // This is not good in terms of 'seperation of concerns' but whatever
+                    {
+                        let laser_start = pos.0 + rotation.0 * Models::MINER_LASER_OFFSET;
+
+                        lasers.stage(&[
+                            LaserVertex {
+                                position: laser_start,
+                                colour: Vec3::unit_z(),
+                            },
+                            LaserVertex {
+                                position: target_pos.0,
+                                colour: Vec3::unit_x(),
+                            },
+                        ]);
+                    }
+
+                    let to_mine = delta_time.0;
+                    let to_mine = to_mine
+                        .min(can_be_mined.minerals)
+                        .min(stored_minerals.capacity - stored_minerals.stored);
+                    can_be_mined.minerals -= to_mine;
+
+                    stored_minerals.stored += to_mine;
+
+                    if to_mine == 0.0 {
+                        commands.entity(*target).remove::<CanBeMined>();
+                    }
+                }
+            } else {
+                queue.0.pop_front();
+
+                if new_targets.iter().next().is_none() {
                     find_next_carrier(pos.0, &mut queue, carriers.iter());
-                    find_next_asteroid(pos.0, &mut queue, &new_targets);
-                } else if let Ok((target_pos, mut can_be_mined)) = targets.get_mut(*target) {
-                    let max_force = max_speed.max_force();
-                    let vector = target_pos.0 - pos.0;
-                    let within_range = vector.mag_sq() < range_sq + max_force;
-
-                    if within_range {
-                        rotation.0 = crate::rotation_from_facing(vector);
-
-                        // This is not good in terms of 'seperation of concerns' but whatever
-                        {
-                            let laser_start = pos.0 + rotation.0 * Models::MINER_LASER_OFFSET;
-
-                            lasers.stage(&[
-                                LaserVertex {
-                                    position: laser_start,
-                                    colour: Vec3::unit_z(),
-                                },
-                                LaserVertex {
-                                    position: target_pos.0,
-                                    colour: Vec3::unit_x(),
-                                },
-                            ]);
-                        }
-
-                        let to_mine = delta_time.0;
-                        let to_mine = to_mine
-                            .min(can_be_mined.minerals)
-                            .min(stored_minerals.capacity - stored_minerals.stored);
-                        can_be_mined.minerals -= to_mine;
-
-                        stored_minerals.stored += to_mine;
-
-                        if to_mine == 0.0 {
-                            commands.entity(*target).remove::<CanBeMined>();
-                        }
-                    }
                 } else {
-                    queue.0.pop_front();
-
-                    if new_targets.iter().next().is_none() {
-                        find_next_carrier(pos.0, &mut queue, carriers.iter());
-                    } else {
-                        find_next_asteroid(pos.0, &mut queue, &new_targets);
-                    }
+                    find_next_asteroid(pos.0, &mut queue, &new_targets);
                 }
             }
         },

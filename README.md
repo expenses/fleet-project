@@ -10,5 +10,5 @@
 * resize ships
 * a way to choose formations.
 * improved movement system
-* only flee in certain circumstances
+* evasion/fleeing is kinda wierd and hard to get right - consider removing.
 * use tlas for choose enemy target - need to store position and side.

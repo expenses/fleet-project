@@ -162,28 +162,47 @@ pub fn run_evasion(
         &Velocity,
         &MaxSpeed,
         Option<&Evading>,
+        &CommandQueue,
         &mut StagingEvasionForce,
     )>,
     boids: Query<(&Position, &Velocity, &MaxSpeed)>,
     mut commands: Commands,
 ) {
     query.for_each_mut(
-        |(entity, pos, vel, max_speed, evading, mut staging_evasion_force)| {
-            if let Some(&Evading(entity_to_avoid)) = evading {
-                let boid = to_boid(pos, vel, max_speed);
+        |(entity, pos, vel, max_speed, evading, queue, mut staging_evasion_force)| {
+            let should_evade = matches!(
+                queue.0.front(),
+                None | Some(Command::Interact {
+                    ty: InteractionType::Attack,
+                    ..
+                })
+            );
 
-                if let Ok(evading_boid) = boids
-                    .get(entity_to_avoid)
-                    .map(|(p, v, ms)| to_boid(p, v, ms))
-                {
-                    staging_evasion_force.0 = boid.flee(evading_boid.pos) * 0.5;
-                } else {
+            if !should_evade {
+                staging_evasion_force.0 = Vec3::zero();
+                return;
+            }
+
+            let entity_to_evade = match evading {
+                Some(&Evading(entity_to_evade)) => entity_to_evade,
+                _ => {
+                    staging_evasion_force.0 = Vec3::zero();
+                    return;
+                }
+            };
+
+            let evading_boid = match boids.get(entity_to_evade) {
+                Ok((p, v, ms)) => to_boid(p, v, ms),
+                _ => {
                     staging_evasion_force.0 = Vec3::zero();
                     commands.entity(entity).remove::<Evading>();
+                    return;
                 }
-            } else {
-                staging_evasion_force.0 = Vec3::zero();
-            }
+            };
+
+            let boid = to_boid(pos, vel, max_speed);
+
+            staging_evasion_force.0 = boid.flee(evading_boid.pos) * 0.5;
         },
     )
 }
