@@ -223,11 +223,10 @@ pub fn handle_right_clicks(
                     {
                         let count = query_set.q0_mut().iter_mut().count();
 
-                        let mut formation = Formation::fighter_screen(
-                            point,
-                            (point - avg).normalized(),
+                        let mut formation = Formation::in_sphere(
+                            point, //(point - avg).normalized(),
                             count,
-                            5.0,
+                            //5.0,
                         );
 
                         query_set.q0_mut().for_each_mut(|(pos, mut queue)| {
