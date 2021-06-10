@@ -113,7 +113,8 @@ pub fn run_persuit(
 
                             entity_commands
                                 .remove::<TlasIndex>()
-                                .remove::<Position>();
+                                .remove::<Position>()
+                                .remove::<Selected>();
                         } else {
                             entity_commands.insert(Unloading::new(total_time.0));
                         }

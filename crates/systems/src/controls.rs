@@ -155,6 +155,7 @@ pub fn handle_right_clicks(
         Query<&mut CommandQueue, (SelectedFriendly, With<CanBeCarried>)>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanMine>)>,
     )>,
+    selected_models: Query<&ModelId, (SelectedFriendly, With<Position>, With<CommandQueue>)>,
     enemies: Query<&Enemy>,
     mouse_button: Res<MouseState>,
     average_selected_position: Res<AverageSelectedPosition>,
@@ -221,13 +222,19 @@ pub fn handle_right_clicks(
                     if let (Some(point), Some(avg)) =
                         (ray_plane_point.0, average_selected_position.0)
                     {
-                        let count = query_set.q0_mut().iter_mut().count();
+                        let mut count = 0;
+                        let mut all_fighters = true;
 
-                        let mut formation = Formation::in_sphere(
-                            point, //(point - avg).normalized(),
-                            count,
-                            //5.0,
-                        );
+                        selected_models.for_each(|&model_id| {
+                            count += 1;
+                            all_fighters &= model_id == ModelId::Fighter;
+                        });
+
+                        let mut formation = if all_fighters {
+                            Formation::fighter_screen(point, (point - avg).normalized(), count, 5.0)
+                        } else {
+                            Formation::in_sphere(point, count)
+                        };
 
                         query_set.q0_mut().for_each_mut(|(pos, mut queue)| {
                             queue.0.clear();
