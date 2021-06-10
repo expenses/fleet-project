@@ -48,6 +48,23 @@ opt-level = 3
 [profile.dev.package."ray-collisions"]
 opt-level = 3
 
+# Font rendering
+
+[profile.dev.package."ttf-parser"]
+opt-level = 3
+
+[profile.dev.package."twox-hash"]
+opt-level = 3
+
+[profile.dev.package."glyph_brush_layout"]
+opt-level = 3
+
+[profile.dev.package."glyph_brush"]
+opt-level = 3
+
+[profile.dev.package."wgpu_glyph"]
+opt-level = 3
+
 [profile.release]
 #debug = true
 
