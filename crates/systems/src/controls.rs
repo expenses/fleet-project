@@ -278,6 +278,7 @@ pub fn handle_keys(
     mut mouse_mode: ResMut<MouseMode>,
     total_time: Res<TotalTime>,
     carriers: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
+    mut build_queues: Query<&mut BuildQueue, SelectedFriendly>,
 ) {
     if keyboard_state.stop.0 {
         query_set.q0_mut().for_each_mut(|mut queue| {
@@ -301,6 +302,10 @@ pub fn handle_keys(
                 &mut query_set.q1_mut(),
                 true,
             );
+        });
+
+        build_queues.for_each_mut(|mut queue| {
+            queue.stay_carried = false;
         })
     }
 
@@ -327,6 +332,10 @@ pub fn handle_keys(
             command_queue.0.clear();
             find_next_carrier(pos.0, &mut command_queue, carriers.iter())
         });
+
+        build_queues.for_each_mut(|mut queue| {
+            queue.stay_carried = true;
+        })
     }
 }
 

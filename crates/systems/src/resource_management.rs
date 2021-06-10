@@ -65,14 +65,32 @@ pub fn mine(
 }
 
 pub fn build_ships<Side: Default + Send + Sync + 'static>(
-    mut query: Query<(&Position, &mut BuildQueue, Option<&Selected>), With<Side>>,
+    mut query: Query<
+        (
+            &Position,
+            &mut BuildQueue,
+            Option<&Selected>,
+            Option<&mut Carrying>,
+        ),
+        With<Side>,
+    >,
     total_time: Res<TotalTime>,
     mut commands: Commands,
     mut rng: ResMut<SmallRng>,
 ) {
-    query.for_each_mut(|(pos, mut build_queue, selected)| {
+    query.for_each_mut(|(pos, mut build_queue, selected, carrying)| {
         if let Some(built_ship) = build_queue.advance(total_time.0) {
             let entity = spawn_ship::<Side>(built_ship, pos.0, &mut commands);
+
+            if build_queue.stay_carried {
+                if let Some(mut carrying) = carrying {
+                    if !carrying.0.is_full() {
+                        carrying.0.push(entity);
+                        commands.entity(entity).remove::<Position>();
+                        return;
+                    }
+                }
+            }
 
             let mut velocity = Velocity(Vec3::zero());
             let mut command_queue = CommandQueue::default();

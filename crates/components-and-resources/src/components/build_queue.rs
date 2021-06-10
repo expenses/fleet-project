@@ -4,6 +4,7 @@ use super::*;
 pub struct BuildQueue {
     building: VecDeque<ShipType>,
     time_of_next_pop: f32,
+    pub stay_carried: bool,
 }
 
 impl BuildQueue {
