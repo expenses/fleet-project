@@ -8,7 +8,7 @@
 * allow for ship construction from minerals
 * health bars?
 * resize ships
-* formations
+* a way to choose formations.
 * mining lasers
 * improved movement system
 * only flee in certain circumstances

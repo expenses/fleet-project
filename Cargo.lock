@@ -194,7 +194,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "bevy_derive"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "Inflector",
  "bevy_macro_utils",
@@ -206,7 +206,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "async-channel",
  "bevy_ecs_macros",
@@ -226,7 +226,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macros"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -237,7 +237,7 @@ dependencies = [
 [[package]]
 name = "bevy_macro_utils"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "cargo-manifest",
  "proc-macro2",
@@ -247,7 +247,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "bevy_reflect_derive",
  "bevy_utils",
@@ -261,7 +261,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect_derive"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -273,7 +273,7 @@ dependencies = [
 [[package]]
 name = "bevy_tasks"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -287,7 +287,7 @@ dependencies = [
 [[package]]
 name = "bevy_utils"
 version = "0.5.0"
-source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#42a3c7bf8bdb8676b673bd7d753bf00fe5479e8f"
+source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
 dependencies = [
  "ahash 0.7.4",
  "bevy_derive",
@@ -1457,9 +1457,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.95"
+version = "0.2.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
+checksum = "5600b4e6efc5421841a2138a6b082e07fe12f9aaa12783d50e5d13325b26b4fc"
 
 [[package]]
 name = "libloading"
@@ -1597,9 +1597,9 @@ dependencies = [
 
 [[package]]
 name = "mio-misc"
-version = "1.0.1"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d9bf3ad929ad9ec136d7bd55f68c62223561423474c21b5e34eb9322018d36"
+checksum = "0ddf05411bb159cdb5801bb10002afb66cb4572be656044315e363460ce69dc2"
 dependencies = [
  "crossbeam",
  "crossbeam-queue",
@@ -2054,9 +2054,9 @@ dependencies = [
 
 [[package]]
 name = "profiling"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a66d5e88679f2720126c11ee29da07a08f094eac52306b066edd7d393752d6"
+checksum = "0a7c000c0ce9d9bb94c0fbacdf20e5087fbe652c556ffb2c9387d980e17d51fb"
 dependencies = [
  "profiling-procmacros",
  "tracy-client",
@@ -2064,9 +2064,9 @@ dependencies = [
 
 [[package]]
 name = "profiling-procmacros"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b83296b4ea7c60800e0832617bb9d274e4f5928abd08acc5a6ae8be0fb15969"
+checksum = "466a51c03efbf023203c8d30ea41eaae0b08d9d3b045db8ee12db88898a31cb7"
 dependencies = [
  "quote",
  "syn",
@@ -2120,7 +2120,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
 dependencies = [
  "libc",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.2",
  "rand_hc 0.3.0",
 ]
@@ -2147,9 +2147,9 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.6.2",
@@ -2626,9 +2626,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.72"
+version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1e8cdbefb79a9a5a65e0db8b47b723ee907b7c7f8496c76a1770b5c310bab82"
+checksum = "f71489ff30030d2ae598524f61326b902466f72a0fb1a8564c001cc63425bcc7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3087,9 +3087,9 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c51f160ef6333906fad7d31a2010d449148dd1a26bc377e0a1ace2cc9e1e1ee"
+checksum = "46bbe7c604a27ca0b05c5503221e76da628225b568e6f1280b42dbad3b72d89b"
 dependencies = [
  "bytemuck",
  "safe_arch",
