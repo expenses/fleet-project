@@ -8,7 +8,7 @@ use components_and_resources::resources::*;
 use components_and_resources::utils::*;
 use std::array::IntoIter;
 use std::ops::{Deref, DerefMut};
-use ultraviolet::{Rotor3, Vec2, Vec3};
+use ultraviolet::Vec3;
 
 mod combat;
 mod controls;
@@ -65,13 +65,6 @@ pub fn upload_ship_buffer(
     models: Res<Models>,
 ) {
     buffer.upload(&gpu_interface.device, &gpu_interface.queue, &models);
-}
-
-fn rotation_from_facing(facing: Vec3) -> Rotor3 {
-    let xz_movement = Vec2::new(facing.x, facing.z).mag();
-
-    ultraviolet::Rotor3::from_rotation_xz(-facing.x.atan2(facing.z))
-        * ultraviolet::Rotor3::from_rotation_yz(-facing.y.atan2(xz_movement))
 }
 
 #[profiling::function]

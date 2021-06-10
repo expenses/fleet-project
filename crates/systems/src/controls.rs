@@ -2,6 +2,7 @@ use crate::find_functions::find_next_carrier;
 use crate::{average, get_scale, unload, SelectedFriendly};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
+use components_and_resources::formations::Formation;
 use components_and_resources::resources::*;
 
 pub fn find_ship_under_cursor(
@@ -149,7 +150,7 @@ pub fn handle_left_drag(
 
 pub fn handle_right_clicks(
     mut query_set: QuerySet<(
-        Query<&mut CommandQueue, SelectedFriendly>,
+        Query<(&Position, &mut CommandQueue), SelectedFriendly>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanAttack>)>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanBeCarried>)>,
         Query<&mut CommandQueue, (SelectedFriendly, With<CanMine>)>,
@@ -217,10 +218,23 @@ pub fn handle_right_clicks(
                     _ => MouseMode::Normal,
                 },
                 MouseMode::Movement { ty, .. } => {
-                    if let Some(point) = ray_plane_point.0 {
-                        query_set.q0_mut().for_each_mut(|mut queue| {
+                    if let (Some(point), Some(avg)) =
+                        (ray_plane_point.0, average_selected_position.0)
+                    {
+                        let count = query_set.q0_mut().iter_mut().count();
+
+                        let mut formation = Formation::fighter_screen(
+                            point,
+                            (point - avg).normalized(),
+                            count,
+                            5.0,
+                        );
+
+                        query_set.q0_mut().for_each_mut(|(pos, mut queue)| {
                             queue.0.clear();
-                            queue.0.push_back(Command::MoveTo { point, ty });
+                            if let Some(point) = formation.choose_position(pos.0) {
+                                queue.0.push_back(Command::MoveTo { point, ty });
+                            }
                         });
                     }
 
