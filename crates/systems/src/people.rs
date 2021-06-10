@@ -25,12 +25,12 @@ pub fn repair_ships(
         }
 
         if let Some(carrying) = carrying {
-            for entity in carrying.0.iter() {
+            for entity in carrying.iter() {
                 if health_increase_pool == 0.0 {
                     break;
                 }
 
-                if let Ok(mut health) = health.get_mut(*entity) {
+                if let Ok(mut health) = health.get_mut(entity) {
                     let health_increase = health_increase_pool.min(health.max - health.current);
 
                     health.current += health_increase;

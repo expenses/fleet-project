@@ -84,8 +84,7 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
 
             if build_queue.stay_carried && built_ship != ShipType::Carrier {
                 if let Some(mut carrying) = carrying {
-                    if !carrying.0.is_full() {
-                        carrying.0.push(entity);
+                    if carrying.checked_push(entity, built_ship == ShipType::Fighter) {
                         commands.entity(entity).remove::<Position>();
                         return;
                     }

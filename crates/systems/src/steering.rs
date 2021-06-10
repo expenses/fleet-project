@@ -17,6 +17,7 @@ pub fn run_persuit(
         Option<&mut StoredMinerals>,
         &mut StagingPersuitForce,
         &TlasIndex,
+        Option<&CanAttack>,
     )>,
     to_transfer: Query<&mut OnBoard>,
     boids: Query<(&Position, Option<&Velocity>, Option<&MaxSpeed>)>,
@@ -27,9 +28,11 @@ pub fn run_persuit(
     mut tlas: ResMut<TopLevelAccelerationStructure>,
     carriers: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
 ) {
-    query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force, tlas_index)| {
+    query.for_each_mut(|(entity, pos, vel, max_speed, queue, stored_minerals, mut staging_persuit_force, tlas_index, can_attack)| {
         let boid = to_boid(pos, vel, max_speed);
         let max_force = max_speed.max_force();
+
+        let can_attack = can_attack.is_some();
 
         let mut queue = match queue {
             Some(queue) => queue,
@@ -90,7 +93,7 @@ pub fn run_persuit(
                         // If the carrier is full, the ship can't load into it
                         // and should look for another (non-full) one. If it's
                         // just docking to drop somethings off then that's fine though.
-                        if carrying.0.is_full() && queue.0.is_empty() {
+                        if carrying.is_full() && queue.0.is_empty() {
                             // Note: `redirect_ships_from_full_carriers` should redirect the ship
                             // before it comes to this, but this is just to make sure.
                             find_next_carrier(pos.0, &mut queue, carriers.iter());
@@ -100,8 +103,8 @@ pub fn run_persuit(
                         let mut entity_commands = commands.entity(entity);
 
                         if queue.0.is_empty() {
-                            if let Err(err) = carrying.0.try_push(entity) {
-                                log::error!("Failed to push to {:?}s carrying queue: {}", target, err);
+                            if !carrying.checked_push(entity, can_attack) {
+                                log::error!("Failed to push to {:?}s carrying list", target);
                             }
 
                             tlas.remove(tlas_index.index);
@@ -113,7 +116,7 @@ pub fn run_persuit(
                             entity_commands.insert(Unloading::new(total_time.0));
                         }
 
-                        if carrying.0.is_full() {
+                        if carrying.is_full() {
                             commands.entity(target).insert(CarrierFull);
                         }
 

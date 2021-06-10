@@ -158,7 +158,7 @@ fn unload(
 ) {
     commands.entity(entity).remove::<CarrierFull>();
 
-    carrying.0.drain(..).for_each(|entity| {
+    carrying.drain().for_each(|entity| {
         unload_single(
             pos,
             entity,
@@ -355,8 +355,8 @@ pub fn count_selected(
         count(
             friendly_carrying
                 .iter()
-                .flat_map(|carrying| &carrying.0)
-                .filter_map(|&entity| all_models.get(entity).ok()),
+                .flat_map(|carrying| carrying.iter())
+                .filter_map(|entity| all_models.get(entity).ok()),
         ),
     );
     section = print(

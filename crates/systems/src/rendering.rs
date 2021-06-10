@@ -402,12 +402,12 @@ pub fn render_3d_ship_stats(
             }
 
             if let Some(carrying) = carrying {
-                if selected || !carrying.0.is_empty() {
+                if selected || !carrying.is_empty() {
                     section = section.add_text(
                         glyph_brush::OwnedText::new(format!(
                             "Carrying: {}/{}\n",
-                            carrying.0.len(),
-                            carrying.0.capacity()
+                            carrying.len(),
+                            carrying.capacity()
                         ))
                         .with_color([1.0; 4]),
                     );
@@ -415,7 +415,7 @@ pub fn render_3d_ship_stats(
                     if selected {
                         let mut counts_and_damaged = [(0, 0, None); Models::COUNT];
 
-                        carrying.0.iter().for_each(|&entity| {
+                        carrying.iter().for_each(|entity| {
                             if let Ok((model_id, health)) = carried_ships.get(entity) {
                                 let (counts, damaged, next_damaged_health) =
                                     &mut counts_and_damaged[*model_id as usize];

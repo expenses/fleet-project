@@ -173,8 +173,52 @@ pub enum InteractionType {
 }
 
 pub struct CanAttack;
+
 #[derive(Default)]
-pub struct Carrying(pub arrayvec::ArrayVec<Entity, 100>);
+pub struct Carrying(arrayvec::ArrayVec<(Entity, bool), 100>);
+
+impl Carrying {
+    #[must_use]
+    pub fn checked_push(&mut self, entity: Entity, priority: bool) -> bool {
+        if self.is_full() {
+            return false;
+        }
+
+        if priority {
+            let insert_index = self.0.partition_point(|&(_, priority)| priority);
+            self.0.insert(insert_index, (entity, priority));
+        } else {
+            self.0.push((entity, priority));
+        }
+
+        true
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.0.iter().map(|&(entity, _)| entity)
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = Entity> + '_ {
+        self.0.drain(..).map(|(entity, _)| entity)
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.0.is_full()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 pub struct CanBeCarried;
 
 pub struct Health {
