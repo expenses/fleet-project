@@ -357,6 +357,26 @@ pub fn handle_keys(
             queue.stay_carried = true;
         })
     }
+
+    let build_ship_type = if keyboard_state.build_fighter.0  {
+        Some(ShipType::Fighter)
+    } else if keyboard_state.build_miner.0 {
+        Some(ShipType::Miner)
+    } else if keyboard_state.build_carrier.0 {
+        Some(ShipType::Carrier)
+    } else {
+        None
+    };
+
+    if let Some(build_ship_type) = build_ship_type {
+        let best_queue = build_queues.iter_mut()
+            .map(|queue| (queue.queue_length(total_time.0), queue))
+            .min_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((_, mut queue)) = best_queue {
+            queue.push(build_ship_type, total_time.0);
+        }
+    }
 }
 
 pub fn update_keyboard_state(mut keyboard_state: ResMut<KeyboardState>) {
