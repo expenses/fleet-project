@@ -75,6 +75,8 @@ pub fn run_persuit(
                     return;
                 }
 
+                staging_persuit_force.0 = Vec3::zero();
+
                 match ty {
                     InteractionType::BeCarriedBy => {
                         queue.0.pop_front();
