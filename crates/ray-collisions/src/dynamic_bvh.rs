@@ -226,6 +226,7 @@ impl<T> DynamicBvh<T> {
 
                 let min_r_to_l_delta = r_to_ll_sa_delta.min(r_to_lr_sa_delta);
 
+                #[allow(clippy::float_cmp)]
                 if min_l_to_r_delta < min_r_to_l_delta && min_l_to_r_delta < 0.0 {
                     if min_l_to_r_delta == l_to_rl_sa_delta {
                         self.nodes[right_child].bounding_box = l_to_rl;
