@@ -489,7 +489,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::update_keyboard_state.system())
         .with_system(systems::increase_total_time.system())
         .with_system(systems::upload_ship_buffer.system())
-        .with_system(systems::render_health.system())
+        .with_system(systems::render_3d_ship_stats.system())
         .with_system(systems::debug_render_tlas.system())
         .with_system(systems::render_buttons.system());
 

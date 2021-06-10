@@ -82,7 +82,7 @@ pub fn build_ships<Side: Default + Send + Sync + 'static>(
         if let Some(built_ship) = build_queue.advance(total_time.0) {
             let entity = spawn_ship::<Side>(built_ship, pos.0, &mut commands);
 
-            if build_queue.stay_carried {
+            if build_queue.stay_carried && built_ship != ShipType::Carrier {
                 if let Some(mut carrying) = carrying {
                     if !carrying.0.is_full() {
                         carrying.0.push(entity);

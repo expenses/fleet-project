@@ -348,7 +348,7 @@ pub fn render_buttons(
 }
 
 #[profiling::function]
-pub fn render_health(
+pub fn render_3d_ship_stats(
     query: Query<
         (
             &Position,
@@ -374,6 +374,7 @@ pub fn render_health(
             let projected =
                 perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
+            // Ship is behind the camera.
             if projected.z < 0.0 {
                 return;
             }
@@ -412,18 +413,25 @@ pub fn render_health(
                     );
 
                     if selected {
-                        let mut counts_and_damaged = [(0, 0); Models::COUNT];
+                        let mut counts_and_damaged = [(0, 0, None); Models::COUNT];
 
                         carrying.0.iter().for_each(|&entity| {
                             if let Ok((model_id, health)) = carried_ships.get(entity) {
-                                counts_and_damaged[*model_id as usize].0 += 1;
-                                counts_and_damaged[*model_id as usize].1 +=
-                                    (health.current < health.max) as u32;
+                                let (counts, damaged, next_damaged_health) =
+                                    &mut counts_and_damaged[*model_id as usize];
+
+                                let is_damaged = health.current < health.max;
+
+                                *counts += 1;
+                                *damaged += is_damaged as u32;
+                                *next_damaged_health =
+                                    next_damaged_health.or(Some(health).filter(|_| is_damaged))
                             }
                         });
 
                         for model_id in IntoIter::new(Models::ARRAY) {
-                            let (count, damaged) = counts_and_damaged[model_id as usize];
+                            let (count, damaged, next_damaged_health) =
+                                counts_and_damaged[model_id as usize];
 
                             if count > 0 {
                                 section = section.add_text(
@@ -435,11 +443,13 @@ pub fn render_health(
                                 );
                             }
 
-                            if damaged > 0 {
+                            if let Some(next_damaged_health) = next_damaged_health {
                                 section = section.add_text(
                                     glyph_brush::OwnedText::new(format!(
-                                        "    - Num. Damaged: {}\n",
-                                        damaged
+                                        "    - Num. Damaged: {} ({:.2}/{:.2})\n",
+                                        damaged,
+                                        next_damaged_health.current,
+                                        next_damaged_health.max
                                     ))
                                     .with_color([1.0; 4]),
                                 );
@@ -522,6 +532,20 @@ pub fn render_health(
                         glyph_brush::OwnedText::new(format!(
                             "  - Progress: {:.2}%\n",
                             progress * 100.0
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+                }
+
+                if selected {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "  - * {}\n",
+                            if build_queue.stay_carried {
+                                "Stay carried"
+                            } else {
+                                "Unload"
+                            }
                         ))
                         .with_color([1.0; 4]),
                     );

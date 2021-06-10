@@ -22,7 +22,7 @@ pub fn fighter_components(ray_cooldown: f32) -> impl Bundle {
         CanBeCarried,
         MaxSpeed(10.0),
         Health {
-            current: 26.0,
+            current: 45.0,
             max: 50.0,
         },
         RayCooldown(ray_cooldown),
@@ -35,7 +35,10 @@ pub fn miner_components() -> impl Bundle {
         ModelId::Miner,
         CanBeCarried,
         MaxSpeed(15.0),
-        Health::new(40.0),
+        Health {
+            current: 30.5,
+            max: 40.0,
+        },
         CanMine,
         StoredMinerals {
             stored: 0.0,
@@ -50,10 +53,7 @@ pub fn carrier_components(queue: BuildQueue, crew: Vec<Entity>) -> impl Bundle {
         OnBoard(crew),
         Carrying::default(),
         MaxSpeed(5.0),
-        Health {
-            current: 247.5,
-            max: 250.0,
-        },
+        Health::new(250.0),
         queue,
     )
 }

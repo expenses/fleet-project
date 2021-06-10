@@ -40,7 +40,7 @@ impl RotationMatrix {
 
 pub struct Selected;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ShipType {
     Carrier,
     Fighter,
