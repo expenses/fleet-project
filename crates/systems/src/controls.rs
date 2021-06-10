@@ -1,3 +1,4 @@
+use crate::find_functions::find_next_carrier;
 use crate::{average, get_scale, unload, SelectedFriendly};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
@@ -260,6 +261,7 @@ pub fn handle_keys(
     mut query_set: QuerySet<(
         Query<&mut CommandQueue, With<Selected>>,
         Query<(&mut Velocity, &mut CommandQueue)>,
+        Query<(&Position, &mut CommandQueue), (With<Selected>, With<CanBeCarried>)>,
     )>,
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
@@ -269,6 +271,7 @@ pub fn handle_keys(
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
     total_time: Res<TotalTime>,
+    carriers: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
 ) {
     if keyboard_state.stop.0 {
         query_set.q0_mut().for_each_mut(|mut queue| {
@@ -311,6 +314,13 @@ pub fn handle_keys(
                 }
             }
         }
+    }
+
+    if keyboard_state.load.0 {
+        query_set.q2_mut().for_each_mut(|(pos, mut command_queue)| {
+            command_queue.0.clear();
+            find_next_carrier(pos.0, &mut command_queue, carriers.iter())
+        });
     }
 }
 
