@@ -74,36 +74,37 @@ pub fn choose_enemy_target<SideA, SideB>(
     SideB: Send + Sync + 'static,
 {
     query.for_each_mut(|(entity, pos, agro_range, mut queue)| {
-        if matches!(
-            queue.0.front(),
-            None | Some(Command::MoveTo {
+        match queue.0.front() {
+            None
+            | Some(Command::MoveTo {
                 ty: MoveType::Attack,
                 ..
-            }),
-        ) {
-            let agro_range_sq = agro_range.0 * agro_range.0;
+            }) => {}
+            _ => return,
+        };
 
-            let target = candidates
-                .iter()
-                .filter_map(|(target_entity, target_pos)| {
-                    let dist_sq = (target_pos.0 - pos.0).mag_sq();
+        let agro_range_sq = agro_range.0 * agro_range.0;
 
-                    if dist_sq < agro_range_sq {
-                        Some((target_entity, dist_sq))
-                    } else {
-                        None
-                    }
-                })
-                .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let target = candidates
+            .iter()
+            .filter_map(|(target_entity, target_pos)| {
+                let dist_sq = (target_pos.0 - pos.0).mag_sq();
 
-            if let Some((target_entity, _)) = target {
-                queue.0.push_front(Command::Interact {
-                    target: target_entity,
-                    ty: InteractionType::Attack,
-                    range_sq: 0.0,
-                });
-                commands.entity(target_entity).insert(Evading(entity));
-            }
+                if dist_sq < agro_range_sq {
+                    Some((target_entity, dist_sq))
+                } else {
+                    None
+                }
+            })
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((target_entity, _)) = target {
+            queue.0.push_front(Command::Interact {
+                target: target_entity,
+                ty: InteractionType::Attack,
+                range_sq: 0.0,
+            });
+            commands.entity(target_entity).insert(Evading(entity));
         }
     });
 }
@@ -127,31 +128,38 @@ pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
     query.for_each_mut(|(pos, vel, mut ray_cooldown, queue, agro_range)| {
         ray_cooldown.0 = (ray_cooldown.0 - delta_time.0).max(0.0);
 
-        if let Some(Command::Interact {
-            ty: InteractionType::Attack,
-            target,
-            ..
-        }) = queue.0.front()
-        {
-            let agro_range_sq = agro_range.0 * agro_range.0;
-
-            let in_range = positions
-                .get(*target)
-                .ok()
-                .filter(|target_pos| (pos.0 - target_pos.0).mag_sq() < agro_range_sq)
-                .is_some();
-
-            if ray_cooldown.0 == 0.0 && in_range {
-                ray_cooldown.0 = 1.0;
-
-                let ray = Ray::new(pos.0, vel.0.normalized());
-
-                commands.spawn_bundle((
-                    Projectile::new(&ray, 200.0),
-                    AliveUntil(total_time.0 + 10.0),
-                    Side::default(),
-                ));
-            }
+        if ray_cooldown.0 != 0.0 {
+            return;
         }
+
+        let attack_target = match queue.0.front() {
+            Some(Command::Interact {
+                ty: InteractionType::Attack,
+                target,
+                ..
+            }) => target,
+            _ => return,
+        };
+
+        let agro_range_sq = agro_range.0 * agro_range.0;
+
+        let in_range = match positions.get(*attack_target) {
+            Ok(target_pos) => (pos.0 - target_pos.0).mag_sq() < agro_range_sq,
+            _ => false,
+        };
+
+        if !in_range {
+            return;
+        }
+
+        ray_cooldown.0 = 1.0;
+
+        let ray = Ray::new(pos.0, vel.0.normalized());
+
+        commands.spawn_bundle((
+            Projectile::new(&ray, 200.0),
+            AliveUntil(total_time.0 + 10.0),
+            Side::default(),
+        ));
     })
 }

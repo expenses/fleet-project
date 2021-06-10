@@ -374,104 +374,72 @@ pub fn render_health(
             let projected =
                 perspective_view.perspective_view * Vec4::new(pos.0.x, pos.0.y, pos.0.z, 1.0);
 
-            if projected.z > 0.0 {
-                let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
+            if projected.z < 0.0 {
+                return;
+            }
 
-                let uv_space_pos = Vec2::new(
-                    (screen_space_pos.x + 1.0) / 2.0,
-                    (1.0 - screen_space_pos.y) / 2.0,
-                );
-                let unnormalised_pos = uv_space_pos * dimensions.to_vec();
+            let screen_space_pos = Vec2::new(projected.x, projected.y) / projected.w;
 
-                let selected = selected.is_some();
+            let uv_space_pos = Vec2::new(
+                (screen_space_pos.x + 1.0) / 2.0,
+                (1.0 - screen_space_pos.y) / 2.0,
+            );
+            let unnormalised_pos = uv_space_pos * dimensions.to_vec();
 
-                let mut section =
-                    glyph_brush::OwnedSection::default().with_screen_position(unnormalised_pos);
+            let selected = selected.is_some();
 
-                if let Some(health) = health {
-                    if selected || health.current < health.max {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.current))
-                                .with_color([1.0; 4]),
-                        );
-                    }
-                }
+            let mut section =
+                glyph_brush::OwnedSection::default().with_screen_position(unnormalised_pos);
 
-                if let Some(carrying) = carrying {
-                    if selected || !carrying.0.is_empty() {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "Carrying: {}/{}\n",
-                                carrying.0.len(),
-                                carrying.0.capacity()
-                            ))
+            if let Some(health) = health {
+                if selected || health.current < health.max {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.current))
                             .with_color([1.0; 4]),
-                        );
-
-                        if selected {
-                            let mut counts_and_damaged = [(0, 0); Models::COUNT];
-
-                            carrying.0.iter().for_each(|&entity| {
-                                if let Ok((model_id, health)) = carried_ships.get(entity) {
-                                    counts_and_damaged[*model_id as usize].0 += 1;
-                                    counts_and_damaged[*model_id as usize].1 +=
-                                        (health.current < health.max) as u32;
-                                }
-                            });
-
-                            for model_id in IntoIter::new(Models::ARRAY) {
-                                let (count, damaged) = counts_and_damaged[model_id as usize];
-
-                                if count > 0 {
-                                    section = section.add_text(
-                                        glyph_brush::OwnedText::new(format!(
-                                            "  - {:?}s: {}\n",
-                                            model_id, count
-                                        ))
-                                        .with_color([1.0; 4]),
-                                    );
-                                }
-
-                                if damaged > 0 {
-                                    section = section.add_text(
-                                        glyph_brush::OwnedText::new(format!(
-                                            "    - Num. Damaged: {}\n",
-                                            damaged
-                                        ))
-                                        .with_color([1.0; 4]),
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    );
                 }
+            }
 
-                if let Some(on_board) = on_board {
+            if let Some(carrying) = carrying {
+                if selected || !carrying.0.is_empty() {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "Carrying: {}/{}\n",
+                            carrying.0.len(),
+                            carrying.0.capacity()
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+
                     if selected {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "On Board: {}\n",
-                                on_board.0.len()
-                            ))
-                            .with_color([1.0; 4]),
-                        );
+                        let mut counts_and_damaged = [(0, 0); Models::COUNT];
 
-                        let mut counts = [0; PersonType::COUNT];
-
-                        on_board.0.iter().for_each(|&entity| {
-                            if let Ok(person_ty) = people.get(entity) {
-                                counts[*person_ty as usize] += 1;
+                        carrying.0.iter().for_each(|&entity| {
+                            if let Ok((model_id, health)) = carried_ships.get(entity) {
+                                counts_and_damaged[*model_id as usize].0 += 1;
+                                counts_and_damaged[*model_id as usize].1 +=
+                                    (health.current < health.max) as u32;
                             }
                         });
 
-                        for person_ty in IntoIter::new(PersonType::ARRAY) {
-                            let count = counts[person_ty as usize];
+                        for model_id in IntoIter::new(Models::ARRAY) {
+                            let (count, damaged) = counts_and_damaged[model_id as usize];
 
                             if count > 0 {
                                 section = section.add_text(
                                     glyph_brush::OwnedText::new(format!(
                                         "  - {:?}s: {}\n",
-                                        person_ty, count
+                                        model_id, count
+                                    ))
+                                    .with_color([1.0; 4]),
+                                );
+                            }
+
+                            if damaged > 0 {
+                                section = section.add_text(
+                                    glyph_brush::OwnedText::new(format!(
+                                        "    - Num. Damaged: {}\n",
+                                        damaged
                                     ))
                                     .with_color([1.0; 4]),
                                 );
@@ -479,57 +447,88 @@ pub fn render_health(
                         }
                     }
                 }
-
-                if let Some(minerals) = minerals {
-                    if selected || minerals.stored > 0.0 {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "Minerals: {:.2}/{:.2}\n",
-                                minerals.stored, minerals.capacity
-                            ))
-                            .with_color([1.0; 4]),
-                        );
-                    }
-                }
-
-                if let Some(can_be_mined) = can_be_mined {
-                    if selected || can_be_mined.minerals < can_be_mined.total {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "Remaining Minerals: {:.2}/{:.2}\n",
-                                can_be_mined.minerals, can_be_mined.total
-                            ))
-                            .with_color([1.0; 4]),
-                        );
-                    }
-                }
-
-                if let Some(build_queue) = build_queue {
-                    let progress = build_queue.progress_time(total_time.0);
-
-                    if selected || progress.is_some() {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "Building Ships: {}\n",
-                                build_queue.num_in_queue()
-                            ))
-                            .with_color([1.0; 4]),
-                        );
-                    }
-
-                    if let Some(progress) = progress {
-                        section = section.add_text(
-                            glyph_brush::OwnedText::new(format!(
-                                "  - Progress: {:.2}%\n",
-                                progress * 100.0
-                            ))
-                            .with_color([1.0; 4]),
-                        );
-                    }
-                }
-
-                glyph_brush.queue(&section);
             }
+
+            if let Some(on_board) = on_board {
+                if selected {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!("On Board: {}\n", on_board.0.len()))
+                            .with_color([1.0; 4]),
+                    );
+
+                    let mut counts = [0; PersonType::COUNT];
+
+                    on_board.0.iter().for_each(|&entity| {
+                        if let Ok(person_ty) = people.get(entity) {
+                            counts[*person_ty as usize] += 1;
+                        }
+                    });
+
+                    for person_ty in IntoIter::new(PersonType::ARRAY) {
+                        let count = counts[person_ty as usize];
+
+                        if count > 0 {
+                            section = section.add_text(
+                                glyph_brush::OwnedText::new(format!(
+                                    "  - {:?}s: {}\n",
+                                    person_ty, count
+                                ))
+                                .with_color([1.0; 4]),
+                            );
+                        }
+                    }
+                }
+            }
+
+            if let Some(minerals) = minerals {
+                if selected || minerals.stored > 0.0 {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "Minerals: {:.2}/{:.2}\n",
+                            minerals.stored, minerals.capacity
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+                }
+            }
+
+            if let Some(can_be_mined) = can_be_mined {
+                if selected || can_be_mined.minerals < can_be_mined.total {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "Remaining Minerals: {:.2}/{:.2}\n",
+                            can_be_mined.minerals, can_be_mined.total
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+                }
+            }
+
+            if let Some(build_queue) = build_queue {
+                let progress = build_queue.progress_time(total_time.0);
+
+                if selected || progress.is_some() {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "Building Ships: {}\n",
+                            build_queue.num_in_queue()
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+                }
+
+                if let Some(progress) = progress {
+                    section = section.add_text(
+                        glyph_brush::OwnedText::new(format!(
+                            "  - Progress: {:.2}%\n",
+                            progress * 100.0
+                        ))
+                        .with_color([1.0; 4]),
+                    );
+                }
+            }
+
+            glyph_brush.queue(&section);
         },
     )
 }

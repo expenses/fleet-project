@@ -101,34 +101,36 @@ pub fn handle_destruction(
 ) {
     query.for_each_mut(
         |(entity, pos, health, carrying, on_board, tlas_index, selected)| {
-            if health.current <= 0.0 {
-                if let Some(mut carrying) = carrying {
-                    unload(
-                        entity,
-                        pos.0,
-                        &mut carrying,
-                        &mut *rng,
-                        total_time.0,
-                        &mut commands,
-                        &mut movement,
-                        selected.is_some(),
-                    );
-                }
-
-                commands.entity(entity).despawn();
-
-                if let Some(on_board) = on_board {
-                    for &entity in on_board.0.iter() {
-                        commands.entity(entity).despawn();
-                    }
-                }
-
-                if let Some(tlas_index) = tlas_index {
-                    tlas.remove(tlas_index.index);
-                }
-
-                spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
+            if health.current > 0.0 {
+                return;
             }
+
+            if let Some(mut carrying) = carrying {
+                unload(
+                    entity,
+                    pos.0,
+                    &mut carrying,
+                    &mut *rng,
+                    total_time.0,
+                    &mut commands,
+                    &mut movement,
+                    selected.is_some(),
+                );
+            }
+
+            commands.entity(entity).despawn();
+
+            if let Some(on_board) = on_board {
+                for &entity in on_board.0.iter() {
+                    commands.entity(entity).despawn();
+                }
+            }
+
+            if let Some(tlas_index) = tlas_index {
+                tlas.remove(tlas_index.index);
+            }
+
+            spawn_explosion(pos.0, total_time.0, &mut *rng, &mut commands);
         },
     )
 }

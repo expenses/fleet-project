@@ -68,45 +68,46 @@ pub fn handle_left_click(
     selected_button: Res<SelectedButton>,
     button_selection: Query<(Entity, &ModelId, Option<&Friendly>, Option<&Enemy>)>,
 ) {
-    if mouse_button.left_state.was_clicked() {
-        if let Some(button_index) = selected_button.0 {
-            if let Some((button_model, button_status)) = unit_buttons.0.get(button_index) {
-                let is_being_carried =
-                    matches!(button_status, UnitStatus::Friendly { carried: true });
-                // can't handle this case yet
-                if is_being_carried {
-                    return;
-                }
-                button_selection.for_each(|(entity, model_id, friendly, enemy)| {
-                    let matches = model_id == button_model
-                        && button_status
-                            == &UnitStatus::from_bools(friendly.is_some(), enemy.is_some(), false);
+    if !mouse_button.left_state.was_clicked() {
+        return;
+    }
 
-                    if !matches ^ keyboard_state.shift {
-                        commands.entity(entity).remove::<Selected>();
-                    }
-                });
+    if let Some(button_index) = selected_button.0 {
+        if let Some((button_model, button_status)) = unit_buttons.0.get(button_index) {
+            let is_being_carried = matches!(button_status, UnitStatus::Friendly { carried: true });
+            // can't handle this case yet
+            if is_being_carried {
+                return;
             }
-            return;
-        }
+            button_selection.for_each(|(entity, model_id, friendly, enemy)| {
+                let matches = model_id == button_model
+                    && button_status
+                        == &UnitStatus::from_bools(friendly.is_some(), enemy.is_some(), false);
 
-        if matches!(*mouse_mode, MouseMode::Movement { .. }) {
-            *mouse_mode = MouseMode::Normal;
-            return;
-        }
-
-        if !keyboard_state.shift {
-            selected.for_each(|entity| {
-                commands.entity(entity).remove::<Selected>();
+                if !matches ^ keyboard_state.shift {
+                    commands.entity(entity).remove::<Selected>();
+                }
             });
         }
+        return;
+    }
 
-        if let Some(entity) = ship_under_cursor.0 {
-            if keyboard_state.shift && selected.get(entity).is_ok() {
-                commands.entity(entity).remove::<Selected>();
-            } else {
-                commands.entity(entity).insert(Selected);
-            }
+    if matches!(*mouse_mode, MouseMode::Movement { .. }) {
+        *mouse_mode = MouseMode::Normal;
+        return;
+    }
+
+    if !keyboard_state.shift {
+        selected.for_each(|entity| {
+            commands.entity(entity).remove::<Selected>();
+        });
+    }
+
+    if let Some(entity) = ship_under_cursor.0 {
+        if keyboard_state.shift && selected.get(entity).is_ok() {
+            commands.entity(entity).remove::<Selected>();
+        } else {
+            commands.entity(entity).insert(Selected);
         }
     }
 }
@@ -120,27 +121,30 @@ pub fn handle_left_drag(
     mut commands: Commands,
     keyboard_state: Res<KeyboardState>,
 ) {
-    if let Some(start) = mouse_state.left_state.was_dragged() {
-        let frustum = SelectionFrustum::new_from_onscreen_box(
-            start.min_by_component(mouse_state.position),
-            start.max_by_component(mouse_state.position),
-            dimensions.width,
-            dimensions.height,
-            perspective_view.perspective_view_with_far_plane.inversed(),
-        );
+    let start = match mouse_state.left_state.was_dragged() {
+        Some(start) => start,
+        None => return,
+    };
 
-        if !keyboard_state.shift {
-            selected.for_each(|entity| {
-                commands.entity(entity).remove::<Selected>();
-            });
-        }
+    let frustum = SelectionFrustum::new_from_onscreen_box(
+        start.min_by_component(mouse_state.position),
+        start.max_by_component(mouse_state.position),
+        dimensions.width,
+        dimensions.height,
+        perspective_view.perspective_view_with_far_plane.inversed(),
+    );
 
-        query.for_each(|(entity, pos)| {
-            if frustum.contains_point(pos.0) {
-                commands.entity(entity).insert(Selected);
-            }
-        })
+    if !keyboard_state.shift {
+        selected.for_each(|entity| {
+            commands.entity(entity).remove::<Selected>();
+        });
     }
+
+    query.for_each(|(entity, pos)| {
+        if frustum.contains_point(pos.0) {
+            commands.entity(entity).insert(Selected);
+        }
+    });
 }
 
 pub fn handle_right_clicks(
@@ -160,67 +164,69 @@ pub fn handle_right_clicks(
     can_be_mined: Query<&Scale, With<CanBeMined>>,
     keyboard_state: Res<KeyboardState>,
 ) {
-    if mouse_button.right_state.was_clicked() {
-        match ship_under_cursor.0 {
-            Some(target_entity) => {
-                if enemies.get(target_entity).is_ok() {
-                    query_set.q1_mut().for_each_mut(|mut queue| {
-                        if !keyboard_state.shift {
-                            queue.0.clear();
-                        }
-                        queue.0.push_back(Command::Interact {
-                            target: target_entity,
-                            ty: InteractionType::Attack,
-                            range_sq: 0.0,
-                        });
-                    });
-                } else if can_carry.get(target_entity).is_ok() {
-                    query_set.q2_mut().for_each_mut(|mut queue| {
-                        if !keyboard_state.shift {
-                            queue.0.clear();
-                        }
-                        queue.0.push_back(Command::Interact {
-                            target: target_entity,
-                            ty: InteractionType::BeCarriedBy,
-                            range_sq: 0.0,
-                        });
-                    });
-                } else if let Ok(scale) = can_be_mined.get(target_entity) {
-                    query_set.q3_mut().for_each_mut(|mut queue| {
-                        if !keyboard_state.shift {
-                            queue.0.clear();
-                        }
-                        queue.0.push_back(Command::Interact {
-                            target: target_entity,
-                            ty: InteractionType::Mine,
-                            range_sq: scale.range_sq(),
-                        });
-                    });
-                }
+    if !mouse_button.right_state.was_clicked() {
+        return;
+    }
 
-                *mouse_mode = MouseMode::Normal
-            }
-            None => {
-                *mouse_mode = match *mouse_mode {
-                    MouseMode::Normal => match average_selected_position.0 {
-                        Some(avg) => MouseMode::Movement {
-                            plane_y: avg.y,
-                            ty: MoveType::Normal,
-                        },
-                        _ => MouseMode::Normal,
-                    },
-                    MouseMode::Movement { ty, .. } => {
-                        if let Some(point) = ray_plane_point.0 {
-                            query_set.q0_mut().for_each_mut(|mut queue| {
-                                queue.0.clear();
-                                queue.0.push_back(Command::MoveTo { point, ty });
-                            });
-                        }
-
-                        MouseMode::Normal
+    match ship_under_cursor.0 {
+        Some(target_entity) => {
+            if enemies.get(target_entity).is_ok() {
+                query_set.q1_mut().for_each_mut(|mut queue| {
+                    if !keyboard_state.shift {
+                        queue.0.clear();
                     }
-                };
+                    queue.0.push_back(Command::Interact {
+                        target: target_entity,
+                        ty: InteractionType::Attack,
+                        range_sq: 0.0,
+                    });
+                });
+            } else if can_carry.get(target_entity).is_ok() {
+                query_set.q2_mut().for_each_mut(|mut queue| {
+                    if !keyboard_state.shift {
+                        queue.0.clear();
+                    }
+                    queue.0.push_back(Command::Interact {
+                        target: target_entity,
+                        ty: InteractionType::BeCarriedBy,
+                        range_sq: 0.0,
+                    });
+                });
+            } else if let Ok(scale) = can_be_mined.get(target_entity) {
+                query_set.q3_mut().for_each_mut(|mut queue| {
+                    if !keyboard_state.shift {
+                        queue.0.clear();
+                    }
+                    queue.0.push_back(Command::Interact {
+                        target: target_entity,
+                        ty: InteractionType::Mine,
+                        range_sq: scale.range_sq(),
+                    });
+                });
             }
+
+            *mouse_mode = MouseMode::Normal
+        }
+        None => {
+            *mouse_mode = match *mouse_mode {
+                MouseMode::Normal => match average_selected_position.0 {
+                    Some(avg) => MouseMode::Movement {
+                        plane_y: avg.y,
+                        ty: MoveType::Normal,
+                    },
+                    _ => MouseMode::Normal,
+                },
+                MouseMode::Movement { ty, .. } => {
+                    if let Some(point) = ray_plane_point.0 {
+                        query_set.q0_mut().for_each_mut(|mut queue| {
+                            queue.0.clear();
+                            queue.0.push_back(Command::MoveTo { point, ty });
+                        });
+                    }
+
+                    MouseMode::Normal
+                }
+            };
         }
     }
 }
