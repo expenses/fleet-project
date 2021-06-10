@@ -114,6 +114,8 @@ impl Models {
         ModelId::Asteroid,
     ];
 
+    pub const MINER_LASER_OFFSET: Vec3 = Vec3::new(0.0, 1.89621, 0.87578);
+
     pub fn get(&self, id: ModelId) -> &Model {
         &self.models[id as usize]
     }

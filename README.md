@@ -9,7 +9,6 @@
 * health bars?
 * resize ships
 * a way to choose formations.
-* mining lasers
 * improved movement system
 * only flee in certain circumstances
 * use tlas for choose enemy target - need to store position and side.

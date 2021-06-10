@@ -142,16 +142,13 @@ pub fn debug_render_find_ship_under_cursor(
     }
 }
 
-pub fn render_projectiles(
-    query: Query<&Projectile>,
-    mut lines_buffer: ResMut<GpuBuffer<LaserVertex>>,
-) {
+pub fn render_projectiles(query: Query<&Projectile>, mut lasers: ResMut<GpuBuffer<LaserVertex>>) {
     query.for_each(|projectile| {
         let (start, end) = projectile.line_points(-0.1);
 
         let colour = Vec3::new(0.75, 0.0, 1.0) * 0.75;
 
-        lines_buffer.stage(&[
+        lasers.stage(&[
             LaserVertex {
                 position: start,
                 colour,

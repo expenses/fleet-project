@@ -1,6 +1,7 @@
 use crate::find_functions::*;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
+use components_and_resources::gpu_structs::LaserVertex;
 use components_and_resources::resources::*;
 use ultraviolet::Vec3;
 
@@ -17,6 +18,7 @@ pub fn mine(
     carriers: Query<(Entity, &Position), With<Carrying>>,
     delta_time: Res<DeltaTime>,
     mut commands: Commands,
+    mut lasers: ResMut<GpuBuffer<LaserVertex>>,
 ) {
     query.for_each_mut(
         |(pos, max_speed, mut queue, mut stored_minerals, mut rotation)| {
@@ -35,9 +37,25 @@ pub fn mine(
                     let vector = target_pos.0 - pos.0;
                     let within_range = vector.mag_sq() < range_sq + max_force;
 
-                    rotation.0 = crate::rotation_from_facing(vector);
-
                     if within_range {
+                        rotation.0 = crate::rotation_from_facing(vector);
+
+                        // This is not good in terms of 'seperation of concerns' but whatever
+                        {
+                            let laser_start = pos.0 + rotation.0 * Models::MINER_LASER_OFFSET;
+
+                            lasers.stage(&[
+                                LaserVertex {
+                                    position: laser_start,
+                                    colour: Vec3::unit_z(),
+                                },
+                                LaserVertex {
+                                    position: target_pos.0,
+                                    colour: Vec3::unit_x(),
+                                },
+                            ]);
+                        }
+
                         let to_mine = delta_time.0;
                         let to_mine = to_mine
                             .min(can_be_mined.minerals)
