@@ -358,7 +358,7 @@ pub fn handle_keys(
         })
     }
 
-    let build_ship_type = if keyboard_state.build_fighter.0  {
+    let build_ship_type = if keyboard_state.build_fighter.0 {
         Some(ShipType::Fighter)
     } else if keyboard_state.build_miner.0 {
         Some(ShipType::Miner)
@@ -369,7 +369,8 @@ pub fn handle_keys(
     };
 
     if let Some(build_ship_type) = build_ship_type {
-        let best_queue = build_queues.iter_mut()
+        let best_queue = build_queues
+            .iter_mut()
             .map(|queue| (queue.queue_length(total_time.0), queue))
             .min_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 

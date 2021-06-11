@@ -1,7 +1,7 @@
 use crate::BoundingBox;
 
 #[derive(Debug)]
-struct Node<T> {
+pub struct Node<T> {
     bounding_box: BoundingBox,
     data: Option<T>,
     parent_index: Option<usize>,
@@ -357,13 +357,19 @@ impl<T> DynamicBvh<T> {
     }
 
     #[inline]
-    pub fn find<FN: Fn(BoundingBox) -> bool>(&self, predicate: FN) -> BvhIterator<T, FN> {
+    pub fn find<'a, FN: Fn(BoundingBox) -> bool>(
+        &'a self,
+        predicate: FN,
+        stack: &'a mut Vec<&'a Node<T>>,
+    ) -> BvhIterator<'a, T, FN> {
+        stack.clear();
+
+        if let Some(node) = self.nodes.get(self.root) {
+            stack.push(node);
+        }
+
         BvhIterator {
-            stack: if let Some(node) = self.nodes.get(self.root) {
-                vec![node]
-            } else {
-                Vec::new()
-            },
+            stack,
             bvh: self,
             predicate,
         }
@@ -377,7 +383,7 @@ impl<T> DynamicBvh<T> {
 }
 
 pub struct BvhIterator<'a, T, FN> {
-    stack: Vec<&'a Node<T>>,
+    stack: &'a mut Vec<&'a Node<T>>,
     bvh: &'a DynamicBvh<T>,
     predicate: FN,
 }

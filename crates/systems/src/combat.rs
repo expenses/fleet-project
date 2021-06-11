@@ -23,8 +23,13 @@ pub fn collide_projectiles<Side>(
     projectiles.par_for_each(&task_pool, 16, |(entity, projectile)| {
         let bounding_box = projectile.bounding_box(delta_time.0);
 
+        let mut find_stack = Vec::with_capacity(10);
+
         let first_hit = bvh
-            .find(|ship_bounding_box| bounding_box.intersects(ship_bounding_box))
+            .find(
+                |ship_bounding_box| bounding_box.intersects(ship_bounding_box),
+                &mut find_stack,
+            )
             .filter_map(|&entity| {
                 ships
                     .get(entity)

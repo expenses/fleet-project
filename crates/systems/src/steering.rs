@@ -254,8 +254,13 @@ pub fn run_avoidance(
 
             let is_carrier = carrying.is_some();
 
+            let mut find_stack = Vec::with_capacity(10);
+
             let iter = bvh
-                .find(|bounding_box| bbox.intersects(bounding_box))
+                .find(
+                    |bounding_box| bbox.intersects(bounding_box),
+                    &mut find_stack,
+                )
                 .filter_map(|&entity| {
                     boids
                         .get(entity)
