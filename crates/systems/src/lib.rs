@@ -303,16 +303,17 @@ pub fn count_selected(
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
+    mut section: Local<glyph_brush::OwnedSection<glyph_brush::Extra>>,
 ) {
-    let mut section = glyph_brush::OwnedSection::default();
+    section.text.clear();
     buttons.0.clear();
 
-    section = section.add_text(
+    section.text.push(
         glyph_brush::OwnedText::new(&format!("Global Minerals: {}\n", global_minerals.0))
             .with_color([1.0; 4]),
     );
 
-    let mut print = |mut section: glyph_brush::OwnedSection,
+    let mut print = |section: &mut glyph_brush::OwnedSection,
                      status: UnitStatus,
                      colour,
                      counts: [u32; Models::COUNT]| {
@@ -322,27 +323,26 @@ pub fn count_selected(
 
             if count > 0 {
                 buttons.0.push((model_id, status));
-                section = section
-                    .add_text(glyph_brush::OwnedText::new(status.to_str()).with_color(colour));
+                section
+                    .text
+                    .push(glyph_brush::OwnedText::new(status.to_str()).with_color(colour));
 
-                section = section.add_text(
+                section.text.push(
                     glyph_brush::OwnedText::new(&format!(" {:?}s: {}\n", Models::ARRAY[i], count))
                         .with_color([1.0; 4]),
                 );
             }
         }
-
-        section
     };
 
-    section = print(
-        section,
+    print(
+        &mut section,
         UnitStatus::Friendly { carried: false },
         [0.25, 1.0, 0.25, 1.0],
         count(friendly.iter()),
     );
-    section = print(
-        section,
+    print(
+        &mut section,
         UnitStatus::Friendly { carried: true },
         [0.25, 1.0, 0.25, 1.0],
         count(
@@ -352,20 +352,20 @@ pub fn count_selected(
                 .filter_map(|entity| all_models.get(entity).ok()),
         ),
     );
-    section = print(
-        section,
+    print(
+        &mut section,
         UnitStatus::Neutral,
         [0.25, 0.25, 1.0, 1.0],
         count(neutral.iter()),
     );
-    section = print(
-        section,
+    print(
+        &mut section,
         UnitStatus::Enemy,
         [1.0, 0.25, 0.25, 1.0],
         count(enemy.iter()),
     );
 
-    glyph_brush.queue(&section);
+    glyph_brush.queue(&*section);
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {
