@@ -366,6 +366,17 @@ pub fn render_3d_ship_stats(
     dimensions: Res<Dimensions>,
     total_time: Res<TotalTime>,
 ) {
+    let mut string_cache = String::new();
+
+    fn write_to_cached_string<'a>(string: &'a mut String, args: std::fmt::Arguments) -> &'a str {
+        use std::fmt::Write;
+
+        //string.clear();
+        let _ = string.write_fmt(args);
+
+        string
+    }
+
     query.for_each(
         |(pos, health, selected, carrying, on_board, minerals, can_be_mined, build_queue)| {
             let projected =
@@ -386,26 +397,34 @@ pub fn render_3d_ship_stats(
 
             let selected = selected.is_some();
 
-            let mut section =
-                glyph_brush::OwnedSection::default().with_screen_position(unnormalised_pos);
+            let mut section = glyph_brush::Section {
+                screen_position: unnormalised_pos.into(),
+                text: Vec::with_capacity(10),
+                ..Default::default()
+            };
 
             if let Some(health) = health {
                 if selected || health.current < health.max {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!("Health: {:.2}\n", health.current))
-                            .with_color([1.0; 4]),
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!("Health: {:.2}\n", health.current),
+                        ))
+                        .with_color([1.0; 4]),
                     );
                 }
             }
 
             if let Some(carrying) = carrying {
                 if selected || !carrying.is_empty() {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "Carrying: {}/{}\n",
                             carrying.len(),
                             carrying.capacity()
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
 
@@ -431,23 +450,27 @@ pub fn render_3d_ship_stats(
                                 counts_and_damaged[model_id as usize];
 
                             if count > 0 {
-                                section = section.add_text(
-                                    glyph_brush::OwnedText::new(format!(
+                                section.text.push(
+                                    glyph_brush::Text::new(write_to_cached_string(
+                                        &mut string_cache,
+                                        format_args!(
                                         "  - {:?}s: {}\n",
                                         model_id, count
-                                    ))
+                                    )))
                                     .with_color([1.0; 4]),
                                 );
                             }
 
                             if let Some(next_damaged_health) = next_damaged_health {
-                                section = section.add_text(
-                                    glyph_brush::OwnedText::new(format!(
+                                section.text.push(
+                                    glyph_brush::Text::new(write_to_cached_string(
+                                        &mut string_cache,
+                                        format_args!(
                                         "    - Num. Damaged: {} ({:.2}/{:.2})\n",
                                         damaged,
                                         next_damaged_health.current,
                                         next_damaged_health.max
-                                    ))
+                                    )))
                                     .with_color([1.0; 4]),
                                 );
                             }
@@ -458,8 +481,10 @@ pub fn render_3d_ship_stats(
 
             if let Some(on_board) = on_board {
                 if selected {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!("On Board: {}\n", on_board.0.len()))
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!("On Board: {}\n", on_board.0.len())))
                             .with_color([1.0; 4]),
                     );
 
@@ -475,11 +500,13 @@ pub fn render_3d_ship_stats(
                         let count = counts[person_ty as usize];
 
                         if count > 0 {
-                            section = section.add_text(
-                                glyph_brush::OwnedText::new(format!(
+                            section.text.push(
+                                glyph_brush::Text::new(write_to_cached_string(
+                                    &mut string_cache,
+                                    format_args!(
                                     "  - {:?}s: {}\n",
                                     person_ty, count
-                                ))
+                                )))
                                 .with_color([1.0; 4]),
                             );
                         }
@@ -489,11 +516,13 @@ pub fn render_3d_ship_stats(
 
             if let Some(minerals) = minerals {
                 if selected || minerals.stored > 0.0 {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "Minerals: {:.2}/{:.2}\n",
                             minerals.stored, minerals.capacity
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
                 }
@@ -501,11 +530,13 @@ pub fn render_3d_ship_stats(
 
             if let Some(can_be_mined) = can_be_mined {
                 if selected || can_be_mined.minerals < can_be_mined.total {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "Remaining Minerals: {:.2}/{:.2}\n",
                             can_be_mined.minerals, can_be_mined.total
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
                 }
@@ -515,35 +546,41 @@ pub fn render_3d_ship_stats(
                 let progress = build_queue.progress_time(total_time.0);
 
                 if selected || progress.is_some() {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "Building Ships: {}\n",
                             build_queue.num_in_queue()
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
                 }
 
                 if let Some(progress) = progress {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "  - Progress: {:.2}%\n",
                             progress * 100.0
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
                 }
 
                 if selected {
-                    section = section.add_text(
-                        glyph_brush::OwnedText::new(format!(
+                    section.text.push(
+                        glyph_brush::Text::new(write_to_cached_string(
+                            &mut string_cache,
+                            format_args!(
                             "  - * {}\n",
                             if build_queue.stay_carried {
                                 "Stay carried"
                             } else {
                                 "Unload"
                             }
-                        ))
+                        )))
                         .with_color([1.0; 4]),
                     );
                 }
