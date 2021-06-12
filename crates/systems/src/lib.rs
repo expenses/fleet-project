@@ -296,7 +296,6 @@ pub fn apply_velocity(
 pub struct MultiString<T> {
     cache_string: String,
     ranges_and_data: Vec<(Range<usize>, T)>,
-    max_len: usize,
 }
 
 impl<T> MultiString<T> {
@@ -312,8 +311,6 @@ impl<T> MultiString<T> {
         let _ = self.cache_string.write_fmt(args);
         let end = self.cache_string.len();
         self.ranges_and_data.push((start..end, data));
-
-        self.max_len = self.max_len.max(self.ranges_and_data.len());
     }
 
     pub fn iter_strings(&self) -> impl Iterator<Item = (&str, &T)> {
@@ -387,18 +384,13 @@ pub fn count_selected(
         count(enemy.iter()),
     );
 
-    let mut section = glyph_brush::Section {
-        text: Vec::with_capacity(string_cache.max_len),
+    glyph_brush.queue(&glyph_brush::Section {
+        text: string_cache
+            .iter_strings()
+            .map(|(string, colour)| glyph_brush::Text::new(string).with_color(*colour))
+            .collect(),
         ..Default::default()
-    };
-
-    for (string, colour) in string_cache.iter_strings() {
-        section
-            .text
-            .push(glyph_brush::Text::new(string).with_color(*colour));
-    }
-
-    glyph_brush.queue(&section);
+    });
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {
