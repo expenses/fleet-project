@@ -8,7 +8,7 @@ use components_and_resources::resources::*;
 use components_and_resources::utils::*;
 use std::array::IntoIter;
 use std::ops::{Deref, DerefMut, Range};
-use ultraviolet::Vec3;
+use ultraviolet::{Vec2, Vec3};
 
 mod combat;
 mod controls;
@@ -293,30 +293,44 @@ pub fn apply_velocity(
 }
 
 #[derive(Default)]
-pub struct MultiString<T> {
+pub struct MultiString {
     cache_string: String,
-    ranges_and_data: Vec<(Range<usize>, T)>,
+    ranges_and_colours: Vec<(Range<usize>, [f32; 4])>,
+    glyph_section: glyph_brush::Section<'static, glyph_brush::Extra>,
 }
 
-impl<T> MultiString<T> {
-    pub fn clear(&mut self) {
-        self.cache_string.clear();
-        self.ranges_and_data.clear();
+impl MultiString {
+    pub fn set_position(&mut self, position: Vec2) {
+        self.glyph_section.screen_position = position.into();
     }
 
-    pub fn push(&mut self, args: std::fmt::Arguments, data: T) {
+    pub fn push(&mut self, args: std::fmt::Arguments, colour: [f32; 4]) {
         use std::fmt::Write;
 
         let start = self.cache_string.len();
         let _ = self.cache_string.write_fmt(args);
         let end = self.cache_string.len();
-        self.ranges_and_data.push((start..end, data));
+        self.ranges_and_colours.push((start..end, colour));
     }
 
-    pub fn iter_strings(&self) -> impl Iterator<Item = (&str, &T)> {
-        self.ranges_and_data
-            .iter()
-            .map(move |(range, data)| (&self.cache_string[range.clone()], data))
+    pub fn queue_section(&mut self, glyph_brush: &mut GlyphBrush) {
+        for (range, colour) in &self.ranges_and_colours {
+            let string = &self.cache_string[range.clone()];
+
+            // Use a transmute to change the lifetime of the string to be static.
+            // This is VERY naughty but as far as I can tell is safe because the string
+            // only needs to last until it is queued in the glyph brush.
+            let string: &'static str = unsafe { std::mem::transmute(string) };
+            self.glyph_section
+                .text
+                .push(glyph_brush::Text::new(string).with_color(*colour));
+        }
+
+        glyph_brush.queue(&self.glyph_section);
+
+        self.glyph_section.text.clear();
+        self.ranges_and_colours.clear();
+        self.cache_string.clear();
     }
 }
 
@@ -331,9 +345,8 @@ pub fn count_selected(
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
-    mut string_cache: Local<MultiString<[f32; 4]>>,
+    mut string_cache: Local<MultiString>,
 ) {
-    string_cache.clear();
     buttons.0.clear();
 
     string_cache.push(
@@ -384,13 +397,7 @@ pub fn count_selected(
         count(enemy.iter()),
     );
 
-    glyph_brush.queue(&glyph_brush::Section {
-        text: string_cache
-            .iter_strings()
-            .map(|(string, colour)| glyph_brush::Text::new(string).with_color(*colour))
-            .collect(),
-        ..Default::default()
-    });
+    string_cache.queue_section(&mut glyph_brush);
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {

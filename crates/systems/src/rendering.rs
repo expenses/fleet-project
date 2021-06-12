@@ -365,8 +365,7 @@ pub fn render_3d_ship_stats(
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
     total_time: Res<TotalTime>,
-    mut string_cache: Local<crate::MultiString<[f32; 4]>>,
-    mut section_cache: Local<glyph_brush::Section<'static, glyph_brush::Extra>>,
+    mut string_cache: Local<crate::MultiString>,
 ) {
     query.for_each(
         |(pos, health, selected, carrying, on_board, minerals, can_be_mined, build_queue)| {
@@ -524,22 +523,8 @@ pub fn render_3d_ship_stats(
                 }
             }
 
-            section_cache.screen_position = unnormalised_pos.into();
-
-            for (string, colour) in string_cache.iter_strings() {
-                // Use a transmute to change the lifetime of the string to be static.
-                // This is VERY naughty but as far as I can tell is safe because the string
-                // only needs to last until it is queued in the glyph brush.
-                let string: &'static str = unsafe { std::mem::transmute(string) };
-                section_cache
-                    .text
-                    .push(glyph_brush::Text::new(string).with_color(*colour));
-            }
-
-            glyph_brush.queue(&*section_cache);
-
-            section_cache.text.clear();
-            string_cache.clear();
+            string_cache.set_position(unnormalised_pos);
+            string_cache.queue_section(&mut glyph_brush);
         },
     )
 }
