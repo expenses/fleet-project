@@ -42,7 +42,7 @@ pub fn run_persuit(
             }
         };
 
-        let command = match queue.0.front().cloned() {
+        let command = match queue.0.front().copied() {
             Some(command) => command,
             None => {
                 staging_persuit_force.0 = Vec3::zero();
@@ -54,7 +54,7 @@ pub fn run_persuit(
             Command::Interact { target, ty, range_sq } => {
                 let target_boid = match boids.get(target) {
                     Ok((p, v, ms)) => {
-                        to_boid(p, &v.cloned().unwrap_or_default(), &ms.cloned().unwrap_or_default())
+                        to_boid(p, &v.copied().unwrap_or_default(), &ms.copied().unwrap_or_default())
                     },
                     _ => {
                         queue.0.pop_front();

@@ -7,7 +7,7 @@ use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
 use std::array::IntoIter;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Range};
 use ultraviolet::Vec3;
 
 mod combat;
@@ -292,6 +292,37 @@ pub fn apply_velocity(
     });
 }
 
+#[derive(Default)]
+pub struct MultiString<T> {
+    cache_string: String,
+    ranges_and_data: Vec<(Range<usize>, T)>,
+    max_len: usize,
+}
+
+impl<T> MultiString<T> {
+    pub fn clear(&mut self) {
+        self.cache_string.clear();
+        self.ranges_and_data.clear();
+    }
+
+    pub fn push(&mut self, args: std::fmt::Arguments, data: T) {
+        use std::fmt::Write;
+
+        let start = self.cache_string.len();
+        let _ = self.cache_string.write_fmt(args);
+        let end = self.cache_string.len();
+        self.ranges_and_data.push((start..end, data));
+
+        self.max_len = self.max_len.max(self.ranges_and_data.len());
+    }
+
+    pub fn iter_strings(&self) -> impl Iterator<Item = (&str, &T)> {
+        self.ranges_and_data
+            .iter()
+            .map(move |(range, data)| (&self.cache_string[range.clone()], data))
+    }
+}
+
 type SelectedUncarried = (With<Selected>, With<Position>);
 
 pub fn count_selected(
@@ -303,46 +334,39 @@ pub fn count_selected(
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
-    mut section: Local<glyph_brush::OwnedSection<glyph_brush::Extra>>,
+    mut string_cache: Local<MultiString<[f32; 4]>>,
 ) {
-    section.text.clear();
+    string_cache.clear();
     buttons.0.clear();
 
-    section.text.push(
-        glyph_brush::OwnedText::new(&format!("Global Minerals: {}\n", global_minerals.0))
-            .with_color([1.0; 4]),
+    string_cache.push(
+        format_args!("Global Minerals: {}\n", global_minerals.0),
+        [1.0; 4],
     );
 
-    let mut print = |section: &mut glyph_brush::OwnedSection,
-                     status: UnitStatus,
-                     colour,
-                     counts: [u32; Models::COUNT]| {
+    let mut print = |status: UnitStatus, colour, counts: [u32; Models::COUNT]| {
         for model_id in IntoIter::new(Models::ARRAY) {
             let i = model_id as usize;
             let count = counts[i];
 
             if count > 0 {
                 buttons.0.push((model_id, status));
-                section
-                    .text
-                    .push(glyph_brush::OwnedText::new(status.to_str()).with_color(colour));
+                string_cache.push(format_args!("{}", status.to_str()), colour);
 
-                section.text.push(
-                    glyph_brush::OwnedText::new(&format!(" {:?}s: {}\n", Models::ARRAY[i], count))
-                        .with_color([1.0; 4]),
+                string_cache.push(
+                    format_args!(" {:?}s: {}\n", Models::ARRAY[i], count),
+                    [1.0; 4],
                 );
             }
         }
     };
 
     print(
-        &mut section,
         UnitStatus::Friendly { carried: false },
         [0.25, 1.0, 0.25, 1.0],
         count(friendly.iter()),
     );
     print(
-        &mut section,
         UnitStatus::Friendly { carried: true },
         [0.25, 1.0, 0.25, 1.0],
         count(
@@ -353,19 +377,28 @@ pub fn count_selected(
         ),
     );
     print(
-        &mut section,
         UnitStatus::Neutral,
         [0.25, 0.25, 1.0, 1.0],
         count(neutral.iter()),
     );
     print(
-        &mut section,
         UnitStatus::Enemy,
         [1.0, 0.25, 0.25, 1.0],
         count(enemy.iter()),
     );
 
-    glyph_brush.queue(&*section);
+    let mut section = glyph_brush::Section {
+        text: Vec::with_capacity(string_cache.max_len),
+        ..Default::default()
+    };
+
+    for (string, colour) in string_cache.iter_strings() {
+        section
+            .text
+            .push(glyph_brush::Text::new(string).with_color(*colour));
+    }
+
+    glyph_brush.queue(&section);
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {

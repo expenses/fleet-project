@@ -94,7 +94,7 @@ pub struct AliveUntil(pub f32);
 #[derive(Default)]
 pub struct WorldSpaceBoundingBox(pub BoundingBox);
 
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct MaxSpeed(pub f32);
 
 impl MaxSpeed {
@@ -134,7 +134,7 @@ pub struct Enemy;
 
 pub struct Evading(pub Entity);
 
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Velocity(pub Vec3);
 pub struct StagingPersuitForce(pub Vec3);
 pub struct StagingEvasionForce(pub Vec3);
@@ -146,7 +146,7 @@ pub struct AgroRange(pub f32);
 #[derive(Default)]
 pub struct CommandQueue(pub VecDeque<Command>);
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Command {
     MoveTo {
         point: Vec3,

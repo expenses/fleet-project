@@ -9,11 +9,11 @@ pub struct BuildQueue {
 
 impl BuildQueue {
     pub fn advance(&mut self, total_time: f32) -> Option<ShipType> {
-        if let Some(building) = self.building.front().cloned() {
+        if let Some(building) = self.building.front().copied() {
             if total_time > self.time_of_next_pop {
                 self.building.pop_front();
 
-                if let Some(next) = self.building.front().cloned() {
+                if let Some(next) = self.building.front().copied() {
                     self.time_of_next_pop = total_time + next.build_time();
                 }
 
@@ -25,7 +25,7 @@ impl BuildQueue {
     }
 
     pub fn progress_time(&self, total_time: f32) -> Option<f32> {
-        if let Some(building) = self.building.front().cloned() {
+        if let Some(building) = self.building.front().copied() {
             let remaining = self.time_of_next_pop - total_time;
             Some(1.0 - (remaining / building.build_time()))
         } else {
