@@ -292,79 +292,23 @@ pub fn apply_velocity(
     });
 }
 
-#[derive(Default)]
-pub struct MultiString {
-    cache_string: String,
-    lengths_and_colours: Vec<(usize, [f32; 4])>,
-    glyph_section: glyph_brush::Section<'static, glyph_brush::Extra>,
-}
-
-impl MultiString {
-    pub fn set_position(&mut self, position: Vec2) {
-        self.glyph_section.screen_position = position.into();
-    }
-
-    pub fn push(&mut self, args: std::fmt::Arguments, colour: [f32; 4]) {
-        use std::fmt::Write;
-
-        let start = self.cache_string.len();
-        let _ = self.cache_string.write_fmt(args);
-        let end = self.cache_string.len();
-
-        let length = end - start;
-
-        match self.lengths_and_colours.last_mut() {
-            Some((last_length, last_colour)) if *last_colour == colour => {
-                *last_length += length;
-            }
-            _ => {
-                self.lengths_and_colours.push((length, colour));
-            }
-        }
-    }
-
-    pub fn queue_section(&mut self, glyph_brush: &mut GlyphBrush) {
-        let mut offset = 0;
-
-        for (length, colour) in &self.lengths_and_colours {
-            let string = &self.cache_string[offset..offset + length];
-            offset += length;
-
-            // Use a transmute to change the lifetime of the string to be static.
-            // This is VERY naughty but as far as I can tell is safe because the string
-            // only needs to last until it is queued in the glyph brush.
-            let string: &'static str = unsafe { std::mem::transmute(string) };
-            self.glyph_section
-                .text
-                .push(glyph_brush::Text::new(string).with_color(*colour));
-        }
-
-        if !self.glyph_section.text.is_empty() {
-            glyph_brush.queue(&self.glyph_section);
-        }
-
-        self.glyph_section.text.clear();
-        self.lengths_and_colours.clear();
-        self.cache_string.clear();
-    }
-}
-
 type SelectedUncarried = (With<Selected>, With<Position>);
 
 pub fn count_selected(
     friendly: Query<&ModelId, (SelectedUncarried, With<Friendly>)>,
     neutral: Query<&ModelId, (SelectedUncarried, Without<Friendly>, Without<Enemy>)>,
     enemy: Query<&ModelId, (SelectedUncarried, With<Enemy>)>,
-    mut glyph_brush: ResMut<GlyphBrush>,
+    mut glyph_layout_cache: ResMut<GlyphLayoutCache>,
     friendly_carrying: Query<&Carrying, (SelectedUncarried, With<Friendly>)>,
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
-    mut string_cache: Local<MultiString>,
 ) {
     buttons.0.clear();
 
-    string_cache.push(
+    glyph_layout_cache.start_section(Vec2::zero());
+
+    glyph_layout_cache.push(
         format_args!("Global Minerals: {}\n", global_minerals.0),
         [1.0; 4],
     );
@@ -376,9 +320,9 @@ pub fn count_selected(
 
             if count > 0 {
                 buttons.0.push((model_id, status));
-                string_cache.push(format_args!("{}", status.to_str()), colour);
+                glyph_layout_cache.push(format_args!("{}", status.to_str()), colour);
 
-                string_cache.push(
+                glyph_layout_cache.push(
                     format_args!(" {:?}s: {}\n", Models::ARRAY[i], count),
                     [1.0; 4],
                 );
@@ -412,7 +356,7 @@ pub fn count_selected(
         count(enemy.iter()),
     );
 
-    string_cache.queue_section(&mut glyph_brush);
+    glyph_layout_cache.finish_section();
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {

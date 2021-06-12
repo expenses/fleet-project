@@ -339,10 +339,11 @@ pub fn run_render_passes(
     let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
     let (width, height) = (dimensions.width, dimensions.height);
 
-    let mut glyph_brush =
-        unsafe { world.get_resource_unchecked_mut::<resources::GlyphBrush>() }.unwrap();
+    let mut glyph_layout_cache =
+        unsafe { world.get_resource_unchecked_mut::<resources::GlyphLayoutCache>() }.unwrap();
 
-    glyph_brush
+    glyph_layout_cache
+        .glyph_brush()
         .draw_queued(
             &gpu_interface.device,
             &mut staging_belt,
