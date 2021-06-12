@@ -388,10 +388,6 @@ pub fn render_3d_ship_stats(
 
             let selected = selected.is_some();
 
-            section_cache.text.clear();
-            section_cache.screen_position = unnormalised_pos.into();
-            string_cache.clear();
-
             if let Some(health) = health {
                 if selected || health.current < health.max {
                     string_cache.push(format_args!("Health: {:.2}\n", health.current), [1.0; 4]);
@@ -528,6 +524,8 @@ pub fn render_3d_ship_stats(
                 }
             }
 
+            section_cache.screen_position = unnormalised_pos.into();
+
             for (string, colour) in string_cache.iter_strings() {
                 // Use a transmute to change the lifetime of the string to be static.
                 // This is VERY naughty but as far as I can tell is safe because the string
@@ -539,6 +537,9 @@ pub fn render_3d_ship_stats(
             }
 
             glyph_brush.queue(&*section_cache);
+
+            section_cache.text.clear();
+            string_cache.clear();
         },
     )
 }
