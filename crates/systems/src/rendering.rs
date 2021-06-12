@@ -365,10 +365,9 @@ pub fn render_3d_ship_stats(
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
     total_time: Res<TotalTime>,
-    mut text_cache: Local<String>,
+    mut string_cache: Local<crate::MultiString<[f32; 4]>>,
+    mut section_cache: Local<glyph_brush::Section<'static, glyph_brush::Extra>>,
 ) {
-    use std::fmt::Write;
-
     query.for_each(
         |(pos, health, selected, carrying, on_board, minerals, can_be_mined, build_queue)| {
             let projected =
@@ -389,21 +388,22 @@ pub fn render_3d_ship_stats(
 
             let selected = selected.is_some();
 
-            text_cache.clear();
+            section_cache.text.clear();
+            section_cache.screen_position = unnormalised_pos.into();
+            string_cache.clear();
 
             if let Some(health) = health {
                 if selected || health.current < health.max {
-                    let _ = text_cache.write_fmt(format_args!("Health: {:.2}\n", health.current));
+                    string_cache.push(format_args!("Health: {:.2}\n", health.current), [1.0; 4]);
                 }
             }
 
             if let Some(carrying) = carrying {
                 if selected || !carrying.is_empty() {
-                    let _ = text_cache.write_fmt(format_args!(
-                        "Carrying: {}/{}\n",
-                        carrying.len(),
-                        carrying.capacity()
-                    ));
+                    string_cache.push(
+                        format_args!("Carrying: {}/{}\n", carrying.len(), carrying.capacity()),
+                        [1.0; 4],
+                    );
 
                     if selected {
                         let mut counts_and_damaged = [(0, 0, None); Models::COUNT];
@@ -427,15 +427,22 @@ pub fn render_3d_ship_stats(
                                 counts_and_damaged[model_id as usize];
 
                             if count > 0 {
-                                let _ = text_cache
-                                    .write_fmt(format_args!("  - {:?}s: {}\n", model_id, count));
+                                string_cache.push(
+                                    format_args!("  - {:?}s: {}\n", model_id, count),
+                                    [1.0; 4],
+                                );
                             }
 
                             if let Some(next_damaged_health) = next_damaged_health {
-                                let _ = text_cache.write_fmt(format_args!(
-                                    "    - Num. Damaged: {} ({:.2}/{:.2})\n",
-                                    damaged, next_damaged_health.current, next_damaged_health.max
-                                ));
+                                string_cache.push(
+                                    format_args!(
+                                        "    - Num. Damaged: {} ({:.2}/{:.2})\n",
+                                        damaged,
+                                        next_damaged_health.current,
+                                        next_damaged_health.max
+                                    ),
+                                    [1.0; 4],
+                                );
                             }
                         }
                     }
@@ -444,7 +451,7 @@ pub fn render_3d_ship_stats(
 
             if let Some(on_board) = on_board {
                 if selected {
-                    let _ = text_cache.write_fmt(format_args!("On Board: {}\n", on_board.0.len()));
+                    string_cache.push(format_args!("On Board: {}\n", on_board.0.len()), [1.0; 4]);
 
                     let mut counts = [0; PersonType::COUNT];
 
@@ -458,8 +465,8 @@ pub fn render_3d_ship_stats(
                         let count = counts[person_ty as usize];
 
                         if count > 0 {
-                            let _ = text_cache
-                                .write_fmt(format_args!("  - {:?}s: {}\n", person_ty, count));
+                            string_cache
+                                .push(format_args!("  - {:?}s: {}\n", person_ty, count), [1.0; 4]);
                         }
                     }
                 }
@@ -467,19 +474,25 @@ pub fn render_3d_ship_stats(
 
             if let Some(minerals) = minerals {
                 if selected || minerals.stored > 0.0 {
-                    let _ = text_cache.write_fmt(format_args!(
-                        "Minerals: {:.2}/{:.2}\n",
-                        minerals.stored, minerals.capacity
-                    ));
+                    string_cache.push(
+                        format_args!(
+                            "Minerals: {:.2}/{:.2}\n",
+                            minerals.stored, minerals.capacity
+                        ),
+                        [1.0; 4],
+                    );
                 }
             }
 
             if let Some(can_be_mined) = can_be_mined {
                 if selected || can_be_mined.minerals < can_be_mined.total {
-                    let _ = text_cache.write_fmt(format_args!(
-                        "Remaining Minerals: {:.2}/{:.2}\n",
-                        can_be_mined.minerals, can_be_mined.total
-                    ));
+                    string_cache.push(
+                        format_args!(
+                            "Remaining Minerals: {:.2}/{:.2}\n",
+                            can_be_mined.minerals, can_be_mined.total
+                        ),
+                        [1.0; 4],
+                    );
                 }
             }
 
@@ -487,34 +500,45 @@ pub fn render_3d_ship_stats(
                 let progress = build_queue.progress_time(total_time.0);
 
                 if selected || progress.is_some() {
-                    let _ = text_cache.write_fmt(format_args!(
-                        "Building Ships: {}\n",
-                        build_queue.num_in_queue()
-                    ));
+                    string_cache.push(
+                        format_args!("Building Ships: {}\n", build_queue.num_in_queue()),
+                        [1.0; 4],
+                    );
                 }
 
                 if let Some(progress) = progress {
-                    let _ = text_cache
-                        .write_fmt(format_args!("  - Progress: {:.2}%\n", progress * 100.0));
+                    string_cache.push(
+                        format_args!("  - Progress: {:.2}%\n", progress * 100.0),
+                        [1.0; 4],
+                    );
                 }
 
                 if selected {
-                    let _ = text_cache.write_fmt(format_args!(
-                        "  - * {}\n",
-                        if build_queue.stay_carried {
-                            "Stay carried"
-                        } else {
-                            "Unload"
-                        }
-                    ));
+                    string_cache.push(
+                        format_args!(
+                            "  - * {}\n",
+                            if build_queue.stay_carried {
+                                "Stay carried"
+                            } else {
+                                "Unload"
+                            }
+                        ),
+                        [1.0; 4],
+                    );
                 }
             }
 
-            glyph_brush.queue(&glyph_brush::Section {
-                screen_position: unnormalised_pos.into(),
-                text: vec![glyph_brush::Text::new(&text_cache).with_color([1.0; 4])],
-                ..Default::default()
-            });
+            for (string, colour) in string_cache.iter_strings() {
+                // Use a transmute to change the lifetime of the string to be static.
+                // This is VERY naughty but as far as I can tell is safe because the string
+                // only needs to last until it is queued in the glyph brush.
+                let string: &'static str = unsafe { std::mem::transmute(string) };
+                section_cache
+                    .text
+                    .push(glyph_brush::Text::new(string).with_color(*colour));
+            }
+
+            glyph_brush.queue(&*section_cache);
         },
     )
 }
