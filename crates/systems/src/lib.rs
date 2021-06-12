@@ -7,7 +7,7 @@ use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
 use std::array::IntoIter;
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{Deref, DerefMut};
 use ultraviolet::{Vec2, Vec3};
 
 mod combat;
@@ -295,7 +295,7 @@ pub fn apply_velocity(
 #[derive(Default)]
 pub struct MultiString {
     cache_string: String,
-    ranges_and_colours: Vec<(Range<usize>, [f32; 4])>,
+    lengths_and_colours: Vec<(usize, [f32; 4])>,
     glyph_section: glyph_brush::Section<'static, glyph_brush::Extra>,
 }
 
@@ -310,12 +310,25 @@ impl MultiString {
         let start = self.cache_string.len();
         let _ = self.cache_string.write_fmt(args);
         let end = self.cache_string.len();
-        self.ranges_and_colours.push((start..end, colour));
+
+        let length = end - start;
+
+        match self.lengths_and_colours.last_mut() {
+            Some((last_length, last_colour)) if *last_colour == colour => {
+                *last_length += length;
+            }
+            _ => {
+                self.lengths_and_colours.push((length, colour));
+            }
+        }
     }
 
     pub fn queue_section(&mut self, glyph_brush: &mut GlyphBrush) {
-        for (range, colour) in &self.ranges_and_colours {
-            let string = &self.cache_string[range.clone()];
+        let mut offset = 0;
+
+        for (length, colour) in &self.lengths_and_colours {
+            let string = &self.cache_string[offset..offset + length];
+            offset += length;
 
             // Use a transmute to change the lifetime of the string to be static.
             // This is VERY naughty but as far as I can tell is safe because the string
@@ -326,10 +339,12 @@ impl MultiString {
                 .push(glyph_brush::Text::new(string).with_color(*colour));
         }
 
-        glyph_brush.queue(&self.glyph_section);
+        if !self.glyph_section.text.is_empty() {
+            glyph_brush.queue(&self.glyph_section);
+        }
 
         self.glyph_section.text.clear();
-        self.ranges_and_colours.clear();
+        self.lengths_and_colours.clear();
         self.cache_string.clear();
     }
 }
