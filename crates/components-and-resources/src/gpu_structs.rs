@@ -5,6 +5,8 @@ use ultraviolet::{Mat3, Mat4, Vec2, Vec3, Vec4};
 pub struct PushConstants {
     pub perspective_view: Mat4,
     pub light_dir: Vec3,
+    pub padding: u32,
+    pub ambient_light: Vec3,
 }
 
 #[repr(C)]

@@ -16,6 +16,7 @@ layout(location = 10) in uint emissive_texture;
 layout(push_constant) uniform PushConstants {
     mat4 perspective_view;
     vec3 light_dir;
+    vec3 ambient_light;
 };
 
 layout(location = 0) out vec3 out_normal;

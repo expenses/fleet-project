@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut rng = rand::thread_rng();
-    let mut background = background::make_background(&mut rng);
+    let (mut background, ambient_light) = background::make_background(&mut rng);
 
     let mut sun_dir = background::uniform_sphere_distribution(&mut rng);
     sun_dir.y = sun_dir.y.abs();
@@ -93,6 +93,7 @@ fn main() -> anyhow::Result<()> {
             contents: bytemuck::cast_slice(&background),
             usage: wgpu::BufferUsage::VERTEX,
         }),
+        ambient_light,
     };
 
     let constants = rendering::passes::Constants {

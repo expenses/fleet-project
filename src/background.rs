@@ -8,7 +8,7 @@ use ultraviolet::{Rotor3, Vec2, Vec3};
 pub use utils::uniform_sphere_distribution;
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
-pub fn make_background(rng: &mut ThreadRng) -> Vec<BackgroundVertex> {
+pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {
     let nebula_colour = Colour::new(
         rng.gen_range(0.0..360.0),
         1.0,
@@ -57,9 +57,13 @@ pub fn make_background(rng: &mut ThreadRng) -> Vec<BackgroundVertex> {
         // collect into vec
         .collect();
 
-    //let ambient = avg(vertices.iter().map(|vertex| vertex.normal.into()));
+    let ambient = vertices.iter().map(|vertex| vertex.colour).sum::<Vec3>() / vertices.len() as f32
+        * 3.0
+        + Vec3::broadcast(1.0 / 10.0);
 
-    vertices
+    dbg!(ambient);
+
+    (vertices, ambient)
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

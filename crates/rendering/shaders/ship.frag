@@ -12,6 +12,7 @@ layout(set = 0, binding = 1) uniform texture2D u_textures[10];
 layout(push_constant) uniform PushConstants {
     mat4 perspective_view;
     vec3 light_dir;
+    vec3 ambient_light;
 };
 
 layout(location = 0) out vec4 colour;
@@ -28,8 +29,8 @@ void main() {
 
     float emissive_factor = texture(sampler2D(u_textures[in_emissive_texture], u_sampler), in_uv).r;
 
-    float colour_factor = max(max(diffuse_factor, emissive_factor), ambient_factor);
+    float colour_factor = max(diffuse_factor, emissive_factor);
 
-    colour = vec4(colour_factor * diffuse, 1.0);
+    colour = vec4((vec3(colour_factor) + ambient_light) * diffuse, 1.0);
     bloom = vec4(emissive_factor * diffuse, 1.0);
 }
