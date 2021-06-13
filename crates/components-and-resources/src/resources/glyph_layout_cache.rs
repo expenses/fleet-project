@@ -52,7 +52,7 @@ impl GlyphLayoutCache {
             // Use a transmute to change the lifetime of the string to be static.
             // This is VERY naughty but as far as I can tell is safe because the string
             // only needs to last until it is queued in the glyph brush.
-            let string: &'static str = unsafe { std::mem::transmute(string) };
+            let string: &'static str = unsafe { std::mem::transmute::<_, &str>(string) };
             self.glyph_section
                 .text
                 .push(wgpu_glyph::Text::new(string).with_color(*colour));
