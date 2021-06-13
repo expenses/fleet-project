@@ -337,7 +337,6 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::Camera::default());
     world.insert_resource(resources::DeltaTime(1.0 / 60.0));
     world.insert_resource(resources::TotalTime(0.0));
-    world.insert_resource(resources::RayPlanePoint::default());
     world.insert_resource(resources::AverageSelectedPosition::default());
     world.insert_resource(resources::MouseMode::Normal);
     world.insert_resource(resources::Paused(false));

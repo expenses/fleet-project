@@ -4,6 +4,7 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::formations::Formation;
 use components_and_resources::resources::*;
+use ultraviolet::{Vec2, Vec3};
 
 pub fn find_ship_under_cursor(
     query: Query<
@@ -160,7 +161,6 @@ pub fn handle_right_clicks(
     mouse_button: Res<MouseState>,
     average_selected_position: Res<AverageSelectedPosition>,
     mut mouse_mode: ResMut<MouseMode>,
-    ray_plane_point: Res<RayPlanePoint>,
     ship_under_cursor: Res<ShipUnderCursor>,
     can_carry: Query<&Carrying>,
     can_be_mined: Query<&Scale, With<CanBeMined>>,
@@ -214,14 +214,15 @@ pub fn handle_right_clicks(
                 MouseMode::Normal => match average_selected_position.0 {
                     Some(avg) => MouseMode::Movement {
                         plane_y: avg.y,
+                        xz: Vec2::zero(),
                         ty: MoveType::Normal,
                     },
                     _ => MouseMode::Normal,
                 },
-                MouseMode::Movement { ty, .. } => {
-                    if let (Some(point), Some(avg)) =
-                        (ray_plane_point.0, average_selected_position.0)
-                    {
+                MouseMode::Movement { ty, xz, plane_y } => {
+                    if let Some(avg) = average_selected_position.0 {
+                        let point = Vec3::new(xz.x, plane_y, xz.y);
+
                         let mut count = 0;
                         let mut all_fighters = true;
 
@@ -258,15 +259,24 @@ pub fn update_mouse_state(mut mouse_state: ResMut<MouseState>, delta_time: Res<D
 
 pub fn update_ray_plane_point(
     ray: Res<Ray>,
-    mouse_mode: Res<MouseMode>,
-    mut ray_plane_point: ResMut<RayPlanePoint>,
+    mut mouse_mode: ResMut<MouseMode>,
+    keyboard_state: Res<KeyboardState>,
 ) {
-    ray_plane_point.0 = match *mouse_mode {
-        MouseMode::Movement { plane_y, .. } => ray
-            .y_plane_intersection(plane_y)
-            .map(|t| ray.get_intersection_point(t)),
-        MouseMode::Normal => None,
-    };
+    if let MouseMode::Movement {
+        plane_y,
+        ref mut xz,
+        ..
+    } = &mut *mouse_mode
+    {
+        if !keyboard_state.shift {
+            if let Some(point) = ray
+                .y_plane_intersection(*plane_y)
+                .map(|t| ray.get_intersection_point(t))
+            {
+                *xz = Vec2::new(point.x, point.z);
+            }
+        }
+    }
 }
 
 pub fn move_camera(
@@ -340,6 +350,7 @@ pub fn handle_keys(
                 if let Some(avg) = average_selected_position.0 {
                     *mouse_mode = MouseMode::Movement {
                         plane_y: avg.y,
+                        xz: Vec2::zero(),
                         ty: MoveType::Attack,
                     };
                 }

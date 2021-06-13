@@ -164,15 +164,14 @@ pub fn render_projectiles(query: Query<&Projectile>, mut lasers: ResMut<GpuBuffe
 pub fn render_movement_circle(
     mut circle_instances: ResMut<GpuBuffer<CircleInstance>>,
     mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
-    ray_plane_point: Res<RayPlanePoint>,
     average_selected_position: Res<AverageSelectedPosition>,
     mouse_mode: Res<MouseMode>,
 ) {
-    if let (Some(avg), Some(point), MouseMode::Movement { plane_y, ty }) =
-        (average_selected_position.0, ray_plane_point.0, &*mouse_mode)
+    if let (Some(avg), MouseMode::Movement { plane_y, xz, ty }) =
+        (average_selected_position.0, &*mouse_mode)
     {
-        let mut circle_center = avg;
-        circle_center.y = *plane_y;
+        let point = Vec3::new(xz.x, *plane_y, xz.y);
+        let circle_center = Vec3::new(avg.x, *plane_y, avg.z);
 
         let scale = (point - circle_center).mag();
 
