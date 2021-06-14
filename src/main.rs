@@ -189,7 +189,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     world.insert_resource(resources::ShipBuffer::new(&device));
-    world.insert_resource(resources::GpuBuffer::<BackgroundVertex>::new(
+    world.insert_resource(resources::GpuBuffer::<ColouredVertex>::new(
         &device,
         "lines",
         wgpu::BufferUsage::VERTEX,
@@ -382,7 +382,7 @@ fn main() -> anyhow::Result<()> {
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())
         .with_system(systems::clear_buffer::<LaserVertex>.system())
-        .with_system(systems::clear_buffer::<BackgroundVertex>.system())
+        .with_system(systems::clear_buffer::<ColouredVertex>.system())
         .with_system(systems::clear_buffer::<RangeInstance>.system())
         .with_system(systems::clear_buffer::<Vertex2D>.system())
         .with_system(systems::clear_buffer::<CircleInstance>.system());
@@ -494,7 +494,7 @@ fn main() -> anyhow::Result<()> {
 
     let upload_buffer_stage = bevy_ecs::schedule::SystemStage::parallel()
         .with_system(systems::upload_buffer::<LaserVertex>.system())
-        .with_system(systems::upload_buffer::<BackgroundVertex>.system())
+        .with_system(systems::upload_buffer::<ColouredVertex>.system())
         .with_system(systems::upload_buffer::<RangeInstance>.system())
         .with_system(systems::upload_buffer::<Vertex2D>.system())
         .with_system(systems::upload_buffer::<CircleInstance>.system());

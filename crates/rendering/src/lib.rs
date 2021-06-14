@@ -376,7 +376,7 @@ impl Pipelines {
             });
 
         let background_vertex_buffer_layout = wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<BackgroundVertex>() as u64,
+            array_stride: std::mem::size_of::<ColouredVertex>() as u64,
             step_mode: wgpu::InputStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
         };

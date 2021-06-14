@@ -1,7 +1,7 @@
 use crate::{Pipelines, Resizables};
 use components_and_resources::components::ModelId;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, BlurSettings, CircleInstance, GodraySettings, LaserVertex, PushConstants,
+    BlurSettings, CircleInstance, ColouredVertex, GodraySettings, LaserVertex, PushConstants,
     RangeInstance, Vertex2D,
 };
 use components_and_resources::resources;
@@ -211,7 +211,7 @@ pub fn run_render_passes(
         .unwrap();
 
     let line_buffer = world
-        .get_resource::<resources::GpuBuffer<BackgroundVertex>>()
+        .get_resource::<resources::GpuBuffer<ColouredVertex>>()
         .unwrap();
 
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

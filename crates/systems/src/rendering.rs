@@ -2,7 +2,7 @@ use super::get_scale;
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::gpu_structs::{
-    BackgroundVertex, CircleInstance, Instance, LaserVertex, RangeInstance, Vertex2D,
+    CircleInstance, ColouredVertex, Instance, LaserVertex, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
 use std::array::IntoIter;
@@ -85,7 +85,7 @@ pub fn debug_render_find_ship_under_cursor(
     )>,
     ray: Res<Ray>,
     models: Res<Models>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut lines_buffer: ResMut<GpuBuffer<ColouredVertex>>,
 ) {
     if let Some((tri, _, position, rotation, scale)) = query
         .iter()
@@ -104,36 +104,36 @@ pub fn debug_render_find_ship_under_cursor(
         .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
     {
         lines_buffer.stage(&[
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * tri.a * scale,
                 colour: Vec3::unit_x(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a) * scale,
                 colour: Vec3::unit_y(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * (tri.a + tri.edge_b_a) * scale,
                 colour: Vec3::unit_y(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a) * scale,
                 colour: Vec3::unit_z(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * (tri.a + tri.edge_c_a) * scale,
                 colour: Vec3::unit_z(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: position.0 + rotation.matrix * tri.a * scale,
                 colour: Vec3::unit_x(),
             },
             /*
-            BackgroundVertex {
+            ColouredVertex {
                 position: ray.get_intersection_point(t) - Vec3::broadcast(0.5),
                 colour: Vec3::unit_x(),
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: ray.get_intersection_point(t) + Vec3::broadcast(0.5),
                 colour: Vec3::unit_x(),
             },
@@ -163,7 +163,7 @@ pub fn render_projectiles(query: Query<&Projectile>, mut lasers: ResMut<GpuBuffe
 
 pub fn render_movement_circle(
     mut circle_instances: ResMut<GpuBuffer<CircleInstance>>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut lines_buffer: ResMut<GpuBuffer<ColouredVertex>>,
     average_selected_position: Res<AverageSelectedPosition>,
     mouse_mode: Res<MouseMode>,
 ) {
@@ -188,27 +188,27 @@ pub fn render_movement_circle(
         }]);
 
         lines_buffer.stage(&[
-            BackgroundVertex {
+            ColouredVertex {
                 position: avg,
                 colour,
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: point,
                 colour,
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: point,
                 colour,
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: circle_center,
                 colour,
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: circle_center,
                 colour,
             },
-            BackgroundVertex {
+            ColouredVertex {
                 position: avg,
                 colour,
             },
@@ -219,7 +219,7 @@ pub fn render_movement_circle(
 pub fn debug_render_targets(
     query: Query<(&Position, &CommandQueue), With<Selected>>,
     positions: Query<&Position>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut lines_buffer: ResMut<GpuBuffer<ColouredVertex>>,
 ) {
     query.for_each(|(position, queue)| {
         let target_pos = match queue.0.front() {
@@ -232,11 +232,11 @@ pub fn debug_render_targets(
 
         if let Some(target_pos) = target_pos {
             lines_buffer.stage(&[
-                BackgroundVertex {
+                ColouredVertex {
                     position: position.0,
                     colour: Vec3::zero(),
                 },
-                BackgroundVertex {
+                ColouredVertex {
                     position: target_pos,
                     colour: Vec3::one(),
                 },
@@ -533,7 +533,7 @@ pub fn render_3d_ship_stats(
 #[profiling::function]
 pub fn debug_render_tlas(
     tlas: Res<TopLevelAccelerationStructure>,
-    mut lines_buffer: ResMut<GpuBuffer<BackgroundVertex>>,
+    mut lines_buffer: ResMut<GpuBuffer<ColouredVertex>>,
     settings: Res<Settings>,
 ) {
     if !settings.debug_render_tlas {
@@ -549,7 +549,7 @@ pub fn debug_render_tlas(
             };
 
             for point in IntoIter::new(bounding_box.line_points()) {
-                lines_buffer.stage(&[BackgroundVertex {
+                lines_buffer.stage(&[ColouredVertex {
                     position: point,
                     colour,
                 }])

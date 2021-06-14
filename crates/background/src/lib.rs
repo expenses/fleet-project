@@ -1,4 +1,4 @@
-use components_and_resources::{gpu_structs::BackgroundVertex, utils::uniform_sphere_distribution};
+use components_and_resources::{gpu_structs::ColouredVertex, utils::uniform_sphere_distribution};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use spade::delaunay::FloatDelaunayTriangulation;
@@ -6,7 +6,7 @@ use tint::Colour;
 use ultraviolet::{Rotor3, Vec2, Vec3};
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
-pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {
+pub fn make_background(rng: &mut ThreadRng) -> (Vec<ColouredVertex>, Vec3) {
     let nebula_colour = Colour::new(
         rng.gen_range(0.0..360.0),
         1.0,
@@ -24,13 +24,13 @@ pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();
 
     // Get the point to rotate the sphere around
-    let target_point = ColouredVertex::rand(rng, Rotor3::identity(), nebula_colour);
+    let target_point = ProjectedVertex::rand(rng, Rotor3::identity(), nebula_colour);
 
     // Get the rotation to that point
     let rotation = Rotor3::from_rotation_between(target_point.unit_pos, Vec3::unit_z());
 
     for _ in 0..100 {
-        dlt.insert(ColouredVertex::rand(rng, rotation, nebula_colour));
+        dlt.insert(ProjectedVertex::rand(rng, rotation, nebula_colour));
     }
 
     let triangles_to_fill_gap = dlt
@@ -48,7 +48,7 @@ pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {
         // chain with gap triangles
         .chain(triangles_to_fill_gap)
         // map to game vertices
-        .map(|vertex| BackgroundVertex {
+        .map(|vertex| ColouredVertex {
             position: vertex.unit_pos * 1000.0,
             colour: vertex.colour,
         })
@@ -65,13 +65,13 @@ pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
-struct ColouredVertex {
+struct ProjectedVertex {
     unit_pos: Vec3,
     projected: Vec2,
     colour: Vec3,
 }
 
-impl ColouredVertex {
+impl ProjectedVertex {
     fn rand(rng: &mut ThreadRng, rotation: Rotor3, colour: Vec3) -> Self {
         use noise::{NoiseFn, Seedable};
 
@@ -96,7 +96,7 @@ impl ColouredVertex {
     }
 }
 
-impl spade::PointN for ColouredVertex {
+impl spade::PointN for ProjectedVertex {
     type Scalar = f32;
 
     fn dimensions() -> usize {
@@ -116,9 +116,9 @@ impl spade::PointN for ColouredVertex {
     }
 }
 
-impl spade::TwoDimensional for ColouredVertex {}
+impl spade::TwoDimensional for ProjectedVertex {}
 
-pub fn create_stars(rng: &mut ThreadRng) -> impl Iterator<Item = BackgroundVertex> + '_ {
+pub fn create_stars(rng: &mut ThreadRng) -> impl Iterator<Item = ColouredVertex> + '_ {
     (0..2000).flat_map(move |_| {
         let unit_pos = uniform_sphere_distribution(rng);
         star_points(unit_pos, 1.0, Vec3::one())
@@ -129,7 +129,7 @@ pub fn star_points(
     unit_pos: Vec3,
     scale: f32,
     colour: Vec3,
-) -> impl Iterator<Item = BackgroundVertex> {
+) -> impl Iterator<Item = ColouredVertex> {
     let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), unit_pos);
 
     let mut points = [
@@ -143,7 +143,7 @@ pub fn star_points(
 
     rotation.rotate_vecs(&mut points);
 
-    std::array::IntoIter::new(points).map(move |point| BackgroundVertex {
+    std::array::IntoIter::new(points).map(move |point| ColouredVertex {
         position: point + unit_pos * 1500.0,
         colour,
     })

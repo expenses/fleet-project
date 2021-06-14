@@ -30,7 +30,7 @@ pub struct ModelVertex {
 
 #[repr(C)]
 #[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct BackgroundVertex {
+pub struct ColouredVertex {
     pub position: Vec3,
     pub colour: Vec3,
 }
