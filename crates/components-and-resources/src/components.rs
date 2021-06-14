@@ -127,10 +127,40 @@ impl Spin {
 
 pub struct CameraFollowing;
 
+pub trait ToSideEnum {
+    const SIDE_ENUM: UnitSide;
+}
+
 #[derive(Default)]
 pub struct Friendly;
+
+impl ToSideEnum for Friendly {
+    const SIDE_ENUM: UnitSide = UnitSide::Friendly;
+}
+
 #[derive(Default)]
 pub struct Enemy;
+
+impl ToSideEnum for Enemy {
+    const SIDE_ENUM: UnitSide = UnitSide::Enemy;
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum UnitSide {
+    Friendly,
+    Enemy,
+    Neutral,
+}
+
+impl UnitSide {
+    pub fn new(friendly: bool, enemy: bool) -> Self {
+        match (friendly, enemy) {
+            (true, false) => Self::Friendly,
+            (false, true) => Self::Enemy,
+            _ => Self::Neutral,
+        }
+    }
+}
 
 pub struct Evading(pub Entity);
 

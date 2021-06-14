@@ -2,11 +2,12 @@ use super::{get_scale, spawn_explosion};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
+use ultraviolet::Vec3;
 
 #[profiling::function]
 pub fn collide_projectiles<Side>(
     projectiles: Query<(Entity, &Projectile), With<Side>>,
-    ships: Query<(&Position, &RotationMatrix, &ModelId, Option<&Scale>), Without<Side>>,
+    ships: Query<(&RotationMatrix, &ModelId, Option<&Scale>), Without<Side>>,
     models: Res<Models>,
     delta_time: Res<DeltaTime>,
     total_time: Res<TotalTime>,
@@ -16,7 +17,7 @@ pub fn collide_projectiles<Side>(
     rng: ResMut<SmallRng>,
     bvh: Res<TopLevelAccelerationStructure>,
 ) where
-    Side: Send + Sync + 'static,
+    Side: ToSideEnum + Send + Sync + 'static,
 {
     let on_hit_resources = parking_lot::Mutex::new((commands, health, rng));
 
@@ -30,18 +31,22 @@ pub fn collide_projectiles<Side>(
                 |ship_bounding_box| bounding_box.intersects(ship_bounding_box),
                 &mut find_stack,
             )
-            .filter_map(|&entity| {
+            .filter_map(|&(entity, pos, side)| {
+                if side == Side::SIDE_ENUM {
+                    return None;
+                }
+
                 ships
                     .get(entity)
                     .ok()
-                    .map(|components| (entity, components))
+                    .map(|components| (entity, pos, components))
             })
-            .flat_map(|(ship_entity, (position, rotation, model_id, scale))| {
+            .flat_map(|(ship_entity, position, (rotation, model_id, scale))| {
                 let scale = get_scale(scale);
 
                 let ray = projectile
                     .as_limited_ray(delta_time.0)
-                    .centered_around_transform(position.0, rotation.reversed, scale);
+                    .centered_around_transform(position, rotation.reversed, scale);
 
                 models
                     .get(*model_id)
@@ -65,7 +70,7 @@ pub fn collide_projectiles<Side>(
         }
     });
 }
-
+/*
 #[profiling::function]
 pub fn choose_enemy_target<SideA, SideB>(
     mut query: Query<
@@ -113,6 +118,7 @@ pub fn choose_enemy_target<SideA, SideB>(
         }
     });
 }
+*/
 
 pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
     mut query: Query<
@@ -168,3 +174,61 @@ pub fn spawn_projectile_from_ships<Side: Send + Sync + Default + 'static>(
         ));
     })
 }
+
+
+#[profiling::function]
+pub fn choose_enemy_target<SideA, SideB>(
+    mut query: Query<
+        (Entity, &Position, &AgroRange, &mut CommandQueue),
+        (With<SideA>, With<CanAttack>),
+    >,
+    mut commands: Commands,
+    tlas: Res<TopLevelAccelerationStructure>,
+) where
+    SideA: Send + Sync + 'static,
+    SideB: ToSideEnum + Send + Sync + 'static,
+{
+    query.for_each_mut(|(entity, pos, agro_range, mut queue)| {
+        match queue.0.front() {
+            None
+            | Some(Command::MoveTo {
+                ty: MoveType::Attack,
+                ..
+            }) => {}
+            _ => return,
+        };
+
+        let agro_range_sq = agro_range.0 * agro_range.0;
+
+        let bbox =
+        BoundingBox::new(-Vec3::broadcast(agro_range.0), Vec3::broadcast(agro_range.0)) + pos.0;
+
+        let mut find_stack = Vec::with_capacity(10);
+
+        let target = tlas.find(|bounding_box| bbox.intersects(bounding_box), &mut find_stack)
+            .filter_map(|&(target_entity, target_pos, target_side)| {
+                if target_side != SideB::SIDE_ENUM {
+                    return None;
+                }
+
+                let dist_sq = (target_pos - pos.0).mag_sq();
+
+                if dist_sq < agro_range_sq {
+                    Some((target_entity, dist_sq))
+                } else {
+                    None
+                }
+            })
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((target_entity, _)) = target {
+            queue.0.push_front(Command::Interact {
+                target: target_entity,
+                ty: InteractionType::Attack,
+                range_sq: 0.0,
+            });
+            commands.entity(target_entity).insert(Evading(entity));
+        }
+    });
+}
+

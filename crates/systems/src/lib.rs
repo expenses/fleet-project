@@ -162,7 +162,11 @@ fn unload(params: UnloadParams) {
         selected,
     } = params;
 
+    let mut unloaded_any = false;
+
     carrying.drain().for_each(|entity| {
+        unloaded_any = true;
+
         unload_single(
             pos,
             entity,
@@ -174,7 +178,9 @@ fn unload(params: UnloadParams) {
         );
     });
 
-    commands.entity(entity).remove::<CarrierFull>();
+    if unloaded_any {
+        commands.entity(entity).remove::<CarrierFull>();
+    }
 }
 
 fn unload_of_type(params: UnloadParams, models: &Query<&ModelId>, ty: ModelId) {
@@ -441,13 +447,23 @@ pub fn set_selected_button(
 
 #[profiling::function]
 pub fn update_tlas(
-    mut tlas: ResMut<DynamicBvh<Entity>>,
+    mut tlas: ResMut<TopLevelAccelerationStructure>,
     // We need to filter to ships that have a `Position` here to prevent carried ships being re-added to
     // the TLAS.
-    mut query: Query<(Entity, &WorldSpaceBoundingBox, Option<&mut TlasIndex>), With<Position>>,
+    mut query: Query<
+        (
+            Entity,
+            &Position,
+            &WorldSpaceBoundingBox,
+            Option<&mut TlasIndex>,
+            Option<&Friendly>,
+            Option<&Enemy>,
+        ),
+        With<Position>,
+    >,
     mut commands: Commands,
 ) {
-    query.for_each_mut(|(entity, bbox, tlas_index)| {
+    query.for_each_mut(|(entity, pos, bbox, tlas_index, friendly, enemy)| {
         let padded_bounding_box = bbox.0.expand(0.5);
 
         match tlas_index {
@@ -456,11 +472,16 @@ pub fn update_tlas(
                     tlas.modify_bounding_box_and_refit(tlas_index.index, padded_bounding_box);
                     tlas_index.padded_bounding_box = padded_bounding_box;
                 }
+
+                if let Some((_, stored_pos, _)) = tlas.get_data_mut(tlas_index.index) {
+                    *stored_pos = pos.0;
+                }
             }
             None => {
-                let index = tlas.insert(entity, padded_bounding_box);
+                let side = UnitSide::new(friendly.is_some(), enemy.is_some());
+
                 commands.entity(entity).insert(TlasIndex {
-                    index,
+                    index: tlas.insert((entity, pos.0, side), padded_bounding_box),
                     padded_bounding_box,
                 });
             }

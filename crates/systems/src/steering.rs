@@ -222,7 +222,6 @@ pub fn run_avoidance(
     boids: Query<(
         Option<&CommandQueue>,
         Option<&Unloading>,
-        &Position,
         &Velocity,
         &MaxSpeed,
     )>,
@@ -261,13 +260,13 @@ pub fn run_avoidance(
                     |bounding_box| bbox.intersects(bounding_box),
                     &mut find_stack,
                 )
-                .filter_map(|&entity| {
+                .filter_map(|&(entity, pos, _side)| {
                     boids
                         .get(entity)
                         .ok()
-                        .map(|components| (entity, components))
+                        .map(|components| (entity, pos, components))
                 })
-                .filter(|&(avoid_entity, (avoid_queue, unloading, ..))| {
+                .filter(|&(avoid_entity, _, (avoid_queue, unloading, ..))| {
                     let avoid_entity_carry_target = get_be_carried_by_entity(avoid_queue);
                     let boid_is_unloading = unloading.is_some();
 
@@ -275,7 +274,7 @@ pub fn run_avoidance(
                         && avoid_entity_carry_target != Some(entity)
                         && !(is_carrier && boid_is_unloading)
                 })
-                .map(|(_, (.., p, v, ms))| to_boid(p, v, ms));
+                .map(|(_, p, (.., v, ms))| to_boid(&Position(p), v, ms));
 
             steering_avoidance_force.0 = boid.avoidance(iter) * 0.1;
         },

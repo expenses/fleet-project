@@ -11,7 +11,7 @@ pub use rand::rngs::SmallRng;
 pub use ray_collisions::{BoundingBox, DynamicBvh, Projectile, Ray, SelectionFrustum};
 pub use structopt::StructOpt;
 
-use crate::components::{ModelId, MoveType};
+use crate::components::{ModelId, MoveType, UnitSide};
 use crate::model::Model;
 use bevy_ecs::prelude::Entity;
 use ultraviolet::{Mat4, Vec2, Vec3};
@@ -27,7 +27,7 @@ pub struct Settings {
 #[derive(Default)]
 pub struct GlobalMinerals(pub f32);
 
-pub type TopLevelAccelerationStructure = DynamicBvh<Entity>;
+pub type TopLevelAccelerationStructure = DynamicBvh<(Entity, Vec3, UnitSide)>;
 
 pub struct MiscTextures {
     pub mined_out_asteroid: u32,

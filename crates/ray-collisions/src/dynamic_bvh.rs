@@ -380,6 +380,10 @@ impl<T> DynamicBvh<T> {
             .iter()
             .map(|(_, node)| (node.bounding_box, node.data.is_some()))
     }
+
+    pub fn get_data_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.nodes[index].data.as_mut()
+    }
 }
 
 pub struct BvhIterator<'a, T, FN> {
