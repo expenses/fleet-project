@@ -1,11 +1,9 @@
-use components_and_resources::{gpu_structs::BackgroundVertex, utils};
+use components_and_resources::{gpu_structs::BackgroundVertex, utils::uniform_sphere_distribution};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use spade::delaunay::FloatDelaunayTriangulation;
 use tint::Colour;
 use ultraviolet::{Rotor3, Vec2, Vec3};
-
-pub use utils::uniform_sphere_distribution;
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 pub fn make_background(rng: &mut ThreadRng) -> (Vec<BackgroundVertex>, Vec3) {

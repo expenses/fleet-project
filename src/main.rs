@@ -5,15 +5,14 @@ use wgpu::util::DeviceExt;
 use winit::event::*;
 use winit::event_loop::*;
 
-mod background;
-
 use bevy_ecs::prelude::{IntoSystem, ParallelSystemDescriptorCoercion, Stage};
-use components_and_resources::gpu_structs::*;
-use components_and_resources::model::{load_image_from_bytes, load_ship_model};
 use components_and_resources::{
     components,
+    gpu_structs::*,
+    model::{load_image_from_bytes, load_ship_model},
     resources::{self, StructOpt},
     texture_manager::TextureManager,
+    utils::uniform_sphere_distribution,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -72,7 +71,7 @@ fn main() -> anyhow::Result<()> {
     let mut rng = rand::thread_rng();
     let (mut background, ambient_light) = background::make_background(&mut rng);
 
-    let mut sun_dir = background::uniform_sphere_distribution(&mut rng);
+    let mut sun_dir = uniform_sphere_distribution(&mut rng);
     sun_dir.y = sun_dir.y.abs();
 
     let stars = background::create_stars(&mut rng)
@@ -172,7 +171,7 @@ fn main() -> anyhow::Result<()> {
             rng.gen_range(-50.0..=10.0),
             rng.gen_range(-400.0..400.0),
         );
-        let facing = background::uniform_sphere_distribution(&mut rng);
+        let facing = uniform_sphere_distribution(&mut rng);
         let rotation = Rotor3::from_rotation_between(Vec3::unit_y(), facing);
 
         world.spawn().insert_bundle((
@@ -181,7 +180,7 @@ fn main() -> anyhow::Result<()> {
             components::RotationMatrix::default(),
             components::ModelId::Asteroid,
             components::WorldSpaceBoundingBox::default(),
-            components::Spin::new(background::uniform_sphere_distribution(&mut rng)),
+            components::Spin::new(uniform_sphere_distribution(&mut rng)),
             components::Scale(rng.gen_range(1.0..5.0)),
             components::Health::new(1000.0),
             components::Selectable,

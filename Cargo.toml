@@ -18,13 +18,9 @@ bevy_tasks = "0.5.0"
 env_logger = "0.8.3"
 wgpu_glyph = "0.12.0"
 
-# Background
-spade = "1.8.2"
-tint = "1.0.1"
-noise = { version = "0.7.0", default-features = false }
-
 colstodian = { git = "https://github.com/termhn/colstodian", branch = "main" }
 
+background = { path = "crates/background" }
 systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
@@ -36,11 +32,18 @@ tracy = ["systems/tracy"]
 [workspace]
 members = [
     ".",
+    "crates/background",
     "crates/components-and-resources",
     "crates/systems",
     "crates/rendering",
     "crates/ray-collisions",
 ]
+
+[profile.dev.package."background"]
+opt-level = 3
+
+[profile.dev.package."components-and-resources"]
+opt-level = 3
 
 [profile.dev.package."systems"]
 opt-level = 3

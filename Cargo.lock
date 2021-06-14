@@ -192,6 +192,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
+name = "background"
+version = "0.1.0"
+dependencies = [
+ "components-and-resources",
+ "noise",
+ "rand 0.8.3",
+ "spade",
+ "tint",
+ "ultraviolet",
+]
+
+[[package]]
 name = "bevy_derive"
 version = "0.5.0"
 source = "git+https://github.com/NathanSWard/bevy?branch=nward/commands-error-handling#1e753f85b661f0d0d19665e37844db49721843f7"
@@ -865,19 +877,17 @@ name = "fleet-renderer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "background",
  "bevy_ecs",
  "bevy_tasks",
  "bytemuck",
  "colstodian",
  "components-and-resources",
  "env_logger",
- "noise",
  "pollster",
  "rand 0.8.3",
  "rendering",
- "spade",
  "systems",
- "tint",
  "ultraviolet",
  "web-sys",
  "wgpu",
@@ -2643,7 +2653,6 @@ dependencies = [
  "bevy_tasks",
  "bytemuck",
  "components-and-resources",
- "glyph_brush",
  "log",
  "parking_lot",
  "profiling",
