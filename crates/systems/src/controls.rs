@@ -309,6 +309,7 @@ pub fn handle_keys(
     total_time: Res<TotalTime>,
     carriers: Query<(Entity, &Position), (With<Carrying>, Without<CarrierFull>)>,
     mut build_queues: Query<&mut BuildQueue, SelectedFriendly>,
+    mut global_minerals: ResMut<GlobalMinerals>,
 ) {
     if keyboard_state.stop.0 {
         query_set.q0_mut().for_each_mut(|mut queue| {
@@ -380,13 +381,18 @@ pub fn handle_keys(
     };
 
     if let Some(build_ship_type) = build_ship_type {
-        let best_queue = build_queues
-            .iter_mut()
-            .map(|queue| (queue.queue_length(total_time.0), queue))
-            .min_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let cost = build_ship_type.build_cost();
+        if cost <= global_minerals.0 {
+            global_minerals.0 -= cost;
 
-        if let Some((_, mut queue)) = best_queue {
-            queue.push(build_ship_type, total_time.0);
+            let best_queue = build_queues
+                .iter_mut()
+                .map(|queue| (queue.queue_length(total_time.0), queue))
+                .min_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            if let Some((_, mut queue)) = best_queue {
+                queue.push(build_ship_type, total_time.0);
+            }
         }
     }
 }
