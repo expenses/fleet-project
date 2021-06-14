@@ -48,7 +48,11 @@ impl Formation {
 
         let middle_x = (width - 1) as f32 / 2.0;
 
-        let middle_y = (count as f32 / width as f32).floor() / 2.0;
+        let middle_y = if width == count {
+            0.0
+        } else {
+            (count as f32 / width as f32).floor() / 2.0
+        };
 
         Self {
             positions: (0..count)
