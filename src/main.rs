@@ -136,9 +136,10 @@ fn main() -> anyhow::Result<()> {
 
         let carrier_crew = if is_carrier {
             Some(vec![
-                world.spawn().insert(components::PersonType::Engineer).id(),
-                world.spawn().insert(components::PersonType::Engineer).id(),
-                world.spawn().insert(components::PersonType::Civilian).id(),
+                world.spawn().insert(components::Engineer).id(),
+                world.spawn().insert(components::Engineer).id(),
+                world.spawn().id(),
+                world.spawn().insert(components::Researcher).id(),
             ])
         } else {
             None
@@ -345,6 +346,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::SelectedButton::default());
     world.insert_resource(resources::TopLevelAccelerationStructure::default());
     world.insert_resource(resources::GlobalMinerals::default());
+    world.insert_resource(resources::GlobalResearch::default());
     world.insert_resource(settings);
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
@@ -378,6 +380,7 @@ fn main() -> anyhow::Result<()> {
         .with_system(systems::count_selected.system())
         .with_system(systems::set_selected_button.system())
         .with_system(systems::repair_ships.system())
+        .with_system(systems::perform_research.system())
         .with_system(systems::mine.system().label("mine").after("vel"))
         // Buffer clears
         .with_system(systems::clear_ship_buffer.system())

@@ -357,7 +357,7 @@ pub fn render_3d_ship_stats(
         ),
         Without<Enemy>,
     >,
-    people: Query<&PersonType>,
+    people: Query<(Option<&Engineer>, Option<&Researcher>)>,
     carried_ships: Query<(&ModelId, &Health)>,
     mut glyph_layout_cache: ResMut<GlyphLayoutCache>,
     perspective_view: Res<PerspectiveView>,
@@ -449,15 +449,17 @@ pub fn render_3d_ship_stats(
                     glyph_layout_cache
                         .push(format_args!("On Board: {}\n", on_board.0.len()), [1.0; 4]);
 
-                    let mut counts = [0; PersonType::COUNT];
+                    let mut counts = [0; PersonEnum::COUNT];
 
                     on_board.0.iter().for_each(|&entity| {
-                        if let Ok(person_ty) = people.get(entity) {
-                            counts[*person_ty as usize] += 1;
+                        if let Ok((engineer, researcher)) = people.get(entity) {
+                            let person_enum =
+                                PersonEnum::new(engineer.is_some(), researcher.is_some());
+                            counts[person_enum as usize] += 1;
                         }
                     });
 
-                    for person_ty in IntoIter::new(PersonType::ARRAY) {
+                    for person_ty in IntoIter::new(PersonEnum::ARRAY) {
                         let count = counts[person_ty as usize];
 
                         if count > 0 {

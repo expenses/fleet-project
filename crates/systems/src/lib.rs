@@ -352,6 +352,7 @@ pub fn count_selected(
     all_models: Query<&ModelId>,
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
+    global_research: Res<GlobalResearch>,
 ) {
     buttons.0.clear();
 
@@ -359,6 +360,11 @@ pub fn count_selected(
 
     glyph_layout_cache.push(
         format_args!("Global Minerals: {}\n", global_minerals.0),
+        [1.0; 4],
+    );
+
+    glyph_layout_cache.push(
+        format_args!("Global Research: {:.2}\n", global_research.0),
         [1.0; 4],
     );
 

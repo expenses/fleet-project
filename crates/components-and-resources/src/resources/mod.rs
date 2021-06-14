@@ -25,6 +25,9 @@ pub struct Settings {
 }
 
 #[derive(Default)]
+pub struct GlobalResearch(pub f32);
+
+#[derive(Default)]
 pub struct GlobalMinerals(pub f32);
 
 pub type TopLevelAccelerationStructure = DynamicBvh<Entity>;
@@ -39,7 +42,7 @@ pub struct UnitButtons(pub Vec<(ModelId, UnitStatus)>);
 impl UnitButtons {
     pub const LINE_HEIGHT: f32 = 18.0;
     pub const BUTTON_WIDTH: f32 = 130.0;
-    pub const UI_LINES: isize = 1;
+    pub const UI_LINES: isize = 2;
 }
 
 #[derive(Default)]

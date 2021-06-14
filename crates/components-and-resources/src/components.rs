@@ -8,9 +8,11 @@ use ultraviolet::{Mat3, Rotor3, Vec3};
 
 mod build_queue;
 mod functions;
+mod people;
 
 pub use build_queue::*;
 pub use functions::*;
+pub use people::*;
 
 #[derive(Debug)]
 pub struct Position(pub Vec3);
@@ -237,17 +239,6 @@ pub struct Selectable;
 #[derive(Debug)]
 pub struct OnBoard(pub Vec<Entity>);
 
-#[derive(Clone, Copy, Debug)]
-pub enum PersonType {
-    Civilian = 0,
-    Engineer = 1,
-}
-
-impl PersonType {
-    pub const COUNT: usize = 2;
-    pub const ARRAY: [Self; Self::COUNT] = [Self::Civilian, Self::Engineer];
-}
-
 pub struct CanMine;
 pub struct CanBeMined {
     pub total: f32,
@@ -288,3 +279,5 @@ pub struct TlasIndex {
 }
 
 pub struct CarrierFull;
+
+pub struct ResearchMultiplier(pub f32);
