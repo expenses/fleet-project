@@ -73,12 +73,15 @@ pub fn choose_enemy_target<SideA, SideB>(
         (With<SideA>, With<CanAttack>),
     >,
     candidates: Query<(Entity, &Position), With<SideB>>,
-    mut commands: Commands,
+    commands: Commands,
+    task_pool: Res<bevy_tasks::TaskPool>,
 ) where
     SideA: Send + Sync + 'static,
     SideB: Send + Sync + 'static,
 {
-    query.for_each_mut(|(entity, pos, agro_range, mut queue)| {
+    let commands = parking_lot::Mutex::new(commands);
+
+    query.par_for_each_mut(&task_pool, 8, |(entity, pos, agro_range, mut queue)| {
         match queue.0.front() {
             None
             | Some(Command::MoveTo {
@@ -109,7 +112,7 @@ pub fn choose_enemy_target<SideA, SideB>(
                 ty: InteractionType::Attack,
                 range_sq: 0.0,
             });
-            commands.entity(target_entity).insert(Evading(entity));
+            commands.lock().entity(target_entity).insert(Evading(entity));
         }
     });
 }
