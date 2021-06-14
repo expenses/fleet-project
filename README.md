@@ -5,7 +5,6 @@
 # todo
 
 * proper ui
-* allow for ship construction from minerals
 * health bars?
 * resize ships
 * evasion/fleeing is kinda wierd and hard to get right - consider removing.
