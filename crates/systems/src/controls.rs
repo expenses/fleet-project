@@ -1,5 +1,5 @@
 use crate::find_functions::find_next_carrier;
-use crate::{average, get_scale, unload, SelectedFriendly};
+use crate::{average, get_scale, unload, unload_of_type, SelectedFriendly, UnloadParams};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::formations::Formation;
@@ -69,6 +69,11 @@ pub fn handle_left_click(
     unit_buttons: Res<UnitButtons>,
     selected_button: Res<SelectedButton>,
     button_selection: Query<(Entity, &ModelId, Option<&Friendly>, Option<&Enemy>)>,
+    mut carrying: Query<(Entity, &Position, &mut Carrying), SelectedFriendly>,
+    mut movement: Query<(&mut Velocity, &mut CommandQueue)>,
+    models: Query<&ModelId>,
+    mut rng: ResMut<SmallRng>,
+    total_time: Res<TotalTime>,
 ) {
     if !mouse_button.left_state.was_clicked() {
         return;
@@ -77,8 +82,23 @@ pub fn handle_left_click(
     if let Some(button_index) = selected_button.0 {
         if let Some((button_model, button_status)) = unit_buttons.0.get(button_index) {
             let is_being_carried = matches!(button_status, UnitStatus::Friendly { carried: true });
-            // can't handle this case yet
             if is_being_carried {
+                carrying.for_each_mut(|(entity, pos, mut carrying)| {
+                    unload_of_type(
+                        UnloadParams {
+                            entity,
+                            pos: pos.0,
+                            carrying: &mut carrying,
+                            rng: &mut rng,
+                            total_time: total_time.0,
+                            commands: &mut commands,
+                            movement: &mut movement,
+                            selected: true,
+                        },
+                        &models,
+                        *button_model,
+                    );
+                });
                 return;
             }
             button_selection.for_each(|(entity, model_id, friendly, enemy)| {
@@ -323,16 +343,16 @@ pub fn handle_keys(
 
     if keyboard_state.unload.0 {
         carrying.for_each_mut(|(entity, pos, mut carrying)| {
-            unload(
+            unload(UnloadParams {
                 entity,
-                pos.0,
-                &mut carrying,
-                &mut *rng,
-                total_time.0,
-                &mut commands,
-                &mut query_set.q1_mut(),
-                true,
-            );
+                pos: pos.0,
+                carrying: &mut carrying,
+                rng: &mut *rng,
+                total_time: total_time.0,
+                commands: &mut commands,
+                movement: &mut query_set.q1_mut(),
+                selected: true,
+            });
         });
 
         build_queues.for_each_mut(|mut queue| {

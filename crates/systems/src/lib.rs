@@ -99,16 +99,16 @@ pub fn handle_destruction(
             }
 
             if let Some(mut carrying) = carrying {
-                unload(
+                unload(UnloadParams {
                     entity,
-                    pos.0,
-                    &mut carrying,
-                    &mut *rng,
-                    total_time.0,
-                    &mut commands,
-                    &mut movement,
-                    selected.is_some(),
-                );
+                    pos: pos.0,
+                    carrying: &mut carrying,
+                    rng: &mut *rng,
+                    total_time: total_time.0,
+                    commands: &mut commands,
+                    movement: &mut movement,
+                    selected: selected.is_some(),
+                });
             }
 
             commands.entity(entity).despawn();
@@ -139,17 +139,28 @@ fn spawn_explosion(pos: Vec3, total_time: f32, rng: &mut SmallRng, commands: &mu
     ));
 }
 
-fn unload(
+struct UnloadParams<'caller, 'q, 'cm, 'v, 'cq> {
     entity: Entity,
     pos: Vec3,
-    carrying: &mut Carrying,
-    rng: &mut SmallRng,
+    carrying: &'caller mut Carrying,
+    rng: &'caller mut SmallRng,
     total_time: f32,
-    commands: &mut Commands,
-    movement: &mut Query<(&mut Velocity, &mut CommandQueue)>,
+    commands: &'caller mut Commands<'cm>,
+    movement: &'caller mut Query<'q, (&'v mut Velocity, &'cq mut CommandQueue)>,
     selected: bool,
-) {
-    commands.entity(entity).remove::<CarrierFull>();
+}
+
+fn unload(params: UnloadParams) {
+    let UnloadParams {
+        entity,
+        pos,
+        carrying,
+        rng,
+        total_time,
+        commands,
+        movement,
+        selected,
+    } = params;
 
     carrying.drain().for_each(|entity| {
         unload_single(
@@ -161,7 +172,45 @@ fn unload(
             commands,
             selected,
         );
-    })
+    });
+
+    commands.entity(entity).remove::<CarrierFull>();
+}
+
+fn unload_of_type(params: UnloadParams, models: &Query<&ModelId>, ty: ModelId) {
+    let UnloadParams {
+        entity,
+        pos,
+        carrying,
+        rng,
+        total_time,
+        commands,
+        movement,
+        selected,
+    } = params;
+
+    let mut unloaded_any = false;
+
+    carrying
+        .drain()
+        .filter(|&entity| models.get(entity).ok() == Some(&ty))
+        .for_each(|entity| {
+            unload_single(
+                pos,
+                entity,
+                rng,
+                total_time,
+                movement.get_mut(entity).ok(),
+                commands,
+                selected,
+            );
+
+            unloaded_any = true;
+        });
+
+    if unloaded_any {
+        commands.entity(entity).remove::<CarrierFull>();
+    }
 }
 
 fn unload_single<V, M>(
