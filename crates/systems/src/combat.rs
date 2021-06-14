@@ -112,7 +112,10 @@ pub fn choose_enemy_target<SideA, SideB>(
                 ty: InteractionType::Attack,
                 range_sq: 0.0,
             });
-            commands.lock().entity(target_entity).insert(Evading(entity));
+            commands
+                .lock()
+                .entity(target_entity)
+                .insert(Evading(entity));
         }
     });
 }

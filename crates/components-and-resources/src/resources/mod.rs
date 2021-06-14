@@ -75,11 +75,7 @@ pub struct Paused(pub bool);
 
 pub enum MouseMode {
     Normal,
-    Movement {
-        plane_y: f32,
-        xz: Vec2,
-        ty: MoveType,
-    },
+    Movement { point_on_plane: Vec3, ty: MoveType },
 }
 
 #[derive(Default)]

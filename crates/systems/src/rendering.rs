@@ -167,13 +167,12 @@ pub fn render_movement_circle(
     average_selected_position: Res<AverageSelectedPosition>,
     mouse_mode: Res<MouseMode>,
 ) {
-    if let (Some(avg), MouseMode::Movement { plane_y, xz, ty }) =
+    if let (Some(avg), &MouseMode::Movement { point_on_plane, ty }) =
         (average_selected_position.0, &*mouse_mode)
     {
-        let point = Vec3::new(xz.x, *plane_y, xz.y);
-        let circle_center = Vec3::new(avg.x, *plane_y, avg.z);
+        let circle_center = Vec3::new(avg.x, point_on_plane.y, avg.z);
 
-        let scale = (point - circle_center).mag();
+        let scale = (point_on_plane - circle_center).mag();
 
         let colour = match ty {
             MoveType::Normal => Vec3::unit_y(),
@@ -193,11 +192,11 @@ pub fn render_movement_circle(
                 colour,
             },
             ColouredVertex {
-                position: point,
+                position: point_on_plane,
                 colour,
             },
             ColouredVertex {
-                position: point,
+                position: point_on_plane,
                 colour,
             },
             ColouredVertex {

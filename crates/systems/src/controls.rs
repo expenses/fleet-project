@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::formations::Formation;
 use components_and_resources::resources::*;
-use ultraviolet::{Vec2, Vec3};
+use ultraviolet::Vec3;
 
 pub fn find_ship_under_cursor(
     query: Query<
@@ -233,16 +233,13 @@ pub fn handle_right_clicks(
             *mouse_mode = match *mouse_mode {
                 MouseMode::Normal => match average_selected_position.0 {
                     Some(avg) => MouseMode::Movement {
-                        plane_y: avg.y,
-                        xz: Vec2::zero(),
+                        point_on_plane: Vec3::new(0.0, avg.y, 0.0),
                         ty: MoveType::Normal,
                     },
                     _ => MouseMode::Normal,
                 },
-                MouseMode::Movement { ty, xz, plane_y } => {
+                MouseMode::Movement { ty, point_on_plane } => {
                     if let Some(avg) = average_selected_position.0 {
-                        let point = Vec3::new(xz.x, plane_y, xz.y);
-
                         let mut count = 0;
                         let mut all_fighters = true;
 
@@ -251,10 +248,17 @@ pub fn handle_right_clicks(
                             all_fighters &= model_id == ModelId::Fighter;
                         });
 
-                        let mut formation = if all_fighters {
-                            Formation::fighter_screen(point, (point - avg).normalized(), count, 5.0)
+                        let mut formation = if count == 1 {
+                            Formation::at_point(point_on_plane, count)
+                        } else if all_fighters {
+                            Formation::fighter_screen(
+                                point_on_plane,
+                                (point_on_plane - avg).normalized(),
+                                count,
+                                5.0,
+                            )
                         } else {
-                            Formation::in_sphere(point, count)
+                            Formation::in_sphere(point_on_plane, count)
                         };
 
                         query_set.q0_mut().for_each_mut(|(pos, mut queue)| {
@@ -283,17 +287,17 @@ pub fn update_ray_plane_point(
     keyboard_state: Res<KeyboardState>,
 ) {
     if let MouseMode::Movement {
-        plane_y,
-        ref mut xz,
+        ref mut point_on_plane,
         ..
     } = &mut *mouse_mode
     {
         if !keyboard_state.shift {
             if let Some(point) = ray
-                .y_plane_intersection(*plane_y)
+                .y_plane_intersection(point_on_plane.y)
                 .map(|t| ray.get_intersection_point(t))
             {
-                *xz = Vec2::new(point.x, point.z);
+                point_on_plane.x = point.x;
+                point_on_plane.z = point.z;
             }
         }
     }
@@ -370,8 +374,7 @@ pub fn handle_keys(
             _ => {
                 if let Some(avg) = average_selected_position.0 {
                     *mouse_mode = MouseMode::Movement {
-                        plane_y: avg.y,
-                        xz: Vec2::zero(),
+                        point_on_plane: Vec3::new(0.0, avg.y, 0.0),
                         ty: MoveType::Attack,
                     };
                 }

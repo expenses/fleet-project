@@ -1,7 +1,7 @@
 use rand::{rngs::SmallRng, SeedableRng};
 use ultraviolet::Vec3;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FormationPosition {
     position: Vec3,
     free: bool,
@@ -79,6 +79,12 @@ impl Formation {
                     )
                 })
                 .collect(),
+        }
+    }
+
+    pub fn at_point(point: Vec3, count: usize) -> Self {
+        Self {
+            positions: vec![FormationPosition::new(point); count],
         }
     }
 }
