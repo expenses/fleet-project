@@ -68,6 +68,17 @@ fn main() -> anyhow::Result<()> {
         height: window_size.height,
     };
 
+    let mut egui_platform =
+        egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
+            physical_width: dimensions.width,
+            physical_height: dimensions.height,
+            scale_factor: window.scale_factor(),
+            font_definitions: Default::default(),
+            style: Default::default(),
+        });
+
+    let mut egui_renderpass = egui_wgpu_backend::RenderPass::new(&device, display_format);
+
     let mut rng = rand::thread_rng();
     let (mut background, ambient_light) = background::make_background(&mut rng);
 
@@ -348,6 +359,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::GlobalMinerals::default());
     world.insert_resource(resources::GlobalResearch::default());
     world.insert_resource(settings);
+    world.insert_resource(egui_platform.context());
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.
@@ -509,134 +521,182 @@ fn main() -> anyhow::Result<()> {
         .with_stage_after("stage 3", "final stage", final_stage)
         .with_stage_after("final stage", "buffer upload stage", upload_buffer_stage);
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent { ref event, .. } => match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::Resized(size) => {
-                let mut dimensions = world.get_resource_mut::<resources::Dimensions>().unwrap();
+    event_loop.run(move |event, _, control_flow| {
+        egui_platform.handle_event(&event);
 
-                let (width, height) = (size.width as u32, size.height as u32);
+        match event {
+            Event::WindowEvent { ref event, .. } => match event {
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::Resized(size) => {
+                    let mut dimensions = world.get_resource_mut::<resources::Dimensions>().unwrap();
 
-                dimensions.width = width as u32;
-                dimensions.height = height as u32;
+                    let (width, height) = (size.width as u32, size.height as u32);
 
-                let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
+                    dimensions.width = width as u32;
+                    dimensions.height = height as u32;
 
-                resizables = rendering::Resizables::new(
-                    width,
-                    height,
-                    display_format,
-                    &gpu_interface.device,
-                    &surface,
-                    &resources,
-                );
+                    let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
 
-                let mut perspective_view = world
-                    .get_resource_mut::<resources::PerspectiveView>()
-                    .unwrap();
+                    resizables = rendering::Resizables::new(
+                        width,
+                        height,
+                        display_format,
+                        &gpu_interface.device,
+                        &surface,
+                        &resources,
+                    );
 
-                perspective_view.set_perspective(
-                    59.0_f32.to_radians(),
-                    size.width as f32 / size.height as f32,
-                )
-            }
-            WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state,
-                        virtual_keycode: Some(key),
-                        ..
-                    },
-                ..
-            } => {
-                let pressed = *state == ElementState::Pressed;
-                let mut keyboard_state = world
-                    .get_resource_mut::<resources::KeyboardState>()
-                    .unwrap();
-                keyboard_state.handle(*key, pressed);
-            }
-            WindowEvent::MouseInput { state, button, .. } => {
-                let mut mouse_state = world.get_resource_mut::<resources::MouseState>().unwrap();
+                    let mut perspective_view = world
+                        .get_resource_mut::<resources::PerspectiveView>()
+                        .unwrap();
 
-                let pressed = *state == ElementState::Pressed;
-                let position = mouse_state.position;
-
-                match button {
-                    MouseButton::Left => mouse_state.left_state.handle(position, pressed),
-                    MouseButton::Right => mouse_state.right_state.handle(position, pressed),
-                    _ => {}
+                    perspective_view.set_perspective(
+                        59.0_f32.to_radians(),
+                        size.width as f32 / size.height as f32,
+                    )
                 }
-            }
-            WindowEvent::MouseWheel { delta, .. } => {
-                let delta = match delta {
-                    MouseScrollDelta::LineDelta(_, y) => -*y,
-                    MouseScrollDelta::PixelDelta(winit::dpi::PhysicalPosition { y, .. }) => {
-                        *y as f32 / -200.0
-                    }
-                };
-
-                let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
-
-                orbit.zoom(delta);
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                let keyboard_state = world.get_resource::<resources::KeyboardState>().unwrap();
-                let mouse_state = world.get_resource::<resources::MouseState>().unwrap();
-
-                let position = Vec2::new(position.x as f32, position.y as f32);
-                let delta = position - mouse_state.position;
-
-                if mouse_state.right_state.is_being_dragged().is_some() {
-                    let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
-                    orbit.rotate(delta);
-                } else if keyboard_state.shift {
-                    let mut mouse_mode = world.get_resource_mut::<resources::MouseMode>().unwrap();
-
-                    if let resources::MouseMode::Movement { point_on_plane, .. } = &mut *mouse_mode
-                    {
-                        point_on_plane.y -= delta.y / 10.0;
-                    }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state,
+                            virtual_keycode: Some(key),
+                            ..
+                        },
+                    ..
+                } => {
+                    let pressed = *state == ElementState::Pressed;
+                    let mut keyboard_state = world
+                        .get_resource_mut::<resources::KeyboardState>()
+                        .unwrap();
+                    keyboard_state.handle(*key, pressed);
                 }
-
-                {
+                WindowEvent::MouseInput { state, button, .. } => {
                     let mut mouse_state =
                         world.get_resource_mut::<resources::MouseState>().unwrap();
-                    mouse_state.position = position;
+
+                    let pressed = *state == ElementState::Pressed;
+                    let position = mouse_state.position;
+
+                    match button {
+                        MouseButton::Left => mouse_state.left_state.handle(position, pressed),
+                        MouseButton::Right => mouse_state.right_state.handle(position, pressed),
+                        _ => {}
+                    }
+                }
+                WindowEvent::MouseWheel { delta, .. } => {
+                    let delta = match delta {
+                        MouseScrollDelta::LineDelta(_, y) => -*y,
+                        MouseScrollDelta::PixelDelta(winit::dpi::PhysicalPosition {
+                            y, ..
+                        }) => *y as f32 / -200.0,
+                    };
+
+                    let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
+
+                    orbit.zoom(delta);
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    let keyboard_state = world.get_resource::<resources::KeyboardState>().unwrap();
+                    let mouse_state = world.get_resource::<resources::MouseState>().unwrap();
+
+                    let position = Vec2::new(position.x as f32, position.y as f32);
+                    let delta = position - mouse_state.position;
+
+                    if mouse_state.right_state.is_being_dragged().is_some() {
+                        let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
+                        orbit.rotate(delta);
+                    } else if keyboard_state.shift {
+                        let mut mouse_mode =
+                            world.get_resource_mut::<resources::MouseMode>().unwrap();
+
+                        if let resources::MouseMode::Movement { point_on_plane, .. } =
+                            &mut *mouse_mode
+                        {
+                            point_on_plane.y -= delta.y / 10.0;
+                        }
+                    }
+
+                    {
+                        let mut mouse_state =
+                            world.get_resource_mut::<resources::MouseState>().unwrap();
+                        mouse_state.position = position;
+                    }
+                }
+                _ => {}
+            },
+            Event::MainEventsCleared => {
+                schedule.run(&mut world);
+
+                egui_platform.update_time(1.0 / 60.0);
+
+                window.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                if let Ok(frame) = resizables.swapchain.get_current_frame() {
+                    let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
+                    let dimensions = world.get_resource::<resources::Dimensions>().unwrap();
+
+                    let mut encoder = gpu_interface.device.create_command_encoder(
+                        &wgpu::CommandEncoderDescriptor {
+                            label: Some("render encoder"),
+                        },
+                    );
+
+                    rendering::passes::run_render_passes(
+                        &frame,
+                        &mut encoder,
+                        &resizables,
+                        &pipelines,
+                        &world,
+                        &star_system,
+                        &tonemapper,
+                        &constants,
+                    );
+
+                    egui_platform.begin_frame();
+                    egui::containers::Window::new("Controls").show(
+                        &egui_platform.context(),
+                        |ui| {
+                            ui.label("hej");
+                        },
+                    );
+                    let (_output, paint_commands) = egui_platform.end_frame();
+                    let paint_jobs = egui_platform.context().tessellate(paint_commands);
+
+                    let screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
+                        physical_width: dimensions.width,
+                        physical_height: dimensions.height,
+                        scale_factor: window.scale_factor() as f32,
+                    };
+
+                    egui_renderpass.update_texture(
+                        &gpu_interface.device,
+                        &gpu_interface.queue,
+                        &egui_platform.context().texture(),
+                    );
+                    egui_renderpass
+                        .update_user_textures(&gpu_interface.device, &gpu_interface.queue);
+                    egui_renderpass.update_buffers(
+                        &gpu_interface.device,
+                        &gpu_interface.queue,
+                        &paint_jobs,
+                        &screen_descriptor,
+                    );
+
+                    // Record all render passes.
+                    egui_renderpass.execute(
+                        &mut encoder,
+                        &frame.output.view,
+                        &paint_jobs,
+                        &screen_descriptor,
+                        None,
+                    );
+
+                    gpu_interface.queue.submit(Some(encoder.finish()));
                 }
             }
             _ => {}
-        },
-        Event::MainEventsCleared => {
-            schedule.run(&mut world);
-
-            window.request_redraw();
         }
-        Event::RedrawRequested(_) => {
-            if let Ok(frame) = resizables.swapchain.get_current_frame() {
-                let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
-
-                let mut encoder =
-                    gpu_interface
-                        .device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("render encoder"),
-                        });
-
-                rendering::passes::run_render_passes(
-                    &frame,
-                    &mut encoder,
-                    &resizables,
-                    &pipelines,
-                    &world,
-                    &star_system,
-                    &tonemapper,
-                    &constants,
-                );
-
-                gpu_interface.queue.submit(Some(encoder.finish()));
-            }
-        }
-        _ => {}
     })
 }
 

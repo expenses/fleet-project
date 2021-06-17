@@ -169,6 +169,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
+name = "atomic_refcell"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681b971236e0f76b20fcafca0236b8718c9186ee778d67cd78bd5f28fd85427f"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -818,10 +824,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "egui"
+version = "0.12.0"
+source = "git+https://github.com/emilk/egui#60fd70921df538c5cfab9918ddac1a2df5a06c66"
+dependencies = [
+ "epaint",
+]
+
+[[package]]
+name = "egui_wgpu_backend"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c42342b2a0ff8450b21d9c97a8be2651aec64139bd89797380be68d60e318677"
+dependencies = [
+ "bytemuck",
+ "epi",
+ "wgpu",
+]
+
+[[package]]
+name = "egui_winit_platform"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd4cf17c0cd4dbcf2f8fef55a3592b9b7cfd970576c7302d8ba5c521b8560371"
+dependencies = [
+ "egui",
+ "winit",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+
+[[package]]
+name = "emath"
+version = "0.12.0"
+source = "git+https://github.com/emilk/egui#60fd70921df538c5cfab9918ddac1a2df5a06c66"
 
 [[package]]
 name = "env_logger"
@@ -834,6 +874,27 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "epaint"
+version = "0.12.0"
+source = "git+https://github.com/emilk/egui#60fd70921df538c5cfab9918ddac1a2df5a06c66"
+dependencies = [
+ "ahash 0.7.4",
+ "atomic_refcell",
+ "emath",
+ "ordered-float",
+ "rusttype",
+]
+
+[[package]]
+name = "epi"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59c4f6cbede1fc8f836384f85295a59199a4825940abcc3a8a29cfe2e3c37583"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -883,6 +944,9 @@ dependencies = [
  "bytemuck",
  "colstodian",
  "components-and-resources",
+ "egui",
+ "egui_wgpu_backend",
+ "egui_winit_platform",
  "env_logger",
  "pollster",
  "rand 0.8.3",
@@ -2653,6 +2717,7 @@ dependencies = [
  "bevy_tasks",
  "bytemuck",
  "components-and-resources",
+ "egui",
  "log",
  "parking_lot",
  "profiling",

@@ -21,7 +21,13 @@ pub fn find_ship_under_cursor(
     ray: Res<Ray>,
     models: Res<Models>,
     mut ship_under_cursor: ResMut<ShipUnderCursor>,
+    gui_ctx: Res<egui::CtxRef>,
 ) {
+    if gui_ctx.wants_pointer_input() {
+        ship_under_cursor.0 = None;
+        return;
+    }
+
     ship_under_cursor.0 = query
         .iter()
         .filter(|(_, bounding_box, ..)| ray.bounding_box_intersection(bounding_box.0).is_some())
@@ -74,8 +80,9 @@ pub fn handle_left_click(
     models: Query<&ModelId>,
     mut rng: ResMut<SmallRng>,
     total_time: Res<TotalTime>,
+    gui_ctx: Res<egui::CtxRef>,
 ) {
-    if !mouse_button.left_state.was_clicked() {
+    if !mouse_button.left_state.was_clicked() || gui_ctx.wants_pointer_input() {
         return;
     }
 
@@ -276,8 +283,17 @@ pub fn handle_right_clicks(
     }
 }
 
-pub fn update_mouse_state(mut mouse_state: ResMut<MouseState>, delta_time: Res<DeltaTime>) {
-    mouse_state.left_state.update(delta_time.0, 0.1);
+pub fn update_mouse_state(
+    mut mouse_state: ResMut<MouseState>,
+    delta_time: Res<DeltaTime>,
+    gui_ctx: Res<egui::CtxRef>,
+) {
+    if !gui_ctx.wants_pointer_input() {
+        mouse_state.left_state.update(delta_time.0, 0.1);
+    } else {
+        mouse_state.left_state = MouseButtonState::Up;
+    }
+
     mouse_state.right_state.update(delta_time.0, 0.075);
 }
 
