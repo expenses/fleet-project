@@ -38,12 +38,12 @@ pub fn make_background(rng: &mut ThreadRng) -> (Vec<ColouredVertex>, Vec3) {
         // get all edges that touch the 'infinite face'
         .filter(|edge| edge.sym().face() == dlt.infinite_face())
         // make a triangle to the target point
-        .flat_map(|edge| std::array::IntoIter::new([target_point, *edge.to(), *edge.from()]));
+        .flat_map(|edge| [target_point, *edge.to(), *edge.from()]);
 
     let vertices: Vec<_> = dlt
         .triangles()
         // flat map to vertices
-        .flat_map(|face| std::array::IntoIter::new(face.as_triangle()))
+        .flat_map(|face| face.as_triangle())
         .map(|vertex| *vertex)
         // chain with gap triangles
         .chain(triangles_to_fill_gap)
@@ -143,7 +143,7 @@ pub fn star_points(
 
     rotation.rotate_vecs(&mut points);
 
-    std::array::IntoIter::new(points).map(move |point| ColouredVertex {
+    std::iter::IntoIterator::into_iter(points).map(move |point| ColouredVertex {
         position: point + unit_pos * 1500.0,
         colour,
     })

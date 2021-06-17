@@ -654,12 +654,9 @@ fn main() -> anyhow::Result<()> {
                     );
 
                     egui_platform.begin_frame();
-                    egui::containers::Window::new("Controls").show(
-                        &egui_platform.context(),
-                        |ui| {
-                            ui.label("hej");
-                        },
-                    );
+                    egui::SidePanel::left("Selected").show(&egui_platform.context(), |ui| {
+                        ui.label("Selected");
+                    });
                     let (_output, paint_commands) = egui_platform.end_frame();
                     let paint_jobs = egui_platform.context().tessellate(paint_commands);
 

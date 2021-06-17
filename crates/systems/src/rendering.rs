@@ -5,7 +5,6 @@ use components_and_resources::gpu_structs::{
     CircleInstance, ColouredVertex, Instance, LaserVertex, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
-use std::array::IntoIter;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
 #[profiling::function]
@@ -417,7 +416,7 @@ pub fn render_3d_ship_stats(
                             }
                         });
 
-                        for model_id in IntoIter::new(Models::ARRAY) {
+                        for model_id in Models::ARRAY {
                             let (count, damaged, next_damaged_health) =
                                 counts_and_damaged[model_id as usize];
 
@@ -459,7 +458,7 @@ pub fn render_3d_ship_stats(
                         }
                     });
 
-                    for person_ty in IntoIter::new(PersonEnum::ARRAY) {
+                    for person_ty in PersonEnum::ARRAY {
                         let count = counts[person_ty as usize];
 
                         if count > 0 {
@@ -549,7 +548,7 @@ pub fn debug_render_tlas(
                 Vec3::unit_z()
             };
 
-            for point in IntoIter::new(bounding_box.line_points()) {
+            for point in bounding_box.line_points() {
                 lines_buffer.stage(&[ColouredVertex {
                     position: point,
                     colour,

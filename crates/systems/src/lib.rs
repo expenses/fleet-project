@@ -6,7 +6,6 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
 use components_and_resources::utils::*;
-use std::array::IntoIter;
 use std::ops::{Deref, DerefMut};
 use ultraviolet::{Vec2, Vec3};
 
@@ -369,7 +368,7 @@ pub fn count_selected(
     );
 
     let mut print = |status: UnitStatus, colour, counts: [u32; Models::COUNT]| {
-        for model_id in IntoIter::new(Models::ARRAY) {
+        for model_id in Models::ARRAY {
             let i = model_id as usize;
             let count = counts[i];
 

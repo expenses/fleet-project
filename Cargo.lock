@@ -524,7 +524,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "colstodian"
 version = "0.1.0-rc.2"
-source = "git+https://github.com/termhn/colstodian?branch=main#b35ddaefc407515ffc5d0d2e76998439d76f9f4a"
+source = "git+https://github.com/termhn/colstodian#b35ddaefc407515ffc5d0d2e76998439d76f9f4a"
 dependencies = [
  "bytemuck",
  "cint",
