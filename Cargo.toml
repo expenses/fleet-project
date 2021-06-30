@@ -81,4 +81,3 @@ opt-level = 3
 [patch.crates-io]
 bevy_ecs = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
 bevy_tasks = { git = "https://github.com/NathanSWard/bevy", branch = "nward/commands-error-handling" }
-egui = { git = "https://github.com/emilk/egui" }

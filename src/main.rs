@@ -654,7 +654,7 @@ fn main() -> anyhow::Result<()> {
                     );
 
                     egui_platform.begin_frame();
-                    egui::SidePanel::left("Selected").show(&egui_platform.context(), |ui| {
+                    egui::SidePanel::left("Selected", 200.0).show(&egui_platform.context(), |ui| {
                         ui.label("Selected");
                     });
                     let (_output, paint_commands) = egui_platform.end_frame();
