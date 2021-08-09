@@ -9,5 +9,5 @@ bytemuck = "1.5.1"
 components-and-resources = { path = "../components-and-resources/" }
 ultraviolet = "0.8.1"
 wgpu = "0.8.1"
-colstodian = { git = "https://github.com/termhn/colstodian", branch = "main" }
+colstodian = { git = "https://github.com/termhn/colstodian" }
 bevy_ecs = "0.5.0"
