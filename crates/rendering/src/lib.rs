@@ -642,7 +642,7 @@ impl Pipelines {
                         push_constant_ranges: &[wgpu::PushConstantRange {
                             stages: wgpu::ShaderStage::FRAGMENT,
                             range: 0
-                                ..std::mem::size_of::<colstodian::tonemapper::LottesTonemapper>()
+                                ..std::mem::size_of::<colstodian::tonemap::BakedLottesTonemapperParams>()
                                     as u32,
                         }],
                     });
