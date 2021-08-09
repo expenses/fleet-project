@@ -55,13 +55,11 @@ fn main() -> anyhow::Result<()> {
     let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
     let window_size = window.inner_size();
 
-    let tonemapper = colstodian::tonemapper::LottesTonemapper::new(
-        colstodian::tonemapper::LottesTonemapperParams {
-            gray_point_in: 0.15,
-            crosstalk: 10.0,
-            ..Default::default()
-        },
-    );
+    let tonemapper = colstodian::tonemap::LottesTonemapperParams {
+        gray_point_in: 0.15,
+        crosstalk: 10.0,
+        ..Default::default()
+    }.into();
 
     let dimensions = resources::Dimensions {
         width: window_size.width,

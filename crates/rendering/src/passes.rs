@@ -28,7 +28,7 @@ pub fn run_render_passes(
     pipelines: &Pipelines,
     world: &bevy_ecs::world::World,
     star_system: &StarSystem,
-    tonemapper: &colstodian::tonemapper::LottesTonemapper,
+    tonemapper: &colstodian::tonemap::BakedLottesTonemapperParams,
     constants: &Constants,
 ) {
     let ship_buffer = world.get_resource::<resources::ShipBuffer>().unwrap();
