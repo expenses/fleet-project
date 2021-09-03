@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
         None,
     ))?;
 
-    let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
+    let display_format = surface.get_preferred_format(&adapter).unwrap();
     let window_size = window.inner_size();
 
     let tonemapper = colstodian::tonemap::LottesTonemapperParams {
@@ -89,7 +89,7 @@ fn main() -> anyhow::Result<()> {
         background_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("background vertices"),
             contents: bytemuck::cast_slice(&background),
-            usage: wgpu::BufferUsage::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX,
         }),
         ambient_light,
     };
@@ -98,22 +98,22 @@ fn main() -> anyhow::Result<()> {
         bounding_box_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("bounding box vertices"),
             contents: bytemuck::cast_slice(&resources::BoundingBox::INDICES),
-            usage: wgpu::BufferUsage::INDEX,
+            usage: wgpu::BufferUsages::INDEX,
         }),
         circle_vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("circle vertices"),
             contents: bytemuck::cast_slice(&circle_vertices::<64>()),
-            usage: wgpu::BufferUsage::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX,
         }),
         circle_line_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("circle line indices"),
             contents: bytemuck::cast_slice(&circle_line_indices::<64, { 64 * 2 }>()),
-            usage: wgpu::BufferUsage::INDEX,
+            usage: wgpu::BufferUsages::INDEX,
         }),
         circle_filled_indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("circle filled indices"),
             contents: bytemuck::cast_slice(&circle_filled_indices::<64, { (64 - 2) * 3 }>()),
-            usage: wgpu::BufferUsage::INDEX,
+            usage: wgpu::BufferUsages::INDEX,
         }),
     };
 
@@ -192,27 +192,27 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::GpuBuffer::<ColouredVertex>::new(
         &device,
         "lines",
-        wgpu::BufferUsage::VERTEX,
+        wgpu::BufferUsages::VERTEX,
     ));
     world.insert_resource(resources::GpuBuffer::<LaserVertex>::new(
         &device,
         "lasers",
-        wgpu::BufferUsage::VERTEX,
+        wgpu::BufferUsages::VERTEX,
     ));
     world.insert_resource(resources::GpuBuffer::<CircleInstance>::new(
         &device,
         "circle instances",
-        wgpu::BufferUsage::VERTEX,
+        wgpu::BufferUsages::VERTEX,
     ));
     world.insert_resource(resources::GpuBuffer::<RangeInstance>::new(
         &device,
         "range instances",
-        wgpu::BufferUsage::VERTEX,
+        wgpu::BufferUsages::VERTEX,
     ));
     world.insert_resource(resources::GpuBuffer::<Vertex2D>::new(
         &device,
         "lines 2d",
-        wgpu::BufferUsage::VERTEX,
+        wgpu::BufferUsages::VERTEX,
     ));
 
     let mut vertices = Vec::new();
@@ -292,17 +292,17 @@ fn main() -> anyhow::Result<()> {
         models,
         vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("merged model vertices"),
-            usage: wgpu::BufferUsage::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX,
             contents: bytemuck::cast_slice(&vertices),
         }),
         indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("merged model indices"),
-            usage: wgpu::BufferUsage::INDEX,
+            usage: wgpu::BufferUsages::INDEX,
             contents: bytemuck::cast_slice(&indices),
         }),
         bounding_boxes: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("merged model bounding box vertices"),
-            usage: wgpu::BufferUsage::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX,
             contents: bytemuck::cast_slice(&bounding_boxes),
         }),
         bind_group: texture_manager.into_bind_group(
@@ -611,7 +611,7 @@ fn main() -> anyhow::Result<()> {
             window.request_redraw();
         }
         Event::RedrawRequested(_) => {
-            if let Ok(frame) = resizables.swapchain.get_current_frame() {
+            if let Ok(frame) = surface.get_current_frame() {
                 let gpu_interface = world.get_resource::<resources::GpuInterface>().unwrap();
 
                 let mut encoder =
@@ -620,6 +620,11 @@ fn main() -> anyhow::Result<()> {
                         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                             label: Some("render encoder"),
                         });
+
+                let frame = frame
+                    .output
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
 
                 rendering::passes::run_render_passes(
                     &frame,

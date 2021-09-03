@@ -8,7 +8,6 @@ const HDR_FRAMEBUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32F
 const EFFECT_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 
 pub struct Resizables {
-    pub swapchain: wgpu::SwapChain,
     hdr_framebuffer: wgpu::TextureView,
     depth_buffer: wgpu::TextureView,
     bloom_buffer: wgpu::TextureView,
@@ -35,7 +34,7 @@ impl Resizables {
             width,
             height,
             EFFECT_BUFFER_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
         let intermediate_bloom_buffer = create_texture(
@@ -44,7 +43,7 @@ impl Resizables {
             width / 2,
             height / 2,
             EFFECT_BUFFER_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
         let godray_buffer = create_texture(
@@ -53,7 +52,7 @@ impl Resizables {
             width,
             height,
             EFFECT_BUFFER_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
         let hdr_framebuffer = create_texture(
@@ -62,20 +61,18 @@ impl Resizables {
             width,
             height,
             HDR_FRAMEBUFFER_FORMAT,
-            wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
+        surface.configure(&device, &wgpu::SurfaceConfiguration {
+            width,
+            height,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: display_format,
+            present_mode: wgpu::PresentMode::Fifo,
+        });
+
         Self {
-            swapchain: device.create_swap_chain(
-                surface,
-                &wgpu::SwapChainDescriptor {
-                    width,
-                    height,
-                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-                    format: display_format,
-                    present_mode: wgpu::PresentMode::Fifo,
-                },
-            ),
             hdr_pass: make_effect_bind_group(device, resources, &hdr_framebuffer, "hdr pass"),
             hdr_framebuffer,
             depth_buffer: create_texture(
@@ -84,7 +81,7 @@ impl Resizables {
                 width,
                 height,
                 DEPTH_FORMAT,
-                wgpu::TextureUsage::RENDER_ATTACHMENT,
+                wgpu::TextureUsages::RENDER_ATTACHMENT,
             ),
             first_bloom_blur_pass: make_effect_bind_group(
                 device,
@@ -168,10 +165,10 @@ impl Resources {
                 &wgpu::BindGroupLayoutDescriptor {
                     label: Some("merged textures bind group layout"),
                     entries: &[
-                        sampler(0, wgpu::ShaderStage::FRAGMENT, false),
+                        sampler(0, wgpu::ShaderStages::FRAGMENT, false),
                         wgpu::BindGroupLayoutEntry {
                             binding: 1,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
                                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
                                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -185,8 +182,8 @@ impl Resources {
             effect_bgl: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("effect bind group layout"),
                 entries: &[
-                    sampler(0, wgpu::ShaderStage::FRAGMENT, true),
-                    texture(1, wgpu::ShaderStage::FRAGMENT),
+                    sampler(0, wgpu::ShaderStages::FRAGMENT, true),
+                    texture(1, wgpu::ShaderStages::FRAGMENT),
                 ],
             }),
             nearest_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
@@ -209,7 +206,7 @@ fn create_texture(
     width: u32,
     height: u32,
     format: wgpu::TextureFormat,
-    usage: wgpu::TextureUsage,
+    usage: wgpu::TextureUsages,
 ) -> wgpu::TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
@@ -258,7 +255,7 @@ impl Pipelines {
                 label: Some("ship bgl pipeline layout"),
                 bind_group_layouts: &[&resources.merged_textures_bgl],
                 push_constant_ranges: &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                    stages: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     range: 0..std::mem::size_of::<PushConstants>() as u32,
                 }],
             });
@@ -272,19 +269,19 @@ impl Pipelines {
 
         let model_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ModelVertex>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2],
         };
 
         let instance_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Instance>() as u64,
-            step_mode: wgpu::InputStepMode::Instance,
+            step_mode: wgpu::VertexStepMode::Instance,
             attributes: &wgpu::vertex_attr_array![3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32x3, 7 => Float32x3, 8 => Float32, 9 => Uint32, 10 => Uint32],
         };
 
         let vertex_2d_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex2D>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x3],
         };
 
@@ -338,7 +335,7 @@ impl Pipelines {
 
         let additive_colour_state = |target| wgpu::ColorTargetState {
             format: target,
-            write_mask: wgpu::ColorWrite::ALL,
+            write_mask: wgpu::ColorWrites::ALL,
             blend: Some(wgpu::BlendState {
                 color: wgpu::BlendComponent {
                     operation: wgpu::BlendOperation::Add,
@@ -351,7 +348,7 @@ impl Pipelines {
 
         let ignore_colour_state = |format| wgpu::ColorTargetState {
             format,
-            write_mask: wgpu::ColorWrite::empty(),
+            write_mask: wgpu::ColorWrites::empty(),
             blend: None,
         };
 
@@ -360,7 +357,7 @@ impl Pipelines {
                 label: Some("perspective view pipeline layout"),
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStage::VERTEX,
+                    stages: wgpu::ShaderStages::VERTEX,
                     range: 0..std::mem::size_of::<Mat4>() as u32,
                 }],
             });
@@ -370,14 +367,14 @@ impl Pipelines {
                 label: Some("seperate perspective view pipeline layout"),
                 bind_group_layouts: &[],
                 push_constant_ranges: &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStage::VERTEX,
+                    stages: wgpu::ShaderStages::VERTEX,
                     range: 0..std::mem::size_of::<[Mat4; 2]>() as u32,
                 }],
             });
 
         let background_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ColouredVertex>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
         };
 
@@ -390,7 +387,7 @@ impl Pipelines {
                 label: Some("bloom blur pipeline layout"),
                 bind_group_layouts: &[&resources.effect_bgl],
                 push_constant_ranges: &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStage::FRAGMENT,
+                    stages: wgpu::ShaderStages::FRAGMENT,
                     range: 0..std::mem::size_of::<BlurSettings>() as u32,
                 }],
             });
@@ -400,26 +397,26 @@ impl Pipelines {
 
         let vec3_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vec3>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3],
         };
 
         let vec2_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vec2>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x2],
         };
 
         let circle_instance_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<CircleInstance>() as u64,
-            step_mode: wgpu::InputStepMode::Instance,
+            step_mode: wgpu::VertexStepMode::Instance,
             attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32, 3 => Float32x4],
         };
 
         let alpha_blend = |target| wgpu::ColorTargetState {
             format: target,
             blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-            write_mask: wgpu::ColorWrite::ALL,
+            write_mask: wgpu::ColorWrites::ALL,
         };
 
         let vs_circle = device
@@ -433,7 +430,7 @@ impl Pipelines {
 
                 let mut fs_ship_desc = wgpu::include_spirv!("../shaders/compiled/ship.frag.spv");
                 // Needed for WGSL reasons
-                fs_ship_desc.flags = Default::default();
+                //fs_ship_desc.flags = Default::default();
                 let fs_ship = device.create_shader_module(&fs_ship_desc);
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -524,7 +521,7 @@ impl Pipelines {
                         label: Some("godray blur pipeline layout"),
                         bind_group_layouts: &[&resources.effect_bgl],
                         push_constant_ranges: &[wgpu::PushConstantRange {
-                            stages: wgpu::ShaderStage::FRAGMENT,
+                            stages: wgpu::ShaderStages::FRAGMENT,
                             range: 0..std::mem::size_of::<GodraySettings>() as u32,
                         }],
                     });
@@ -606,7 +603,7 @@ impl Pipelines {
 
                 let instance_buffer_layout = wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Instance>() as u64,
-                    step_mode: wgpu::InputStepMode::Instance,
+                    step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &wgpu::vertex_attr_array![1 => Float32x3, 2 => Float32x3, 3 => Float32x3, 4 => Float32x3, 5 => Float32x3, 6 => Float32],
                 };
 
@@ -640,7 +637,7 @@ impl Pipelines {
                         label: Some("tonemapper pipeline layout"),
                         bind_group_layouts: &[&resources.effect_bgl],
                         push_constant_ranges: &[wgpu::PushConstantRange {
-                            stages: wgpu::ShaderStage::FRAGMENT,
+                            stages: wgpu::ShaderStages::FRAGMENT,
                             range: 0..std::mem::size_of::<
                                 colstodian::tonemap::BakedLottesTonemapperParams,
                             >() as u32,

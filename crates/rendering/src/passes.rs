@@ -22,7 +22,7 @@ pub struct Constants {
 }
 
 pub fn run_render_passes(
-    frame: &wgpu::SwapChainFrame,
+    frame: &wgpu::TextureView,
     encoder: &mut wgpu::CommandEncoder,
     resizables: &Resizables,
     pipelines: &Pipelines,
@@ -83,7 +83,7 @@ pub fn run_render_passes(
 
     render_pass.set_pipeline(&pipelines.ship);
     render_pass.set_push_constants(
-        wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+        wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
         0,
         bytemuck::bytes_of(&PushConstants {
             perspective_view: perspective_view.perspective_view,
@@ -105,7 +105,7 @@ pub fn run_render_passes(
         render_pass.set_pipeline(&pipelines.lasers);
         render_pass.set_vertex_buffer(0, laser_buffer);
         render_pass.set_push_constants(
-            wgpu::ShaderStage::VERTEX,
+            wgpu::ShaderStages::VERTEX,
             0,
             bytemuck::bytes_of(&perspective_view.perspective_view),
         );
@@ -115,7 +115,7 @@ pub fn run_render_passes(
     render_pass.set_pipeline(&pipelines.background);
     render_pass.set_vertex_buffer(0, star_system.background_vertices.slice(..));
     render_pass.set_push_constants(
-        wgpu::ShaderStage::VERTEX,
+        wgpu::ShaderStages::VERTEX,
         0,
         bytemuck::bytes_of(&perspective_view.perspective_view_without_movement),
     );
@@ -139,7 +139,7 @@ pub fn run_render_passes(
     render_pass.set_pipeline(&pipelines.first_bloom_blur);
     render_pass.set_bind_group(0, &resizables.first_bloom_blur_pass, &[]);
     render_pass.set_push_constants(
-        wgpu::ShaderStage::FRAGMENT,
+        wgpu::ShaderStages::FRAGMENT,
         0,
         bytemuck::bytes_of(&BlurSettings {
             direction: 0,
@@ -167,7 +167,7 @@ pub fn run_render_passes(
     render_pass.set_pipeline(&pipelines.second_bloom_blur);
     render_pass.set_bind_group(0, &resizables.second_bloom_blur_pass, &[]);
     render_pass.set_push_constants(
-        wgpu::ShaderStage::FRAGMENT,
+        wgpu::ShaderStages::FRAGMENT,
         0,
         bytemuck::bytes_of(&BlurSettings {
             direction: 1,
@@ -183,7 +183,7 @@ pub fn run_render_passes(
         render_pass.set_pipeline(&pipelines.godray_blur);
         render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);
         render_pass.set_push_constants(
-            wgpu::ShaderStage::FRAGMENT,
+            wgpu::ShaderStages::FRAGMENT,
             0,
             bytemuck::bytes_of(&GodraySettings {
                 density_div_num_samples: 1.0 / 100.0,
@@ -217,7 +217,7 @@ pub fn run_render_passes(
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("tonemap and ui render pass"),
         color_attachments: &[wgpu::RenderPassColorAttachment {
-            view: &frame.output.view,
+            view: frame,
             resolve_target: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -237,7 +237,7 @@ pub fn run_render_passes(
     render_pass.set_pipeline(&pipelines.tonemapper);
     render_pass.set_bind_group(0, &resizables.hdr_pass, &[]);
     render_pass.set_push_constants(
-        wgpu::ShaderStage::FRAGMENT,
+        wgpu::ShaderStages::FRAGMENT,
         0,
         bytemuck::bytes_of(tonemapper),
     );
@@ -249,7 +249,7 @@ pub fn run_render_passes(
         render_pass.set_pipeline(&pipelines.lines);
         render_pass.set_vertex_buffer(0, line_buffer);
         render_pass.set_push_constants(
-            wgpu::ShaderStage::VERTEX,
+            wgpu::ShaderStages::VERTEX,
             0,
             bytemuck::bytes_of(&perspective_view.perspective_view),
         );
@@ -259,7 +259,7 @@ pub fn run_render_passes(
     {
         render_pass.set_pipeline(&pipelines.bounding_boxes);
         render_pass.set_push_constants(
-            wgpu::ShaderStage::VERTEX,
+            wgpu::ShaderStages::VERTEX,
             0,
             bytemuck::bytes_of(&perspective_view.perspective_view),
         );
@@ -313,7 +313,7 @@ pub fn run_render_passes(
     if num_range_instances > 0 {
         render_pass.set_pipeline(&pipelines.z_facing_circle_outline);
         render_pass.set_push_constants(
-            wgpu::ShaderStage::VERTEX,
+            wgpu::ShaderStages::VERTEX,
             0,
             bytemuck::bytes_of(&[perspective_view.perspective, perspective_view.view]),
         );
@@ -351,7 +351,7 @@ pub fn run_render_passes(
             &gpu_interface.device,
             &mut staging_belt,
             encoder,
-            &frame.output.view,
+            frame,
             width,
             height,
         )

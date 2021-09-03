@@ -6,11 +6,11 @@ pub struct GpuBuffer<T> {
     capacity_in_bytes: usize,
     buffer: wgpu::Buffer,
     label: &'static str,
-    usage: wgpu::BufferUsage,
+    usage: wgpu::BufferUsages,
 }
 
 impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
-    pub fn new(device: &wgpu::Device, label: &'static str, usage: wgpu::BufferUsage) -> Self {
+    pub fn new(device: &wgpu::Device, label: &'static str, usage: wgpu::BufferUsages) -> Self {
         let capacity_in_bytes = std::mem::size_of::<T>();
 
         Self {
@@ -18,7 +18,7 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
                 size: capacity_in_bytes as u64,
-                usage: wgpu::BufferUsage::COPY_DST | usage,
+                usage: wgpu::BufferUsages::COPY_DST | usage,
                 mapped_at_creation: false,
             }),
             label,
@@ -52,7 +52,7 @@ impl<T: Copy + bytemuck::Pod> GpuBuffer<T> {
             self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(self.label),
                 size: self.capacity_in_bytes as u64,
-                usage: wgpu::BufferUsage::COPY_DST | self.usage,
+                usage: wgpu::BufferUsages::COPY_DST | self.usage,
                 mapped_at_creation: true,
             });
 
@@ -87,13 +87,13 @@ impl ShipBuffer {
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(Self::LABEL),
                 size: capacity_in_bytes as u64,
-                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::VERTEX,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
                 mapped_at_creation: false,
             }),
             draw_indirect_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("draw indirect buffer"),
                 size: (std::mem::size_of::<DrawIndexedIndirect>() * Models::COUNT) as u64,
-                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::INDIRECT,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
                 mapped_at_creation: false,
             }),
             draw_indirect_count: 0,
@@ -143,7 +143,7 @@ impl ShipBuffer {
             self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(Self::LABEL),
                 size: self.capacity_in_bytes as u64,
-                usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::VERTEX,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
                 mapped_at_creation: false,
             });
         }
