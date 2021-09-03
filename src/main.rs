@@ -59,7 +59,8 @@ fn main() -> anyhow::Result<()> {
         gray_point_in: 0.15,
         crosstalk: 10.0,
         ..Default::default()
-    }.into();
+    }
+    .into();
 
     let dimensions = resources::Dimensions {
         width: window_size.width,

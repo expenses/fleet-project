@@ -131,7 +131,7 @@ fn load_image(
     let image_end = image_start + image_view.length();
     let image_bytes = &buffer_blob[image_start..image_end];
 
-    load_image_from_bytes(image_bytes, &device, &queue)
+    load_image_from_bytes(image_bytes, device, queue)
 }
 
 pub fn load_image_from_bytes(

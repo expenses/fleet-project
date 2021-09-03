@@ -97,7 +97,7 @@ pub fn run_render_passes(
     render_pass.set_index_buffer(models.indices.slice(..), wgpu::IndexFormat::Uint16);
     render_pass.set_bind_group(0, &models.bind_group, &[]);
 
-    render_pass.multi_draw_indexed_indirect(&draw_indirect_buffer, 0, draw_indirect_count);
+    render_pass.multi_draw_indexed_indirect(draw_indirect_buffer, 0, draw_indirect_count);
 
     let (laser_buffer, num_laser_vertices) = laser_buffer.slice();
 
@@ -178,7 +178,7 @@ pub fn run_render_passes(
     render_pass.draw(0..3, 0..1);
 
     if settings.draw_godrays {
-        let uv_space_light_pos = uv_space_light_pos(&perspective_view, star_system.sun_dir);
+        let uv_space_light_pos = uv_space_light_pos(perspective_view, star_system.sun_dir);
 
         render_pass.set_pipeline(&pipelines.godray_blur);
         render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);

@@ -48,7 +48,7 @@ impl Resizables {
         );
 
         let godray_buffer = create_texture(
-            &device,
+            device,
             "godray buffer",
             width,
             height,
@@ -57,7 +57,7 @@ impl Resizables {
         );
 
         let hdr_framebuffer = create_texture(
-            &device,
+            device,
             "hdr framebuffer",
             width,
             height,
@@ -76,10 +76,10 @@ impl Resizables {
                     present_mode: wgpu::PresentMode::Fifo,
                 },
             ),
-            hdr_pass: make_effect_bind_group(&device, &resources, &hdr_framebuffer, "hdr pass"),
+            hdr_pass: make_effect_bind_group(device, resources, &hdr_framebuffer, "hdr pass"),
             hdr_framebuffer,
             depth_buffer: create_texture(
-                &device,
+                device,
                 "depth buffer",
                 width,
                 height,
@@ -87,22 +87,22 @@ impl Resizables {
                 wgpu::TextureUsage::RENDER_ATTACHMENT,
             ),
             first_bloom_blur_pass: make_effect_bind_group(
-                &device,
-                &resources,
+                device,
+                resources,
                 &bloom_buffer,
                 "first bloom blur pass bind group",
             ),
             bloom_buffer,
             second_bloom_blur_pass: make_effect_bind_group(
-                &device,
-                &resources,
+                device,
+                resources,
                 &intermediate_bloom_buffer,
                 "second bloom blur pass bind group",
             ),
             intermediate_bloom_buffer,
             godray_bind_group: make_effect_bind_group(
-                &device,
-                &resources,
+                device,
+                resources,
                 &godray_buffer,
                 "godray blur bind group",
             ),
@@ -641,9 +641,9 @@ impl Pipelines {
                         bind_group_layouts: &[&resources.effect_bgl],
                         push_constant_ranges: &[wgpu::PushConstantRange {
                             stages: wgpu::ShaderStage::FRAGMENT,
-                            range: 0
-                                ..std::mem::size_of::<colstodian::tonemap::BakedLottesTonemapperParams>()
-                                    as u32,
+                            range: 0..std::mem::size_of::<
+                                colstodian::tonemap::BakedLottesTonemapperParams,
+                            >() as u32,
                         }],
                     });
 
