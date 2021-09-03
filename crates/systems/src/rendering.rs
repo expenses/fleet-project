@@ -98,7 +98,8 @@ pub fn debug_render_find_ship_under_cursor(
             models
                 .get(*model_id)
                 .acceleration_tree
-                .locate_with_selection_function_with_data(ray)
+                .locate_with_selection_function(ray)
+                .filter_map(move |tri| ray.triangle_intersection(tri).map(|t| (tri, t)))
                 .map(move |(tri, t)| (tri, t * scale, position, rotation, scale))
         })
         .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))

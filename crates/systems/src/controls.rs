@@ -33,9 +33,10 @@ pub fn find_ship_under_cursor(
             models
                 .get(*model_id)
                 .acceleration_tree
-                .locate_with_selection_function_with_data(ray)
+                .locate_with_selection_function(ray)
+                .filter_map(move |triangle| ray.triangle_intersection(triangle))
                 // We need to multiply t by scale here as the time of impact is calculated on an unscaled model
-                .map(move |(_, t)| (entity, t * scale))
+                .map(move |t| (entity, t * scale))
         })
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(entity, _)| entity);

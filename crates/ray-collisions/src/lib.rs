@@ -4,7 +4,7 @@ mod dynamic_bvh;
 
 pub use dynamic_bvh::DynamicBvh;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
@@ -142,14 +142,14 @@ impl std::ops::Neg for &Ray {
     }
 }
 
-impl rstar::SelectionFunctionWithData<Triangle, f32> for Ray {
+impl rstar::SelectionFunction<Triangle> for Ray {
     fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
         let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
         self.bounding_box_intersection(bounding_box).is_some()
     }
 
-    fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
-        self.triangle_intersection(triangle)
+    fn should_unpack_leaf(&self, _: &Triangle) -> bool {
+        true
     }
 }
 
@@ -192,7 +192,7 @@ impl Projectile {
 
     pub fn as_limited_ray(&self, delta_time: f32) -> LimitedRay {
         LimitedRay {
-            ray: self.flipped_ray.clone(),
+            ray: self.flipped_ray,
             max_t: self.max_t(delta_time),
             scale: 1.0,
         }
@@ -203,6 +203,7 @@ impl Projectile {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct LimitedRay {
     ray: Ray,
     max_t: f32,
@@ -224,9 +225,16 @@ impl LimitedRay {
             scale: self.scale * scale,
         }
     }
+
+    pub fn triangle_intersection(&self, triangle: &Triangle) -> Option<f32> {
+        self.ray
+            .triangle_intersection(triangle)
+            .map(|t| t * self.scale)
+            .filter(|&t| t <= self.max_t)
+    }
 }
 
-impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
+impl rstar::SelectionFunction<Triangle> for LimitedRay {
     fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
         let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
         self.ray
@@ -236,11 +244,8 @@ impl rstar::SelectionFunctionWithData<Triangle, f32> for LimitedRay {
             .is_some()
     }
 
-    fn should_unpack_leaf(&self, triangle: &Triangle) -> Option<f32> {
-        self.ray
-            .triangle_intersection(triangle)
-            .map(|t| t * self.scale)
-            .filter(|&t| t <= self.max_t)
+    fn should_unpack_leaf(&self, _: &Triangle) -> bool {
+        true
     }
 }
 

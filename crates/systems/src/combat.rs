@@ -46,8 +46,9 @@ pub fn collide_projectiles<Side>(
                 models
                     .get(*model_id)
                     .acceleration_tree
-                    .locate_with_selection_function_with_data(ray)
-                    .map(move |(_, scaled_t)| (ship_entity, scaled_t))
+                    .locate_with_selection_function(ray)
+                    .filter_map(move |triangle| ray.triangle_intersection(triangle))
+                    .map(move |scaled_t| (ship_entity, scaled_t))
             })
             .max_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
