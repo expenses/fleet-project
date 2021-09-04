@@ -123,7 +123,7 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
-    if settings.enable_blur {
+    if !settings.disable_bloom {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("first bloom blur render pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -179,7 +179,7 @@ pub fn run_render_passes(
         render_pass.draw(0..3, 0..1);
     }
 
-    if settings.enable_godrays {
+    if !settings.disable_godrays {
         let uv_space_light_pos = uv_space_light_pos(perspective_view, star_system.sun_dir);
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

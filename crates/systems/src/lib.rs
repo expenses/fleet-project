@@ -353,17 +353,18 @@ pub fn count_selected(
     mut buttons: ResMut<UnitButtons>,
     global_minerals: Res<GlobalMinerals>,
     global_research: Res<GlobalResearch>,
+    dpi_factor: Res<DpiFactor>,
 ) {
     buttons.0.clear();
 
-    glyph_layout_cache.start_section(Vec2::zero());
+    let mut section = glyph_layout_cache.start_section(Vec2::zero(), dpi_factor.0);
 
-    glyph_layout_cache.push(
+    section.push(
         format_args!("Global Minerals: {}\n", global_minerals.0),
         [1.0; 4],
     );
 
-    glyph_layout_cache.push(
+    section.push(
         format_args!("Global Research: {:.2}\n", global_research.0),
         [1.0; 4],
     );
@@ -375,9 +376,9 @@ pub fn count_selected(
 
             if count > 0 {
                 buttons.0.push((model_id, status));
-                glyph_layout_cache.push(format_args!("{}", status.to_str()), colour);
+                section.push(format_args!("{}", status.to_str()), colour);
 
-                glyph_layout_cache.push(
+                section.push(
                     format_args!(" {:?}s: {}\n", Models::ARRAY[i], count),
                     [1.0; 4],
                 );
@@ -410,8 +411,6 @@ pub fn count_selected(
         [1.0, 0.25, 0.25, 1.0],
         count(enemy.iter()),
     );
-
-    glyph_layout_cache.finish_section();
 }
 
 fn count<'a>(iter: impl Iterator<Item = &'a ModelId>) -> [u32; Models::COUNT] {

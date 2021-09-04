@@ -19,12 +19,14 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 #[derive(StructOpt)]
 pub struct Settings {
     #[structopt(long)]
-    pub enable_godrays: bool,
+    pub disable_godrays: bool,
     #[structopt(long)]
-    pub enable_blur: bool,
+    pub disable_bloom: bool,
     #[structopt(long)]
-    pub debug_render_tlas: bool,
+    pub enable_tlas_debug_drawing: bool,
 }
+
+pub struct DpiFactor(pub f32);
 
 #[derive(Default)]
 pub struct GlobalResearch(pub f32);

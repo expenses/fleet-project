@@ -354,6 +354,7 @@ fn main() -> anyhow::Result<()> {
     world.insert_resource(resources::GlobalMinerals::default());
     world.insert_resource(resources::GlobalResearch::default());
     world.insert_resource(settings);
+    world.insert_resource(resources::DpiFactor(window.scale_factor() as f32));
 
     let stage_1 = bevy_ecs::schedule::SystemStage::parallel()
         // No dependencies.

@@ -367,6 +367,7 @@ pub fn render_3d_ship_stats(
     perspective_view: Res<PerspectiveView>,
     dimensions: Res<Dimensions>,
     total_time: Res<TotalTime>,
+    dpi_factor: Res<DpiFactor>,
 ) {
     query.for_each(
         |(pos, health, selected, carrying, on_board, minerals, can_be_mined, build_queue)| {
@@ -388,18 +389,17 @@ pub fn render_3d_ship_stats(
 
             let selected = selected.is_some();
 
-            glyph_layout_cache.start_section(unnormalised_pos);
+            let mut section = glyph_layout_cache.start_section(unnormalised_pos, dpi_factor.0);
 
             if let Some(health) = health {
                 if selected || health.current < health.max {
-                    glyph_layout_cache
-                        .push(format_args!("Health: {:.2}\n", health.current), [1.0; 4]);
+                    section.push(format_args!("Health: {:.2}\n", health.current), [1.0; 4]);
                 }
             }
 
             if let Some(carrying) = carrying {
                 if selected || !carrying.is_empty() {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!("Carrying: {}/{}\n", carrying.len(), carrying.capacity()),
                         [1.0; 4],
                     );
@@ -426,14 +426,14 @@ pub fn render_3d_ship_stats(
                                 counts_and_damaged[model_id as usize];
 
                             if count > 0 {
-                                glyph_layout_cache.push(
+                                section.push(
                                     format_args!("  - {:?}s: {}\n", model_id, count),
                                     [1.0; 4],
                                 );
                             }
 
                             if let Some(next_damaged_health) = next_damaged_health {
-                                glyph_layout_cache.push(
+                                section.push(
                                     format_args!(
                                         "    - Num. Damaged: {} ({:.2}/{:.2})\n",
                                         damaged,
@@ -450,8 +450,7 @@ pub fn render_3d_ship_stats(
 
             if let Some(on_board) = on_board {
                 if selected {
-                    glyph_layout_cache
-                        .push(format_args!("On Board: {}\n", on_board.0.len()), [1.0; 4]);
+                    section.push(format_args!("On Board: {}\n", on_board.0.len()), [1.0; 4]);
 
                     let mut counts = [0; PersonEnum::COUNT];
 
@@ -467,7 +466,7 @@ pub fn render_3d_ship_stats(
                         let count = counts[person_ty as usize];
 
                         if count > 0 {
-                            glyph_layout_cache
+                            section
                                 .push(format_args!("  - {:?}s: {}\n", person_ty, count), [1.0; 4]);
                         }
                     }
@@ -476,7 +475,7 @@ pub fn render_3d_ship_stats(
 
             if let Some(minerals) = minerals {
                 if selected || minerals.stored > 0.0 {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!(
                             "Minerals: {:.2}/{:.2}\n",
                             minerals.stored, minerals.capacity
@@ -488,7 +487,7 @@ pub fn render_3d_ship_stats(
 
             if let Some(can_be_mined) = can_be_mined {
                 if selected || can_be_mined.minerals < can_be_mined.total {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!(
                             "Remaining Minerals: {:.2}/{:.2}\n",
                             can_be_mined.minerals, can_be_mined.total
@@ -502,21 +501,21 @@ pub fn render_3d_ship_stats(
                 let progress = build_queue.progress_time(total_time.0);
 
                 if selected || progress.is_some() {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!("Building Ships: {}\n", build_queue.num_in_queue()),
                         [1.0; 4],
                     );
                 }
 
                 if let Some(progress) = progress {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!("  - Progress: {:.2}%\n", progress * 100.0),
                         [1.0; 4],
                     );
                 }
 
                 if selected {
-                    glyph_layout_cache.push(
+                    section.push(
                         format_args!(
                             "  - * {}\n",
                             if build_queue.stay_carried {
@@ -529,8 +528,6 @@ pub fn render_3d_ship_stats(
                     );
                 }
             }
-
-            glyph_layout_cache.finish_section();
         },
     )
 }
@@ -541,7 +538,7 @@ pub fn debug_render_tlas(
     mut lines_buffer: ResMut<GpuBuffer<ColouredVertex>>,
     settings: Res<Settings>,
 ) {
-    if !settings.debug_render_tlas {
+    if !settings.enable_tlas_debug_drawing {
         return;
     }
 
