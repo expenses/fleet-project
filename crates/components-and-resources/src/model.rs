@@ -1,12 +1,12 @@
 use crate::gpu_structs::ModelVertex;
 use crate::texture_manager::TextureManager;
-use ray_collisions::{BoundingBox, Triangle};
+use ray_collisions::{BoundingBox, DynamicBvh, Triangle};
 use ultraviolet::Vec3;
 use wgpu::util::DeviceExt;
 
 pub struct Model {
     pub num_indices: u32,
-    pub acceleration_tree: rstar::RTree<Triangle>,
+    pub acceleration_tree: DynamicBvh<Triangle>,
     pub bounding_box: BoundingBox,
     pub diffuse_texture: u32,
     pub emissive_texture: u32,
@@ -70,18 +70,20 @@ pub fn load_ship_model(
     assert_eq!(bounding_boxes.clone().count(), 1);
     let bounding_box = bounding_boxes.next().unwrap();
 
-    let acceleration_tree = rstar::RTree::bulk_load(
-        indices
-            .chunks(3)
-            .map(|chunk| {
-                Triangle::new(
-                    merged_vertices[chunk[0] as usize].position,
-                    merged_vertices[chunk[1] as usize].position,
-                    merged_vertices[chunk[2] as usize].position,
-                )
-            })
-            .collect(),
-    );
+    let mut acceleration_tree = DynamicBvh::default();
+
+    let triangles = indices.chunks(3).map(|chunk| {
+        Triangle::new(
+            merged_vertices[chunk[0] as usize].position,
+            merged_vertices[chunk[1] as usize].position,
+            merged_vertices[chunk[2] as usize].position,
+        )
+    });
+
+    for triangle in triangles {
+        let bbox = triangle.bounding_box();
+        acceleration_tree.insert(triangle, bbox);
+    }
 
     let num_indices = indices.len() as u32;
 

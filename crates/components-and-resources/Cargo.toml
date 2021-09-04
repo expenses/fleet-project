@@ -12,7 +12,6 @@ gltf = { version = "0.16.0", default-features = false, features = ["utils"] }
 image = { version = "0.23.14", features = ["png"], default-features = false }
 rand = { version = "=0.8.3", features = ["small_rng"] }
 ray-collisions = { path = "../ray-collisions/" }
-rstar = "0.9"
 ultraviolet = { version = "0.8.1", features = ["bytemuck"] }
 wgpu = "0.10.1"
 wgpu_glyph = "0.14.1"

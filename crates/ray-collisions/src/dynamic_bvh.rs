@@ -375,6 +375,25 @@ impl<T> DynamicBvh<T> {
         }
     }
 
+    #[inline]
+    pub fn find_with_owned_stack<'a, FN: Fn(BoundingBox) -> bool>(
+        &'a self,
+        predicate: FN,
+        mut stack: Vec<&'a Node<T>>,
+    ) -> StackOwningBvhIterator<'a, T, FN> {
+        stack.clear();
+
+        if let Some(node) = self.nodes.get(self.root) {
+            stack.push(node);
+        }
+
+        StackOwningBvhIterator {
+            stack,
+            bvh: self,
+            predicate,
+        }
+    }
+
     pub fn iter_bounding_boxes(&self) -> impl Iterator<Item = (BoundingBox, bool)> + '_ {
         self.nodes
             .iter()
@@ -443,6 +462,33 @@ impl<T: std::fmt::Debug> std::fmt::Debug for DynamicBvh<T> {
                 &format_args!("{}{}", string, if string.is_empty() { "[]" } else { "" }),
             )
             .finish()
+    }
+}
+
+pub struct StackOwningBvhIterator<'a, T, FN> {
+    stack: Vec<&'a Node<T>>,
+    bvh: &'a DynamicBvh<T>,
+    predicate: FN,
+}
+
+impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for StackOwningBvhIterator<'a, T, FN> {
+    type Item = &'a T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(node) = self.stack.pop() {
+            if (self.predicate)(node.bounding_box) {
+                match &node.data {
+                    Some(data) => return Some(data),
+                    None => {
+                        self.stack.push(&self.bvh.nodes[node.left_child]);
+                        self.stack.push(&self.bvh.nodes[node.right_child]);
+                    }
+                }
+            }
+        }
+
+        None
     }
 }
 

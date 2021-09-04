@@ -43,10 +43,15 @@ pub fn collide_projectiles<Side>(
                     .as_limited_ray(delta_time.0)
                     .centered_around_transform(position.0, rotation.reversed, scale);
 
+                let inner_find_stack = Vec::with_capacity(10);
+
                 models
                     .get(*model_id)
                     .acceleration_tree
-                    .locate_with_selection_function(ray)
+                    .find_with_owned_stack(
+                        move |bbox| ray.bounding_box_intersection(bbox),
+                        inner_find_stack,
+                    )
                     .filter_map(move |triangle| ray.triangle_intersection(triangle))
                     .map(move |scaled_t| (ship_entity, scaled_t))
             })

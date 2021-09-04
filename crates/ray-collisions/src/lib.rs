@@ -142,17 +142,6 @@ impl std::ops::Neg for &Ray {
     }
 }
 
-impl rstar::SelectionFunction<Triangle> for Ray {
-    fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
-        let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
-        self.bounding_box_intersection(bounding_box).is_some()
-    }
-
-    fn should_unpack_leaf(&self, _: &Triangle) -> bool {
-        true
-    }
-}
-
 pub struct Projectile {
     flipped_ray: Ray,
     velocity: f32,
@@ -232,20 +221,13 @@ impl LimitedRay {
             .map(|t| t * self.scale)
             .filter(|&t| t <= self.max_t)
     }
-}
 
-impl rstar::SelectionFunction<Triangle> for LimitedRay {
-    fn should_unpack_parent(&self, envelope: &rstar::AABB<[f32; 3]>) -> bool {
-        let bounding_box = BoundingBox::new(envelope.lower().into(), envelope.upper().into());
+    pub fn bounding_box_intersection(&self, bounding_box: BoundingBox) -> bool {
         self.ray
             .bounding_box_intersection(bounding_box)
             .map(|t| t * self.scale)
             .filter(|&t| t <= self.max_t)
             .is_some()
-    }
-
-    fn should_unpack_leaf(&self, _: &Triangle) -> bool {
-        true
     }
 }
 
@@ -381,19 +363,15 @@ impl Triangle {
             edge_c_a: c - a,
         }
     }
-}
 
-impl rstar::RTreeObject for Triangle {
-    type Envelope = rstar::AABB<[f32; 3]>;
-
-    // This is only called during construction so there's no need to cache the aabb.
-    fn envelope(&self) -> Self::Envelope {
+    pub fn bounding_box(&self) -> BoundingBox {
         let b = self.edge_b_a + self.a;
         let c = self.edge_c_a + self.a;
 
         let min = self.a.min_by_component(b).min_by_component(c);
         let max = self.a.max_by_component(b).max_by_component(c);
-        rstar::AABB::from_corners(min.into(), max.into())
+
+        BoundingBox::new(min, max)
     }
 }
 
