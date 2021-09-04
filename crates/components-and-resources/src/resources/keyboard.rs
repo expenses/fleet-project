@@ -2,6 +2,48 @@ use crate::resources::{Camera, Orbit};
 use ultraviolet::Vec3;
 use winit::event::VirtualKeyCode;
 
+pub struct KeyBindings {
+    pub camera_forwards: VirtualKeyCode,
+    pub camera_left: VirtualKeyCode,
+    pub camera_back: VirtualKeyCode,
+    pub camera_right: VirtualKeyCode,
+    pub center_camera: VirtualKeyCode,
+    pub fire: VirtualKeyCode,
+    pub shift: VirtualKeyCode,
+    pub stop: VirtualKeyCode,
+    pub pause: VirtualKeyCode,
+    pub unload: VirtualKeyCode,
+    pub attack_move: VirtualKeyCode,
+    pub escape: VirtualKeyCode,
+    pub load: VirtualKeyCode,
+    pub build_fighter: VirtualKeyCode,
+    pub build_miner: VirtualKeyCode,
+    pub build_carrier: VirtualKeyCode,
+}
+
+impl Default for KeyBindings {
+    fn default() -> Self {
+        Self {
+            camera_forwards: VirtualKeyCode::Up,
+            camera_left: VirtualKeyCode::Left,
+            camera_back: VirtualKeyCode::Down,
+            camera_right: VirtualKeyCode::Right,
+            center_camera: VirtualKeyCode::C,
+            fire: VirtualKeyCode::F,
+            shift: VirtualKeyCode::LShift,
+            stop: VirtualKeyCode::S,
+            pause: VirtualKeyCode::P,
+            unload: VirtualKeyCode::U,
+            attack_move: VirtualKeyCode::A,
+            escape: VirtualKeyCode::Escape,
+            load: VirtualKeyCode::L,
+            build_fighter: VirtualKeyCode::B,
+            build_miner: VirtualKeyCode::N,
+            build_carrier: VirtualKeyCode::M,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct KeyboardState {
     pub camera_forwards: bool,
@@ -36,26 +78,26 @@ impl Tapped {
 }
 
 impl KeyboardState {
+    #[rustfmt::skip]
     pub fn handle(&mut self, key: VirtualKeyCode, pressed: bool) {
-        match key {
-            VirtualKeyCode::Up => self.camera_forwards = pressed,
-            VirtualKeyCode::Left => self.camera_left = pressed,
-            VirtualKeyCode::Down => self.camera_back = pressed,
-            VirtualKeyCode::Right => self.camera_right = pressed,
-            VirtualKeyCode::C => self.center_camera.handle(pressed),
-            VirtualKeyCode::F => self.fire = pressed,
-            VirtualKeyCode::LShift => self.shift = pressed,
-            VirtualKeyCode::S => self.stop.handle(pressed),
-            VirtualKeyCode::P => self.pause.handle(pressed),
-            VirtualKeyCode::U => self.unload.handle(pressed),
-            VirtualKeyCode::A => self.attack_move.handle(pressed),
-            VirtualKeyCode::Escape => self.escape.handle(pressed),
-            VirtualKeyCode::L => self.load.handle(pressed),
-            VirtualKeyCode::B => self.build_fighter.handle(pressed),
-            VirtualKeyCode::N => self.build_miner.handle(pressed),
-            VirtualKeyCode::M => self.build_carrier.handle(pressed),
-            _ => {}
-        }
+        let bindings = KeyBindings::default();
+
+        if key == bindings.camera_forwards { self.camera_forwards = pressed; }
+        if key == bindings.camera_left { self.camera_left = pressed; }
+        if key == bindings.camera_back { self.camera_back = pressed; }
+        if key == bindings.camera_right { self.camera_right = pressed; }
+        if key == bindings.center_camera { self.center_camera.handle(pressed); }
+        if key == bindings.fire { self.fire = pressed; }
+        if key == bindings.shift { self.shift = pressed; }
+        if key == bindings.stop { self.stop.handle(pressed); }
+        if key == bindings.pause { self.pause.handle(pressed); }
+        if key == bindings.unload { self.unload.handle(pressed); }
+        if key == bindings.attack_move { self.attack_move.handle(pressed); }
+        if key == bindings.escape { self.escape.handle(pressed); }
+        if key == bindings.load { self.load.handle(pressed); }
+        if key == bindings.build_fighter { self.build_fighter.handle(pressed); }
+        if key == bindings.build_miner { self.build_miner.handle(pressed); }
+        if key == bindings.build_carrier { self.build_carrier.handle(pressed); }
     }
 
     pub fn update(&mut self) {
