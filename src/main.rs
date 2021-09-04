@@ -20,30 +20,37 @@ fn main() -> anyhow::Result<()> {
 
     let settings = resources::Settings::from_args();
 
-    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let backends = wgpu::Backends::VULKAN;
+
+    let instance = wgpu::Instance::new(backends);
 
     let event_loop = winit::event_loop::EventLoop::new();
     let window = winit::window::Window::new(&event_loop)?;
 
     let surface = unsafe { instance.create_surface(&window) };
 
-    let adapter = pollster::block_on(instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-            }))
-            .ok_or_else(|| anyhow::anyhow!(
-                "'request_adapter' failed. If you get this on linux, try installing the vulkan drivers for your gpu. \
-                You can check that they're working properly by running `vulkaninfo` or `vkcube`."
-            ))?;
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: Some(&surface),
+    }))
+    .ok_or_else(|| {
+        anyhow::anyhow!(
+            "'request_adapter' failed because we couldn't find an adapter for 
+                '{:?}'. If you get this on linux, try installing the vulkan drivers for your gpu. \
+                You can check that they're working properly by running `vulkaninfo` or `vkcube`.",
+            backends
+        )
+    })?;
 
     let (device, queue) = pollster::block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
             label: Some("device"),
             features: wgpu::Features::PUSH_CONSTANTS
                 | wgpu::Features::DEPTH_CLAMPING
-                | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
-                | wgpu::Features::MULTI_DRAW_INDIRECT,
+                | wgpu::Features::TEXTURE_BINDING_ARRAY
+                | wgpu::Features::MULTI_DRAW_INDIRECT
+                | wgpu::Features::SPIRV_SHADER_PASSTHROUGH
+                | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
             limits: wgpu::Limits {
                 max_push_constant_size: std::mem::size_of::<[ultraviolet::Mat4; 2]>() as u32,
                 ..Default::default()
@@ -277,7 +284,7 @@ fn main() -> anyhow::Result<()> {
     ];
 
     let resources = rendering::Resources::new(&device, texture_manager.count());
-    let pipelines = rendering::Pipelines::new(&device, &resources, display_format);
+    let pipelines = unsafe { rendering::Pipelines::new(&device, &resources, display_format) };
 
     let mut resizables = rendering::Resizables::new(
         dimensions.width,

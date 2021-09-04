@@ -64,13 +64,16 @@ impl Resizables {
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
-        surface.configure(&device, &wgpu::SurfaceConfiguration {
-            width,
-            height,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: display_format,
-            present_mode: wgpu::PresentMode::Fifo,
-        });
+        surface.configure(
+            device,
+            &wgpu::SurfaceConfiguration {
+                width,
+                height,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: display_format,
+                present_mode: wgpu::PresentMode::Fifo,
+            },
+        );
 
         Self {
             hdr_pass: make_effect_bind_group(device, resources, &hdr_framebuffer, "hdr pass"),
@@ -245,7 +248,7 @@ impl Pipelines {
     // We use helper structs and clone them around.
     // It would be a pain to remove the clone from the last use of the struct.
     #[allow(clippy::redundant_clone)]
-    pub fn new(
+    pub unsafe fn new(
         device: &wgpu::Device,
         resources: &Resources,
         display_format: wgpu::TextureFormat,
@@ -319,7 +322,7 @@ impl Pipelines {
             ..Default::default()
         };
 
-        let vs_fullscreen_tri = device.create_shader_module(&wgpu::include_spirv!(
+        let vs_fullscreen_tri = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
             "../shaders/compiled/fullscreen_tri.vert.spv"
         ));
 
@@ -329,7 +332,7 @@ impl Pipelines {
             buffers: &[],
         };
 
-        let vs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
+        let vs_flat_colour = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
             "../shaders/compiled/flat_colour.vert.spv"
         ));
 
@@ -378,7 +381,7 @@ impl Pipelines {
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
         };
 
-        let fs_flat_colour = device.create_shader_module(&wgpu::include_spirv!(
+        let fs_flat_colour = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
             "../shaders/compiled/flat_colour.frag.spv"
         ));
 
@@ -392,8 +395,9 @@ impl Pipelines {
                 }],
             });
 
-        let fs_blur =
-            device.create_shader_module(&wgpu::include_spirv!("../shaders/compiled/blur.frag.spv"));
+        let fs_blur = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
+            "../shaders/compiled/blur.frag.spv"
+        ));
 
         let vec3_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vec3>() as u64,
@@ -419,19 +423,19 @@ impl Pipelines {
             write_mask: wgpu::ColorWrites::ALL,
         };
 
-        let vs_circle = device
-            .create_shader_module(&wgpu::include_spirv!("../shaders/compiled/circle.vert.spv"));
+        let vs_circle = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
+            "../shaders/compiled/circle.vert.spv"
+        ));
 
         Self {
             ship: {
-                let vs_ship = device.create_shader_module(&wgpu::include_spirv!(
+                let vs_ship = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/ship.vert.spv"
                 ));
 
-                let mut fs_ship_desc = wgpu::include_spirv!("../shaders/compiled/ship.frag.spv");
-                // Needed for WGSL reasons
-                //fs_ship_desc.flags = Default::default();
-                let fs_ship = device.create_shader_module(&fs_ship_desc);
+                let fs_ship = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
+                    "../shaders/compiled/ship.frag.spv"
+                ));
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("ship pipeline"),
@@ -459,7 +463,7 @@ impl Pipelines {
                 })
             },
             background: {
-                let fs_background = device.create_shader_module(&wgpu::include_spirv!(
+                let fs_background = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/background.frag.spv"
                 ));
 
@@ -526,7 +530,7 @@ impl Pipelines {
                         }],
                     });
 
-                let fs_godray_blur = device.create_shader_module(&wgpu::include_spirv!(
+                let fs_godray_blur = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/godray_blur.frag.spv"
                 ));
 
@@ -545,9 +549,9 @@ impl Pipelines {
                 })
             },
             lasers: {
-                let fs_flat_colour_bloom = device.create_shader_module(&wgpu::include_spirv!(
-                    "../shaders/compiled/flat_colour_bloom.frag.spv"
-                ));
+                let fs_flat_colour_bloom = device.create_shader_module_spirv(
+                    &wgpu::include_spirv_raw!("../shaders/compiled/flat_colour_bloom.frag.spv"),
+                );
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("lasers pipeline"),
@@ -597,7 +601,7 @@ impl Pipelines {
                 })
             },
             bounding_boxes: {
-                let vs_bounding_box = device.create_shader_module(&wgpu::include_spirv!(
+                let vs_bounding_box = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/bounding_box.vert.spv"
                 ));
 
@@ -644,7 +648,7 @@ impl Pipelines {
                         }],
                     });
 
-                let fs_tonemap = device.create_shader_module(&wgpu::include_spirv!(
+                let fs_tonemap = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/tonemap.frag.spv"
                 ));
 
@@ -713,7 +717,7 @@ impl Pipelines {
                 })
             },
             z_facing_circle_outline: {
-                let vs_z_facing = device.create_shader_module(&wgpu::include_spirv!(
+                let vs_z_facing = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
                     "../shaders/compiled/z_facing.vert.spv"
                 ));
 
@@ -742,8 +746,9 @@ impl Pipelines {
                 })
             },
             lines_2d: {
-                let vs_2d = device
-                    .create_shader_module(&wgpu::include_spirv!("../shaders/compiled/2d.vert.spv"));
+                let vs_2d = device.create_shader_module_spirv(&wgpu::include_spirv_raw!(
+                    "../shaders/compiled/2d.vert.spv"
+                ));
 
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("lines 2d pipeline"),
