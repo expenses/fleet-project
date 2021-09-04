@@ -153,8 +153,8 @@ impl Orbit {
         let speed = 0.15;
         self.latitude -= delta.x.to_radians() * speed;
         self.longitude = (self.longitude - delta.y.to_radians() * speed)
-            .max(std::f32::EPSILON)
-            .min(PI - std::f32::EPSILON);
+            .max(std::f32::EPSILON * 2.0)
+            .min(PI - std::f32::EPSILON * 2.0);
     }
 
     pub fn zoom(&mut self, delta: f32) {
