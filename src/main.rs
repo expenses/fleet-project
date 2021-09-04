@@ -18,6 +18,8 @@ use components_and_resources::{
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
+    let mut gamepad_ctx = gilrs::Gilrs::new().unwrap();
+
     let settings = resources::Settings::from_args();
 
     let backends = wgpu::Backends::VULKAN;
@@ -614,6 +616,35 @@ fn main() -> anyhow::Result<()> {
             _ => {}
         },
         Event::MainEventsCleared => {
+            while let Some(_) = gamepad_ctx.next_event() {}
+
+            for (_id, gamepad) in gamepad_ctx.gamepads() {
+                let x = gamepad.value(gilrs::ev::Axis::RightStickX);
+                let y = -gamepad.value(gilrs::ev::Axis::RightStickY);
+
+                let delta = Vec2::new(x, y) * 10.0;
+
+                let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
+
+                orbit.rotate(delta);
+
+                if gamepad.is_pressed(gilrs::ev::Button::LeftTrigger2) {
+                    orbit.zoom(1.0);
+                } else if gamepad.is_pressed(gilrs::ev::Button::RightTrigger2) {
+                    orbit.zoom(-1.0);
+                }
+
+                let right = gamepad.value(gilrs::ev::Axis::LeftStickX);
+                let forwards = gamepad.value(gilrs::ev::Axis::LeftStickY);
+
+                let camera_movement = orbit.camera_movement(forwards, right);
+
+                let mut camera = world.get_resource_mut::<resources::Camera>().unwrap();
+
+                // todo: need to unsnap from followed objects.
+                camera.center += camera_movement;
+            }
+
             schedule.run(&mut world);
 
             window.request_redraw();

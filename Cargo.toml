@@ -25,6 +25,7 @@ background = { path = "crates/background" }
 systems = { path = "crates/systems" }
 components-and-resources = { path = "crates/components-and-resources"}
 rendering = { path = "crates/rendering" }
+gilrs = "0.8.1"
 
 [features]
 default = []
