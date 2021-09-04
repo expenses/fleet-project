@@ -19,7 +19,9 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 #[derive(StructOpt)]
 pub struct Settings {
     #[structopt(long)]
-    pub draw_godrays: bool,
+    pub enable_godrays: bool,
+    #[structopt(long)]
+    pub enable_blur: bool,
     #[structopt(long)]
     pub debug_render_tlas: bool,
 }

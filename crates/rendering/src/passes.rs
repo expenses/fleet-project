@@ -123,62 +123,77 @@ pub fn run_render_passes(
 
     drop(render_pass);
 
-    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("first bloom blur render pass"),
-        color_attachments: &[wgpu::RenderPassColorAttachment {
-            view: &resizables.intermediate_bloom_buffer,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: true,
-            },
-        }],
-        depth_stencil_attachment: None,
-    });
+    if settings.enable_blur {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("first bloom blur render pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.intermediate_bloom_buffer,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
 
-    render_pass.set_pipeline(&pipelines.first_bloom_blur);
-    render_pass.set_bind_group(0, &resizables.first_bloom_blur_pass, &[]);
-    render_pass.set_push_constants(
-        wgpu::ShaderStages::FRAGMENT,
-        0,
-        bytemuck::bytes_of(&BlurSettings {
-            direction: 0,
-            strength: 1.0,
-            scale: 2.0,
-        }),
-    );
-    render_pass.draw(0..3, 0..1);
+        render_pass.set_pipeline(&pipelines.first_bloom_blur);
+        render_pass.set_bind_group(0, &resizables.first_bloom_blur_pass, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStages::FRAGMENT,
+            0,
+            bytemuck::bytes_of(&BlurSettings {
+                direction: 0,
+                strength: 1.0,
+                scale: 2.0,
+            }),
+        );
+        render_pass.draw(0..3, 0..1);
 
-    drop(render_pass);
+        drop(render_pass);
 
-    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("second bloom blur render pass"),
-        color_attachments: &[wgpu::RenderPassColorAttachment {
-            view: &resizables.hdr_framebuffer,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: true,
-            },
-        }],
-        depth_stencil_attachment: None,
-    });
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("second bloom blur render pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.hdr_framebuffer,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
 
-    render_pass.set_pipeline(&pipelines.second_bloom_blur);
-    render_pass.set_bind_group(0, &resizables.second_bloom_blur_pass, &[]);
-    render_pass.set_push_constants(
-        wgpu::ShaderStages::FRAGMENT,
-        0,
-        bytemuck::bytes_of(&BlurSettings {
-            direction: 1,
-            strength: 1.0,
-            scale: 1.0,
-        }),
-    );
-    render_pass.draw(0..3, 0..1);
+        render_pass.set_pipeline(&pipelines.second_bloom_blur);
+        render_pass.set_bind_group(0, &resizables.second_bloom_blur_pass, &[]);
+        render_pass.set_push_constants(
+            wgpu::ShaderStages::FRAGMENT,
+            0,
+            bytemuck::bytes_of(&BlurSettings {
+                direction: 1,
+                strength: 1.0,
+                scale: 1.0,
+            }),
+        );
+        render_pass.draw(0..3, 0..1);
+    }
 
-    if settings.draw_godrays {
+    if settings.enable_godrays {
         let uv_space_light_pos = uv_space_light_pos(perspective_view, star_system.sun_dir);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("god ray render pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &resizables.hdr_framebuffer,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
 
         render_pass.set_pipeline(&pipelines.godray_blur);
         render_pass.set_bind_group(0, &resizables.godray_bind_group, &[]);
@@ -195,8 +210,6 @@ pub fn run_render_passes(
         );
         render_pass.draw(0..3, 0..1);
     }
-
-    drop(render_pass);
 
     let circle_instances_buffer = world
         .get_resource::<resources::GpuBuffer<CircleInstance>>()
