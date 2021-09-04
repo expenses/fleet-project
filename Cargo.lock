@@ -1413,7 +1413,6 @@ dependencies = [
  "log",
  "num-traits",
  "petgraph",
- "rose_tree",
  "spirv",
  "thiserror",
 ]
@@ -2180,15 +2179,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rose_tree"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcd16c61e9205949fa4f8a22096705b4c2f8b8025b2ff67ff6c86afd854039ae"
-dependencies = [
- "petgraph",
-]
-
-[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2760,7 +2750,6 @@ dependencies = [
  "arrayvec",
  "js-sys",
  "log",
- "naga",
  "parking_lot",
  "raw-window-handle",
  "smallvec",

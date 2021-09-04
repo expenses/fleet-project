@@ -95,14 +95,12 @@ pub fn debug_render_find_ship_under_cursor(
 
             let ray = ray.centered_around_transform(position.0, rotation.reversed, scale);
 
-            let find_stack = Vec::with_capacity(10);
-
             models
                 .get(*model_id)
                 .acceleration_tree
                 .find_with_owned_stack(
                     move |bbox| ray.bounding_box_intersection(bbox).is_some(),
-                    find_stack,
+                    Vec::with_capacity(10),
                 )
                 .filter_map(move |tri| ray.triangle_intersection(tri).map(|t| (tri, t)))
                 .map(move |(tri, t)| (tri, t * scale, position, rotation, scale))

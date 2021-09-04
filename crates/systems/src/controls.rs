@@ -30,14 +30,12 @@ pub fn find_ship_under_cursor(
 
             let ray = ray.centered_around_transform(position.0, rotation.reversed, scale);
 
-            let find_stack = Vec::with_capacity(10);
-
             models
                 .get(*model_id)
                 .acceleration_tree
                 .find_with_owned_stack(
                     move |bbox| ray.bounding_box_intersection(bbox).is_some(),
-                    find_stack,
+                    Vec::with_capacity(10),
                 )
                 .filter_map(move |triangle| ray.triangle_intersection(triangle))
                 // We need to multiply t by scale here as the time of impact is calculated on an unscaled model
