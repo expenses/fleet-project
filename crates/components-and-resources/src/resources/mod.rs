@@ -151,10 +151,13 @@ impl Orbit {
     pub fn rotate(&mut self, delta: Vec2) {
         use std::f32::consts::PI;
         let speed = 0.15;
+
+        let epsilon = 0.0001;
+
         self.latitude -= delta.x.to_radians() * speed;
         self.longitude = (self.longitude - delta.y.to_radians() * speed)
-            .max(std::f32::EPSILON)
-            .min(PI - std::f32::EPSILON);
+            .max(epsilon)
+            .min(PI - epsilon);
     }
 
     pub fn zoom(&mut self, delta: f32) {
@@ -167,6 +170,14 @@ impl Orbit {
         let x = horizontal_amount * self.latitude.sin();
         let z = horizontal_amount * self.latitude.cos();
         Vec3::new(x, y, z) * self.distance
+    }
+
+    pub fn camera_movement(&self, forwards: f32, right: f32) -> Vec3 {
+        -Vec3::new(
+            forwards * self.latitude.sin() - right * self.latitude.cos(),
+            0.0,
+            forwards * self.latitude.cos() + right * self.latitude.sin(),
+        )
     }
 }
 

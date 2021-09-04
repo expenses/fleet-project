@@ -1,5 +1,4 @@
 use crate::resources::{Camera, Orbit};
-use ultraviolet::Vec3;
 use winit::event::VirtualKeyCode;
 
 pub struct KeyBindings {
@@ -119,14 +118,7 @@ impl KeyboardState {
         let right = self.camera_right as i8 - self.camera_left as i8;
 
         if forwards != 0 || right != 0 {
-            let forwards = forwards as f32;
-            let right = right as f32;
-
-            camera.center -= Vec3::new(
-                forwards * orbit.latitude.sin() - right * orbit.latitude.cos(),
-                0.0,
-                forwards * orbit.latitude.cos() + right * orbit.latitude.sin(),
-            );
+            camera.center += orbit.camera_movement(forwards as f32, right as f32);
 
             true
         } else {
