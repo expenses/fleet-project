@@ -283,7 +283,8 @@ pub fn handle_right_clicks(
 
 pub fn update_mouse_state(mut mouse_state: ResMut<MouseState>, delta_time: Res<DeltaTime>) {
     mouse_state.left_state.update(delta_time.0, 0.1);
-    mouse_state.right_state.update(delta_time.0, 0.075);
+    mouse_state.right_state.update(delta_time.0, 0.1);
+    mouse_state.middle_state.update(delta_time.0, 0.0);
 }
 
 pub fn update_ray_plane_point(
@@ -309,13 +310,31 @@ pub fn update_ray_plane_point(
 }
 
 pub fn move_camera(
-    keyboard_state: Res<KeyboardState>,
+    kbd: Res<KeyboardState>,
     orbit: Res<Orbit>,
+    mouse: Res<MouseState>,
+    dimensions: Res<Dimensions>,
     mut camera: ResMut<Camera>,
     currently_following: Query<Entity, With<CameraFollowing>>,
     mut commands: Commands,
 ) {
-    if keyboard_state.move_camera(&mut camera, &orbit) {
+    let keyboard_control = camera.control(
+        &orbit,
+        kbd.camera_forwards,
+        kbd.camera_back,
+        kbd.camera_left,
+        kbd.camera_right,
+    );
+
+    let edge_of_screen_control = camera.control(
+        &orbit,
+        mouse.position.y < 10.0,
+        mouse.position.y > dimensions.height as f32 - 10.0,
+        mouse.position.x < 10.0,
+        mouse.position.x > dimensions.width as f32 - 10.0,
+    );
+
+    if keyboard_control || edge_of_screen_control {
         currently_following.for_each(|entity| {
             commands.entity(entity).remove::<CameraFollowing>();
         });

@@ -1,5 +1,6 @@
-use crate::resources::{Camera, Orbit};
 use winit::event::VirtualKeyCode;
+use winit::window::Fullscreen;
+use winit::window::Window;
 
 pub struct KeyBindings {
     pub camera_forwards: VirtualKeyCode,
@@ -18,6 +19,7 @@ pub struct KeyBindings {
     pub build_fighter: VirtualKeyCode,
     pub build_miner: VirtualKeyCode,
     pub build_carrier: VirtualKeyCode,
+    pub toggle_fullscreen: VirtualKeyCode,
 }
 
 impl Default for KeyBindings {
@@ -39,6 +41,7 @@ impl Default for KeyBindings {
             build_fighter: VirtualKeyCode::B,
             build_miner: VirtualKeyCode::N,
             build_carrier: VirtualKeyCode::M,
+            toggle_fullscreen: VirtualKeyCode::F11,
         }
     }
 }
@@ -78,7 +81,7 @@ impl Tapped {
 
 impl KeyboardState {
     #[rustfmt::skip]
-    pub fn handle(&mut self, key: VirtualKeyCode, pressed: bool) {
+    pub fn handle(&mut self, key: VirtualKeyCode, pressed: bool, window: &Window) {
         let bindings = KeyBindings::default();
 
         if key == bindings.camera_forwards { self.camera_forwards = pressed; }
@@ -97,6 +100,14 @@ impl KeyboardState {
         if key == bindings.build_fighter { self.build_fighter.handle(pressed); }
         if key == bindings.build_miner { self.build_miner.handle(pressed); }
         if key == bindings.build_carrier { self.build_carrier.handle(pressed); }
+
+        if key == bindings.toggle_fullscreen && pressed {
+            if window.fullscreen().is_some() {
+                window.set_fullscreen(None);
+            } else {
+                window.set_fullscreen(Some(Fullscreen::Borderless(None)))
+            }
+        }
     }
 
     pub fn update(&mut self) {
@@ -111,18 +122,5 @@ impl KeyboardState {
         self.build_fighter.reset();
         self.build_miner.reset();
         self.build_carrier.reset();
-    }
-
-    pub fn move_camera(&self, camera: &mut Camera, orbit: &Orbit) -> bool {
-        let forwards = self.camera_forwards as i8 - self.camera_back as i8;
-        let right = self.camera_right as i8 - self.camera_left as i8;
-
-        if forwards != 0 || right != 0 {
-            camera.center += orbit.camera_movement(forwards as f32, right as f32);
-
-            true
-        } else {
-            false
-        }
     }
 }

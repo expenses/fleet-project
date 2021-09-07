@@ -5,6 +5,7 @@ pub struct MouseState {
     pub position: Vec2,
     pub left_state: MouseButtonState,
     pub right_state: MouseButtonState,
+    pub middle_state: MouseButtonState,
 }
 
 #[derive(Debug, Clone)]

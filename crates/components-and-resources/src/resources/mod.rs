@@ -130,6 +130,28 @@ pub struct Camera {
     pub center: Vec3,
 }
 
+impl Camera {
+    pub fn control(
+        &mut self,
+        orbit: &Orbit,
+        forwards: bool,
+        back: bool,
+        left: bool,
+        right: bool,
+    ) -> bool {
+        let forwards = forwards as i8 - back as i8;
+        let right = right as i8 - left as i8;
+
+        if forwards != 0 || right != 0 {
+            self.center += orbit.camera_movement(forwards as f32, right as f32);
+
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub struct Dimensions {
     pub width: u32,
     pub height: u32,

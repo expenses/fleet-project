@@ -557,10 +557,12 @@ fn main() -> anyhow::Result<()> {
                 ..
             } => {
                 let pressed = *state == ElementState::Pressed;
+
                 let mut keyboard_state = world
                     .get_resource_mut::<resources::KeyboardState>()
                     .unwrap();
-                keyboard_state.handle(*key, pressed);
+
+                keyboard_state.handle(*key, pressed, &window);
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let mut mouse_state = world.get_resource_mut::<resources::MouseState>().unwrap();
@@ -571,6 +573,7 @@ fn main() -> anyhow::Result<()> {
                 match button {
                     MouseButton::Left => mouse_state.left_state.handle(position, pressed),
                     MouseButton::Right => mouse_state.right_state.handle(position, pressed),
+                    MouseButton::Middle => mouse_state.middle_state.handle(position, pressed),
                     _ => {}
                 }
             }
@@ -593,7 +596,7 @@ fn main() -> anyhow::Result<()> {
                 let position = Vec2::new(position.x as f32, position.y as f32);
                 let delta = position - mouse_state.position;
 
-                if mouse_state.right_state.is_being_dragged().is_some() {
+                if mouse_state.middle_state.is_being_dragged().is_some() {
                     let mut orbit = world.get_resource_mut::<resources::Orbit>().unwrap();
                     orbit.rotate(delta);
                 } else if keyboard_state.shift {
