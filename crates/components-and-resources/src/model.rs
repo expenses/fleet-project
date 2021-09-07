@@ -67,10 +67,9 @@ pub fn load_ship_model(
         .meshes()
         .flat_map(|mesh| mesh.primitives())
         .map(|primitive| primitive.bounding_box());
+
     assert_eq!(bounding_boxes.clone().count(), 1);
     let bounding_box = bounding_boxes.next().unwrap();
-
-    let mut acceleration_tree = DynamicBvh::default();
 
     let triangles = indices.chunks(3).map(|chunk| {
         Triangle::new(
@@ -79,6 +78,8 @@ pub fn load_ship_model(
             merged_vertices[chunk[2] as usize].position,
         )
     });
+
+    let mut acceleration_tree = DynamicBvh::default();
 
     for triangle in triangles {
         let bbox = triangle.bounding_box();
@@ -96,6 +97,7 @@ pub fn load_ship_model(
         .base_color_texture()
         .unwrap()
         .texture();
+
     let diffuse_texture = load_image(&diffuse_texture.source(), buffer_blob, device, queue)?;
     let emissive_texture = material.emissive_texture().unwrap().texture();
     let emissive_texture = load_image(&emissive_texture.source(), buffer_blob, device, queue)?;
@@ -103,9 +105,7 @@ pub fn load_ship_model(
     let diffuse_texture = texture_manager.add(diffuse_texture);
     let emissive_texture = texture_manager.add(emissive_texture);
 
-    let min: Vec3 = bounding_box.min.into();
-    let max: Vec3 = bounding_box.max.into();
-    let bounding_box = BoundingBox::new(min, max);
+    let bounding_box = BoundingBox::new(bounding_box.min.into(), bounding_box.max.into());
 
     merged_bounding_boxes.extend_from_slice(&bounding_box.corners());
 

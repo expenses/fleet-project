@@ -1,4 +1,6 @@
+use crate::utils::compare_floats;
 use rand::{rngs::SmallRng, SeedableRng};
+use std::f32::consts::PI;
 use ultraviolet::Vec3;
 
 #[derive(Debug, Clone, Copy)]
@@ -26,7 +28,7 @@ impl Formation {
         let position_index = (0..self.positions.len())
             .filter(|&index| self.positions[index].free)
             .map(|index| (index, (self.positions[index].position - location).mag_sq()))
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .min_by(|&(_, a), &(_, b)| compare_floats(a, b));
 
         match position_index {
             Some((index, _)) => {
@@ -70,7 +72,7 @@ impl Formation {
         // Volume of a sphere: 4/3 * pi * r ^ 3
         // Radius from volume: v ^ 1/3 / pi * 3/4
 
-        let radius = (count as f32).powf(1.0 / 3.0) / std::f32::consts::PI * 3.0 / 4.0;
+        let radius = (count as f32).powf(1.0 / 3.0) / PI * 3.0 / 4.0;
         let radius = radius * 20.0;
 
         let mut rng = SmallRng::seed_from_u64(0);

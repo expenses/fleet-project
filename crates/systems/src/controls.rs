@@ -4,6 +4,7 @@ use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::formations::Formation;
 use components_and_resources::resources::*;
+use components_and_resources::utils::compare_floats;
 use ultraviolet::Vec3;
 
 pub fn find_ship_under_cursor(
@@ -41,7 +42,7 @@ pub fn find_ship_under_cursor(
                 // We need to multiply t by scale here as the time of impact is calculated on an unscaled model
                 .map(move |t| (entity, t * scale))
         })
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .min_by(|&(_, a), &(_, b)| compare_floats(a, b))
         .map(|(entity, _)| entity);
 }
 
@@ -415,7 +416,7 @@ pub fn handle_keys(
             let best_queue = build_queues
                 .iter_mut()
                 .map(|queue| (queue.queue_length(total_time.0), queue))
-                .min_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                .min_by(|&(a, _), &(b, _)| compare_floats(a, b));
 
             if let Some((_, mut queue)) = best_queue {
                 queue.push(build_ship_type, total_time.0);

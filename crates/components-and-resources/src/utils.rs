@@ -33,3 +33,7 @@ pub fn random_point_in_sphere<R: Rng>(rng: &mut R) -> Vec3 {
 
     on_sphere * distance_from_center
 }
+
+pub fn compare_floats(a: f32, b: f32) -> std::cmp::Ordering {
+    a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
+}

@@ -361,7 +361,7 @@ impl<T> DynamicBvh<T> {
         &'a self,
         predicate: FN,
         stack: &'a mut Vec<&'a Node<T>>,
-    ) -> BvhIterator<'a, T, FN> {
+    ) -> BvhIterator<'a, 'a, T, FN> {
         stack.clear();
 
         if let Some(node) = self.nodes.get(self.root) {
@@ -401,13 +401,13 @@ impl<T> DynamicBvh<T> {
     }
 }
 
-pub struct BvhIterator<'a, T, FN> {
-    stack: &'a mut Vec<&'a Node<T>>,
+pub struct BvhIterator<'a, 'b, T, FN> {
+    stack: &'b mut Vec<&'a Node<T>>,
     bvh: &'a DynamicBvh<T>,
     predicate: FN,
 }
 
-impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, T, FN> {
+impl<'a, 'b, T, FN: Fn(BoundingBox) -> bool> Iterator for BvhIterator<'a, 'b, T, FN> {
     type Item = &'a T;
 
     #[inline]
@@ -476,19 +476,12 @@ impl<'a, T, FN: Fn(BoundingBox) -> bool> Iterator for StackOwningBvhIterator<'a,
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(node) = self.stack.pop() {
-            if (self.predicate)(node.bounding_box) {
-                match &node.data {
-                    Some(data) => return Some(data),
-                    None => {
-                        self.stack.push(&self.bvh.nodes[node.left_child]);
-                        self.stack.push(&self.bvh.nodes[node.right_child]);
-                    }
-                }
-            }
+        BvhIterator {
+            stack: &mut self.stack,
+            bvh: self.bvh,
+            predicate: &self.predicate,
         }
-
-        None
+        .next()
     }
 }
 
@@ -502,6 +495,8 @@ fn test() {
     for i in 0..100 {
         bvh.insert((), bbox(Vec3::new(i as f32 * 100.0, 0.0, 0.0)));
     }
+
     dbg!(bvh);
+
     //panic!("Panicking in order to debug the tree")
 }

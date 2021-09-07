@@ -5,6 +5,7 @@ use components_and_resources::gpu_structs::{
     CircleInstance, ColouredVertex, Instance, LaserVertex, RangeInstance, Vertex2D,
 };
 use components_and_resources::resources::*;
+use components_and_resources::utils::compare_floats;
 use std::array::IntoIter;
 use ultraviolet::{Vec2, Vec3, Vec4};
 
@@ -105,7 +106,7 @@ pub fn debug_render_find_ship_under_cursor(
                 .filter_map(move |tri| ray.triangle_intersection(tri).map(|t| (tri, t)))
                 .map(move |(tri, t)| (tri, t * scale, position, rotation, scale))
         })
-        .min_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .min_by(|&(_, a, ..), &(_, b, ..)| compare_floats(a, b))
     {
         lines_buffer.stage(&[
             ColouredVertex {
@@ -318,25 +319,25 @@ pub fn render_buttons(
     selected_button: Res<SelectedButton>,
     mut lines_2d: ResMut<GpuBuffer<Vertex2D>>,
     dimensions: Res<Dimensions>,
+    dpi_factor: Res<DpiFactor>,
 ) {
     if let Some(i) = selected_button.0 {
         let colour = Vec3::one();
 
         let offset = i + 1 + UnitButtons::UI_LINES as usize;
 
+        let line_height = UnitButtons::LINE_HEIGHT * dpi_factor.0;
+
         lines_2d.stage(&[
             Vertex2D {
-                pos: to_wgpu(
-                    Vec2::new(0.0, offset as f32 * UnitButtons::LINE_HEIGHT),
-                    &dimensions,
-                ),
+                pos: to_wgpu(Vec2::new(0.0, offset as f32 * line_height), &dimensions),
                 colour,
             },
             Vertex2D {
                 pos: to_wgpu(
                     Vec2::new(
-                        UnitButtons::BUTTON_WIDTH,
-                        offset as f32 * UnitButtons::LINE_HEIGHT,
+                        UnitButtons::BUTTON_WIDTH * dpi_factor.0,
+                        offset as f32 * line_height,
                     ),
                     &dimensions,
                 ),

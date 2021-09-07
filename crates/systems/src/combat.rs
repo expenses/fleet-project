@@ -2,6 +2,7 @@ use super::{get_scale, spawn_explosion};
 use bevy_ecs::prelude::*;
 use components_and_resources::components::*;
 use components_and_resources::resources::*;
+use components_and_resources::utils::compare_floats;
 
 #[profiling::function]
 pub fn collide_projectiles<Side>(
@@ -53,7 +54,7 @@ pub fn collide_projectiles<Side>(
                     .filter_map(move |triangle| ray.triangle_intersection(triangle))
                     .map(move |scaled_t| (ship_entity, scaled_t))
             })
-            .max_by(|(_, a, ..), (_, b, ..)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|&(_, a, ..), &(_, b, ..)| compare_floats(a, b));
 
         if let Some((ship_entity, t)) = first_hit {
             let position = projectile.get_intersection_point(t);
@@ -108,7 +109,7 @@ pub fn choose_enemy_target<SideA, SideB>(
                     None
                 }
             })
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            .min_by(|&(_, a), &(_, b)| compare_floats(a, b));
 
         if let Some((target_entity, _)) = target {
             queue.0.push_front(Command::Interact {

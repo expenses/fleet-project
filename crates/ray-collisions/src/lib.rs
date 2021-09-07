@@ -449,6 +449,7 @@ impl SelectionFrustum {
     }
 
     fn new_from_corners(near_corners: [Vec3; 4], far_corners: [Vec3; 4]) -> Self {
+        // We leave out the near and far planes as we want to select everything in the 2d box.
         /*
         let near = Plane::new_from_3_coplanar_points(
             near_corners[0], near_corners[2], near_corners[1]

@@ -427,13 +427,14 @@ pub fn set_selected_button(
     buttons: Res<UnitButtons>,
     mut selected_button: ResMut<SelectedButton>,
     mouse_state: Res<MouseState>,
+    dpi_factor: Res<DpiFactor>,
 ) {
-    if mouse_state.position.x > UnitButtons::BUTTON_WIDTH {
+    if mouse_state.position.x > (UnitButtons::BUTTON_WIDTH * dpi_factor.0) {
         selected_button.0 = None;
         return;
     }
 
-    let index = mouse_state.position.y / UnitButtons::LINE_HEIGHT;
+    let index = mouse_state.position.y / (UnitButtons::LINE_HEIGHT * dpi_factor.0);
 
     let index = index as isize - UnitButtons::UI_LINES;
 

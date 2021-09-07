@@ -14,11 +14,13 @@ pub fn make_background(rng: &mut ThreadRng) -> (Vec<ColouredVertex>, Vec3) {
         0.75,
     )
     .from_hsv();
+
     let nebula_colour = Vec3::new(
         nebula_colour.red as f32,
         nebula_colour.green as f32,
         nebula_colour.blue as f32,
     );
+
     //let colour_mod = rng.gen_range(-0.5..1.0);
 
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();

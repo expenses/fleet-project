@@ -4,6 +4,7 @@ use bevy_ecs::prelude::Bundle;
 use bevy_ecs::prelude::Entity;
 use rand::Rng;
 use std::collections::VecDeque;
+use std::f32::consts::TAU;
 use ultraviolet::{Mat3, Rotor3, Vec3};
 
 mod build_queue;
@@ -28,7 +29,7 @@ pub struct RotationMatrix {
 impl RotationMatrix {
     pub fn random_for_rendering_only(rng: &mut rand::rngs::SmallRng) -> Self {
         let rotor = Rotor3::from_angle_plane(
-            rng.gen_range(0.0..std::f32::consts::TAU),
+            rng.gen_range(0.0..TAU),
             ultraviolet::Bivec3::from_normalized_axis(uniform_sphere_distribution(rng)),
         );
 

@@ -86,9 +86,14 @@ pub struct Vertex2D {
 #[repr(C)]
 #[derive(Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DrawIndexedIndirect {
+    // The number of indices per instance.
     pub index_count: u32,
-    pub instance_count: u32, // The number of instances to draw.
-    pub base_index: u32,     // The base index within the index buffer.
-    pub vertex_offset: i32, // The value added to the vertex index before indexing into the vertex buffer.
-    pub base_instance: u32, // The instance ID of the first instance to draw.
+    // The number of instances to draw.
+    pub instance_count: u32,
+    // The base index within the index buffer.
+    pub base_index: u32,
+    // The value added to the vertex index before indexing into the vertex buffer.
+    pub vertex_offset: i32,
+    // The instance ID of the first instance to draw.
+    pub base_instance: u32,
 }

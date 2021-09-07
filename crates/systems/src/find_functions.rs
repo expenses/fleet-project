@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use components_and_resources::components::*;
+use components_and_resources::{components::*, utils::compare_floats};
 use ultraviolet::Vec3;
 
 pub fn find_next_carrier<'a>(
@@ -12,7 +12,7 @@ pub fn find_next_carrier<'a>(
             let dist_sq = (pos - new_pos.0).mag_sq();
             (entity, dist_sq)
         })
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        .min_by(|&(_, a), &(_, b)| compare_floats(a, b));
 
     if let Some((entity, _)) = carrier {
         queue.0.push_front(Command::Interact {
@@ -34,7 +34,7 @@ pub fn find_next_asteroid(
             let dist_sq = (pos - new_pos.0).mag_sq();
             (entity, dist_sq, scale)
         })
-        .min_by(|(_, a, _), (_, b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        .min_by(|&(_, a, _), &(_, b, _)| compare_floats(a, b));
 
     if let Some((entity, _, scale)) = new_target {
         queue.0.push_back(Command::Interact {
